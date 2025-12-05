@@ -11,17 +11,6 @@ const PRICE_LEVEL_MAP: Record<string, number> = {
   'VERY_EXPENSIVE': 5,
 };
 
-/**
- * Map Google Places API review to our PlaceReview type
- * The new Places API uses a different structure than the legacy API
- */
-const mapReview = (review: google.maps.places.Review): PlaceReview => ({
-  text: review.text || '',
-  rating: review.rating ?? undefined,
-  author_name: review.authorAttribution?.displayName ?? undefined,
-  relative_time_description: review.relativePublishTimeDescription ?? undefined,
-});
-
 // Fields to request from Places API
 const PLACE_FIELDS = [
   'id', 'displayName', 'location', 'rating', 'userRatingCount',
@@ -44,6 +33,28 @@ interface SearchPlacesResult {
 }
 
 /**
+ * Extract reviews from Google Places API response
+ * The new Places API returns reviews in a different format than legacy
+ */
+const mapReviews = (reviews: google.maps.places.Review[] | null | undefined): PlaceReview[] => {
+  if (!reviews || !Array.isArray(reviews)) return [];
+  
+  return reviews.map(review => {
+    // Handle both new API format (text as object with .text property) and legacy format
+    const reviewText = typeof review.text === 'object' && review.text !== null
+      ? (review.text as unknown as { text?: string }).text || ''
+      : (review.text as unknown as string) || '';
+    
+    return {
+      text: reviewText,
+      rating: review.rating ?? undefined,
+      relativeTime: review.relativePublishTimeDescription ?? undefined,
+      authorName: review.authorAttribution?.displayName ?? undefined,
+    };
+  }).filter(r => r.text && r.text.length > 0);
+};
+
+/**
  * Map Google Places API place to our GooglePlace type
  */
 const mapPlace = (p: google.maps.places.Place): GooglePlace => ({
@@ -60,7 +71,8 @@ const mapPlace = (p: google.maps.places.Place): GooglePlace => ({
     open_now: (p.regularOpeningHours as unknown as { openNow?: boolean }).openNow ?? false,
     weekday_text: p.regularOpeningHours.weekdayDescriptions,
   } : undefined,
-  reviews: p.reviews?.map(mapReview).filter(r => r.text.length > 0) ?? undefined,
+  // Map reviews from new Places API format to our PlaceReview type
+  reviews: mapReviews(p.reviews),
   serves_vegetarian_food: p.servesVegetarianFood ?? undefined,
   serves_beer: p.servesBeer ?? undefined,
   serves_wine: p.servesWine ?? undefined,

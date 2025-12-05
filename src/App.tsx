@@ -13,7 +13,7 @@ import { ThemeMode } from './types';
  */
 const AppContent: React.FC = () => {
   // User preferences with localStorage persistence
-  const { preferences, setPreferences } = usePreferences();
+  const { preferences, setPreferences, effectiveTheme } = usePreferences();
   
   // Main lunch decision orchestration
   const {
@@ -30,8 +30,8 @@ const AppContent: React.FC = () => {
     calculate(preferences);
   };
 
-  // Determine if dark mode is active
-  const isDark = preferences.theme === ThemeMode.DARK;
+  // Determine if dark mode is active (based on effective theme, not preference)
+  const isDark = effectiveTheme === 'dark';
 
   return (
     <div className={`font-sans transition-colors duration-300 ${isDark ? 'text-dark-text bg-dark-bg' : 'text-braun-dark bg-braun-bg'}`}>
@@ -42,6 +42,7 @@ const AppContent: React.FC = () => {
         preferences={preferences} 
         setPreferences={setPreferences}
         onCalculate={handleCalculate}
+        effectiveTheme={effectiveTheme}
       />
 
       {/* Processing Screen */}
@@ -49,7 +50,7 @@ const AppContent: React.FC = () => {
         appState={appState} 
         logs={logs} 
         progress={progress}
-        theme={preferences.theme}
+        theme={effectiveTheme === 'dark' ? ThemeMode.DARK : ThemeMode.LIGHT}
       />
 
       {/* Results Screen */}
@@ -59,7 +60,7 @@ const AppContent: React.FC = () => {
         userLat={preferences.lat}
         userLng={preferences.lng}
         onReset={reset}
-        theme={preferences.theme}
+        theme={effectiveTheme === 'dark' ? ThemeMode.DARK : ThemeMode.LIGHT}
       />
     </div>
   );

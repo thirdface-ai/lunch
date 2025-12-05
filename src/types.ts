@@ -15,7 +15,8 @@ export enum TransportMode {
 // Theme Mode
 export enum ThemeMode {
   LIGHT = 'light',
-  DARK = 'dark'
+  DARK = 'dark',
+  SYSTEM = 'system'
 }
 
 // Hunger Vibes
@@ -49,6 +50,14 @@ export enum DietaryRestriction {
   VEGETARIAN = 'Vegetarian',
 }
 
+// Place Review (our own type for consistent handling)
+export interface PlaceReview {
+  text: string;
+  rating?: number;
+  relativeTime?: string;
+  authorName?: string;
+}
+
 // User Preferences
 export interface UserPreferences {
   address: string;
@@ -62,14 +71,6 @@ export interface UserPreferences {
   theme: ThemeMode;
   dietaryRestrictions: DietaryRestriction[];
   freestylePrompt?: string;
-}
-
-// Place Review (our own type for AI analysis)
-export interface PlaceReview {
-  text: string;
-  rating?: number;
-  author_name?: string;
-  relative_time_description?: string;
 }
 
 // Google Place
@@ -114,9 +115,6 @@ export interface GeminiRecommendation {
   is_cash_only: boolean;
   cash_warning_msg: string | null;
   is_new_opening?: boolean;
-  // New fields for deep analysis
-  personalized_fit: string;
-  review_highlights: string[];
 }
 
 // Final Result

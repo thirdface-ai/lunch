@@ -7,13 +7,15 @@ interface ControlPanelProps {
   preferences: UserPreferences;
   setPreferences: React.Dispatch<React.SetStateAction<UserPreferences>>;
   onCalculate: () => void;
+  effectiveTheme: 'light' | 'dark';
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
   appState,
   preferences,
   setPreferences,
-  onCalculate
+  onCalculate,
+  effectiveTheme
 }) => {
   // Input State
   const [inputValue, setInputValue] = useState(preferences.address);
@@ -155,11 +157,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       }
   }
 
+  // Toggle between light and dark
   const toggleTheme = () => {
-      setPreferences(prev => ({
-          ...prev,
-          theme: prev.theme === ThemeMode.LIGHT ? ThemeMode.DARK : ThemeMode.LIGHT
-      }));
+      setPreferences(prev => {
+          // Switch to the opposite of current effective theme
+          const nextTheme = effectiveTheme === 'dark' ? ThemeMode.LIGHT : ThemeMode.DARK;
+          return { ...prev, theme: nextTheme };
+      });
   };
 
   const handleDietaryToggle = (restriction: DietaryRestriction) => {
@@ -174,7 +178,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
   if (appState !== AppState.INPUT) return null;
 
-  const isDark = preferences.theme === ThemeMode.DARK;
+  const isDark = effectiveTheme === 'dark';
   const darkMuted = 'text-[#999]';
   const lightMuted = 'text-braun-text-muted';
 
@@ -202,7 +206,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     className={`flex items-center gap-2 px-2 py-1 rounded-[1px] border transition-colors ${isDark ? 'border-dark-border bg-dark-bg' : 'border-braun-border bg-[#E5E5E0]'}`}
                 >
                     <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-braun-dark' : 'bg-braun-orange'}`}></div>
-                    <span className={`font-mono text-[8px] uppercase tracking-wider ${isDark ? darkMuted : lightMuted}`}>{isDark ? 'NIGHT MODE' : 'DAY MODE'}</span>
+                    <span className={`font-mono text-[8px] uppercase tracking-wider ${isDark ? darkMuted : lightMuted}`}>
+                        {isDark ? 'NIGHT MODE' : 'DAY MODE'}
+                    </span>
                 </button>
             </div>
         </div>

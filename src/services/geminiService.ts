@@ -105,33 +105,36 @@ export const decideLunch = async (
     freestylePrompt 
   });
 
-  // Pre-process candidates to give the AI a very clean JSON object to work with
-  // Include rich review data for deep semantic analysis
-  const analysisPayload = candidates.map(p => ({
-    id: p.place_id,
-    name: p.name,
-    types: p.types,
-    rating: p.rating,
-    user_ratings_total: p.user_ratings_total,
-    price_level: p.price_level,
-    virtual_menu_source: p.editorial_summary?.overview || 'No official menu summary available.',
-    website_ref: p.website || 'N/A',
-    attributes: {
-      is_vegetarian: p.serves_vegetarian_food,
-      has_takeout: p.takeout,
-      has_dine_in: p.dine_in,
-      has_alcohol: p.serves_beer || p.serves_wine,
-      payment_options: p.payment_options 
-    },
-    // Deep review analysis: 20 reviews with full context for AI analysis
-    reviews_deep: p.reviews?.slice(0, 20).map(r => ({
+  // Pre-process candidates with FULL review data for deep AI analysis
+  const analysisPayload = candidates.map(p => {
+    // Extract comprehensive review data with ratings for sentiment analysis
+    const reviewsWithMetadata = p.reviews?.slice(0, 20).map(r => ({
       text: r.text?.substring(0, 500) || '',
       rating: r.rating,
-      author: r.author_name,
-      time_ago: r.relative_time_description,
-    })).filter(r => r.text.length > 0) || [],
-    review_count: p.reviews?.length || 0,
-  }));
+      time: r.relativeTime,
+    })).filter(r => r.text.length > 0) || [];
+
+    return {
+      id: p.place_id,
+      name: p.name,
+      types: p.types,
+      rating: p.rating,
+      user_ratings_total: p.user_ratings_total,
+      price_level: p.price_level,
+      virtual_menu_source: p.editorial_summary?.overview || 'No official menu summary available.',
+      website_ref: p.website || 'N/A',
+      attributes: {
+        is_vegetarian: p.serves_vegetarian_food,
+        has_takeout: p.takeout,
+        has_dine_in: p.dine_in,
+        has_alcohol: p.serves_beer || p.serves_wine,
+        payment_options: p.payment_options 
+      },
+      // Full reviews with ratings for deep semantic analysis
+      reviews: reviewsWithMetadata,
+      review_count: reviewsWithMetadata.length,
+    };
+  });
 
   const dietaryProtocol = `
     7. DIETARY RESTRICTION PROTOCOL (HIGH PRIORITY & LOCALIZED):
@@ -159,99 +162,114 @@ export const decideLunch = async (
   `;
 
   const systemInstruction = `
-    ROLE: You are a high-precision Culinary Data Scientist & Logistics Officer, operating under the codename "LUNCHBOX".
-    MODEL: gemini-2.0-flash
+    ROLE: You are an elite Culinary Intelligence Analyst operating under codename "LUNCHBOX". You specialize in deep semantic analysis of restaurant reviews to extract actionable dining intelligence.
+    MODEL: gemini-3.0-preview
 
     CONTEXT:
-    You are analyzing lunch options for a user located at: "${address}". This geographic context (city, country) is CRITICAL. You MUST adapt your language analysis to the local language. For example, if the user is in Berlin, Germany, you must search reviews for German terms (e.g., "glutenfrei" for gluten-free, "barzahlung" for cash only) in addition to English terms.
+    Location: "${address}". This geographic context is CRITICAL - adapt your language analysis to include local language terms (e.g., German "glutenfrei", "lecker", "Schnitzel" in Berlin).
 
     PRIMARY OBJECTIVE: 
-    From the provided JSON array of restaurant candidates, select a diverse pool of 5 to 10 optimal lunch destinations. Your final output MUST contain a MINIMUM of 3 recommendations. This is a non-negotiable requirement. If you cannot find at least 3 perfect matches for the user's vibe and budget, you are authorized and required to supplement the results with the next-best logical alternatives to meet this quota. Your selection must be a ruthlessly logical, data-driven synthesis of the user's constraints and the implicit operational reality of the candidate locations.
+    Perform DEEP REVIEW MINING to select 5-10 optimal lunch destinations. MINIMUM 3 recommendations required.
 
-    CORE DIRECTIVES (NON-NEGOTIABLE):
+    ============================================================
+    CRITICAL: DEEP REVIEW ANALYSIS PROTOCOL (MANDATORY)
+    ============================================================
+    
+    For EACH candidate, you MUST perform multi-layer semantic analysis:
 
-    1. THE "HIDDEN GEM" HEURISTIC (PRIMARY SORTING BIAS):
-       - Your primary goal is discovery, not confirmation. STRONGLY FAVOR high-quality, independent restaurants over famous chains or obvious tourist traps.
-       - Define the "sweet spot" for a hidden gem as: Rating > 4.3 AND User Ratings Total BETWEEN 50 and 750.
-       - Places with thousands of reviews are acceptable only if they are a perfect vibe/budget match and no other viable "hidden gem" candidates exist.
-       - De-prioritize candidates with overly generic names (e.g., 'Italian Restaurant') if more specific, characterful options exist.
+    LAYER 1 - DISH EXTRACTION (HIGHEST PRIORITY):
+    - Scan ALL reviews for specific dish names (not categories like "pasta" but actual dishes like "Cacio e Pepe", "Tonkotsu Ramen", "Bánh Mì")
+    - Count frequency: How many reviews mention the same dish?
+    - Extract sentiment per dish: "amazing [dish]", "best [dish] in town", "disappointing [dish]"
+    - Cross-reference with menu/editorial summary
+    - The \`recommended_dish\` MUST be the most frequently praised specific item from reviews
+    - If reviews mention "the [X] is a must-try" or "don't miss the [X]" - that's your dish
 
-    2. DIVERSITY PROTOCOL (STRICT & MANDATORY):
-       - The selected pool of restaurants MUST represent fundamentally different culinary worlds.
-       - EXAMPLE (FAIL): A pool containing only Italian restaurants.
-       - EXAMPLE (SUCCESS): A pool containing a Ramen Shop, a French Bistro, and a Salad Bar.
-       - This protocol is absolute. If you cannot find a diverse pool of options that match the vibe, you must still provide the best candidates and note the lack of diversity in an \`ai_reason\` field.
+    LAYER 2 - QUALITY SIGNALS:
+    - Identify recurring praise patterns: "always consistent", "never disappoints", "hidden gem"
+    - Identify red flags: "went downhill", "used to be good", "overpriced", "long wait", "rude staff"
+    - Weight recent reviews (check time indicators) higher than older ones
+    - Look for specificity: Detailed reviews > vague "great food" reviews
 
-    3. DEEP SEMANTIC REVIEW ANALYSIS (CRITICAL - SPEND TIME HERE):
-       - You have access to \`reviews_deep\` containing up to 20 reviews per candidate with full text, ratings, and timestamps.
-       - You MUST perform DEEP semantic analysis of ALL reviews for every candidate. This is the core of your analysis.
-       - EXTRACT SPECIFIC DISH NAMES: Scan every review for mentions of specific dishes, ingredients, or menu items.
-       - IDENTIFY PATTERNS: Look for dishes mentioned by MULTIPLE reviewers - these are validated recommendations.
-       - EXTRACT QUOTES: Pull 2-3 short, impactful quotes from reviews that capture the essence of the place.
-       - OPERATIONAL DATA: Extract mentions of "wait times," "noise level," "service speed," "good for groups," "great for lunch," etc.
-       - SENTIMENT ANALYSIS: Synthesize overall sentiment. Look for recurring praise or complaints.
-       - NEGATIVE SIGNALS: A single deal-breaker mentioned in multiple reviews (e.g., 'dirty', 'rude service', 'long wait') should disqualify a candidate.
-       - VIBE VALIDATION: Do reviews for a "View & Vibe" candidate actually mention the view? Do "Grab & Go" candidates have reviews mentioning fast service?
+    LAYER 3 - OPERATIONAL INTELLIGENCE:
+    - Service speed signals: "quick lunch", "fast service", "waited 45 minutes"
+    - Atmosphere: "quiet", "loud", "good for meetings", "cramped"
+    - Value signals: "huge portions", "overpriced", "great value"
+    
+    ============================================================
+    DISH RECOMMENDATION RULES (ZERO TOLERANCE FOR GENERICS)
+    ============================================================
+    
+    The \`recommended_dish\` field is the most important output. Follow these rules:
 
-    4. PERSONALIZED FIT ANALYSIS (REQUIRED FOR EACH SELECTION):
-       - The \`personalized_fit\` field MUST explain specifically WHY this restaurant matches THIS user's preferences.
-       - Reference the user's stated vibe, budget, and dietary needs explicitly.
-       - EXAMPLE (BAD): "Great restaurant with good food."
-       - EXAMPLE (GOOD): "Perfect for your 'Light & Clean' vibe: reviews mention 'fresh salads,' 'healthy options,' and 'light portions.' Multiple reviewers note it's ideal for a quick lunch. Within your 'Series A' budget at price level 2."
-       - If the user has dietary restrictions, explain how the restaurant accommodates them based on review evidence.
+    FORBIDDEN (instant failure):
+    - "Their specialty" / "House special"
+    - "Any of the [category]" / "All pastas are good"
+    - "Check the menu" / "Daily specials"
+    - Generic categories: "Pizza", "Burger", "Salad", "Sandwich"
+    - Vague: "Everything is good"
 
-    5. REVIEW-EXTRACTED DISH RECOMMENDATIONS (STRICT):
-       - \`recommended_dish\` MUST be a specific dish name extracted DIRECTLY from \`reviews_deep\`.
-       - Prioritize dishes mentioned by MULTIPLE reviewers.
-       - Include the specific name as reviewers wrote it (e.g., "Spicy Miso Ramen" not just "ramen").
-       - GENERIC RECOMMENDATIONS ARE A CRITICAL FAILURE. Never output:
-         - "Signature dishes or daily specials"
-         - "Ask the staff"
-         - "Any of the pasta dishes"
-         - Generic category names like "Pizza" or "Burger"
-       - If no specific dish is mentioned in reviews, use the \`virtual_menu_source\` OR output "Chef's recommendation (verify with staff)" as LAST RESORT ONLY.
+    REQUIRED (specific extracted dishes):
+    - "Margherita DOC" not "Pizza"
+    - "Spicy Miso Ramen with Chashu" not "Ramen"
+    - "Eggs Benedict with Hollandaise" not "Breakfast"
+    - "Double Smashburger with Secret Sauce" not "Burger"
 
-    6. REVIEW HIGHLIGHTS (REQUIRED):
-       - \`review_highlights\` MUST contain 2-3 short, impactful direct quotes from the reviews.
-       - Choose quotes that reveal: food quality, atmosphere, service, or unique selling points.
-       - Keep quotes under 100 characters each. Truncate with "..." if needed.
-       - Include the reviewer's rating if available (e.g., "[5★] 'Best ramen in the city!'").
+    If reviews don't mention specific dishes, look for:
+    - "The [X]" pattern: "The carbonara here is insane"
+    - "Order the [X]": "Order the lamb chops"
+    - "Famous for [X]": "Famous for their sourdough"
+    - Named items: "Big Mac" style proprietary names
 
-    7. FUNCTIONAL REASONING & AI_REASON:
-       - \`ai_reason\` should be a comprehensive analysis including:
-         - Rating analysis (e.g., "4.7/5 from 342 reviews indicates consistent quality")
-         - Review sentiment summary
-         - Why this beats other candidates
-         - Any caveats or things to be aware of
-       - **Comparative Analysis is Mandatory.** State *why* this option was chosen over a strong-but-rejected candidate.
+    ============================================================
+    SELECTION CRITERIA
+    ============================================================
 
-    8. PAYMENT PROTOCOL (STRICT & LOCALIZED):
-       - IF 'noCash' is TRUE: DISCARD any place with signals of being CASH ONLY.
-       - Scan \`payment_options\` and \`reviews_deep\` for payment method mentions.
-       - Set 'is_cash_only' to true if evidence suggests cash-only.
+    1. HIDDEN GEM BIAS:
+       - Sweet spot: Rating > 4.3, Reviews between 50-750
+       - Favor independents over chains
+       - De-prioritize tourist traps
+
+    2. DIVERSITY MANDATE:
+       - Pool must span different cuisines
+       - Fail: All Italian. Success: Ramen + French Bistro + Taqueria
+
+    3. PAYMENT PROTOCOL (STRICT & LOCALIZED):
+       - Scan \`payment_options\` AND reviews for cash-only signals
+       - Local language detection required (e.g., "nur Barzahlung", "solo efectivo", "contanti")
+       - English signals: "cash only", "no cards", "ATM nearby", "bring cash"
+       - IF \`payment_options.accepts_credit_cards: false\` OR \`payment_options.accepts_cash_only: true\`:
+         - IMMEDIATELY set \`is_cash_only: true\`
+       - IF reviews mention cash-only (even once): set \`is_cash_only: true\`
+       - IF noCash=true in user request:
+         - DISCARD any candidate with cash-only signals entirely
+       - IF noCash=false (user allows cash):
+         - Include cash-only places but MUST set \`is_cash_only: true\` to warn user
 
     ${budgetProtocol}
 
-    9. FRESH DROP / NEW OPENING PROTOCOL:
-       - Give advantage to "Fresh Drops": high ratings but < 50 reviews, or reviews mentioning "just opened", "new spot".
-       - Set \`is_new_opening\` to true for qualifying candidates.
-    
-    10. FREESTYLE PROMPT PROTOCOL (HIGHEST PRIORITY):
-        - If "SPECIFIC REQUEST" is provided, it OVERRIDES generic vibe constraints.
-        - The specific request is the user's direct voice.
+    4. FRESH DROP DETECTION:
+       - High rating + low reviews (<50) + "just opened" mentions = \`is_new_opening: true\`
+
+    5. FREESTYLE OVERRIDE:
+       - User's specific request takes priority over vibe
 
     ${dietaryRestrictions.length > 0 ? dietaryProtocol : ''}
+
+    ============================================================
+    AI_REASON QUALITY STANDARD
+    ============================================================
     
+    Must include:
+    - Specific review evidence: "Reviews cite the 'Duck Confit' 6 times with unanimous praise"
+    - Data points: Rating density, review sentiment ratio
+    - Why this over alternatives: "Chosen over X because reviews confirm faster service"
+    
+    BAD: "Great Italian food with nice atmosphere!"
+    GOOD: "4.6/312 reviews with 8 mentions of 'Truffle Pasta'. Recent reviews (last 3 months) confirm consistency. Faster service than competitor 'Pasta House' based on review sentiment."
+
     ---
-    ANALYSIS DEPTH REQUIREMENT:
-    Take your time analyzing the reviews. The quality of your dish recommendations and personalized fit explanations depends on thorough review analysis. A shallow analysis that misses specific dish names or returns generic recommendations is a failure.
-    
-    FINAL OUTPUT:
-    Return strictly valid JSON matching the provided schema. Your deep analysis must be evident in:
-    - Specific dish names from reviews
-    - Personalized fit explanations referencing user preferences
-    - Direct quotes from reviewers
-    - Data-driven reasoning
+    OUTPUT: Return valid JSON array matching the schema. Your deep review analysis must be evident in specific dish recommendations and data-driven reasoning.
   `;
 
   const prompt = `
@@ -268,11 +286,11 @@ export const decideLunch = async (
 
   try {
     const text = await callGeminiProxy(
-      'gemini-2.0-flash',
+      'gemini-3.0-preview',
       prompt,
       {
         systemInstruction: systemInstruction,
-        temperature: 0.7, 
+        temperature: 0.5, // Lower temperature for more precise dish extraction
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.ARRAY,
@@ -284,13 +302,8 @@ export const decideLunch = async (
               recommended_dish: { type: Type.STRING },
               is_cash_only: { type: Type.BOOLEAN },
               is_new_opening: { type: Type.BOOLEAN },
-              personalized_fit: { type: Type.STRING },
-              review_highlights: { 
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
-              },
             },
-            required: ['place_id', 'ai_reason', 'recommended_dish', 'is_cash_only', 'personalized_fit', 'review_highlights'],
+            required: ['place_id', 'ai_reason', 'recommended_dish', 'is_cash_only'],
           },
         },
       }
@@ -307,10 +320,6 @@ export const decideLunch = async (
     return recommendations.map(rec => ({
       ...rec,
       cash_warning_msg: rec.is_cash_only ? 'Note: This location may be cash-only.' : null,
-      // Ensure review_highlights is always an array
-      review_highlights: rec.review_highlights || [],
-      // Ensure personalized_fit has a fallback
-      personalized_fit: rec.personalized_fit || rec.ai_reason,
     }));
 
   } catch (error) {

@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateLoadingLogs, decideLunch, Type } from './geminiService';
-import { HungerVibe, PricePoint, DietaryRestriction, GooglePlace } from '../types';
+import { HungerVibe, PricePoint, DietaryRestriction, GooglePlace, PlaceReview } from '../types';
 
-// Mock the supabase client
+// Mock the supabase functions invoke
 const mockInvoke = vi.fn();
+
 vi.mock('../lib/supabase', () => ({
   supabase: {
     functions: {
@@ -58,7 +59,10 @@ describe('generateLoadingLogs', () => {
   });
 
   it('returns fallback logs when API fails', async () => {
-    mockInvoke.mockRejectedValueOnce(new Error('Network error'));
+    mockInvoke.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Network error' },
+    });
 
     const result = await generateLoadingLogs(HungerVibe.LIGHT_AND_CLEAN, 'Test Address');
     
@@ -68,8 +72,6 @@ describe('generateLoadingLogs', () => {
   });
 
   it('returns fallback logs when API returns empty text', async () => {
-    // When API returns empty text, the proxy throws an error due to !data?.text check
-    // This triggers the catch block which returns fallback logs
     mockInvoke.mockResolvedValueOnce({
       data: { text: '' },
       error: null,
@@ -77,7 +79,7 @@ describe('generateLoadingLogs', () => {
 
     const result = await generateLoadingLogs(null, 'Address');
     
-    // Empty text triggers error fallback, not the ['PROCESSING...'] return
+    // When API returns empty text, it triggers error handling which returns fallback logs
     expect(result).toContain('OPTIMIZING SEARCH...');
     expect(result).toContain('READING MENUS...');
     expect(result).toContain('CALCULATING ROUTES...');
@@ -94,7 +96,7 @@ describe('generateLoadingLogs', () => {
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it('passes correct model to API', async () => {
+  it('passes correct model to API for loading logs', async () => {
     mockInvoke.mockResolvedValueOnce({
       data: { text: JSON.stringify(['LOG']) },
       error: null,
@@ -138,8 +140,6 @@ describe('decideLunch', () => {
         recommended_dish: 'Margherita Pizza',
         is_cash_only: false,
         is_new_opening: false,
-        personalized_fit: 'Perfect for your Hearty & Rich vibe',
-        review_highlights: ['[5★] "Best pizza in town!"'],
       },
     ];
 
@@ -161,8 +161,6 @@ describe('decideLunch', () => {
     expect(result).toHaveLength(1);
     expect(result[0].place_id).toBe('place-1');
     expect(result[0].cash_warning_msg).toBeNull();
-    expect(result[0].personalized_fit).toBe('Perfect for your Hearty & Rich vibe');
-    expect(result[0].review_highlights).toHaveLength(1);
   });
 
   it('adds cash warning message when is_cash_only is true', async () => {
@@ -173,8 +171,6 @@ describe('decideLunch', () => {
         recommended_dish: 'Currywurst',
         is_cash_only: true,
         is_new_opening: false,
-        personalized_fit: 'Matches your Grab & Go vibe',
-        review_highlights: ['[4★] "Quick and tasty!"'],
       },
     ];
 
@@ -198,7 +194,10 @@ describe('decideLunch', () => {
   });
 
   it('returns empty array on API error', async () => {
-    mockInvoke.mockRejectedValueOnce(new Error('API Error'));
+    mockInvoke.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'API Error' },
+    });
 
     const result = await decideLunch(
       mockCandidates,
@@ -294,7 +293,13 @@ describe('decideLunch', () => {
     expect(callBody.contents).toContain('USER REQUIRES CASHLESS: true');
   });
 
-  it('processes candidate data correctly for API payload', async () => {
+  it('processes candidate data with reviews correctly for API payload', async () => {
+    const reviewsData: PlaceReview[] = [
+      { text: 'The Cacio e Pepe is absolutely incredible!', rating: 5, relativeTime: '2 weeks ago' },
+      { text: 'Best carbonara in Rome. The truffle pasta is a must-try.', rating: 5, relativeTime: '1 month ago' },
+      { text: 'Great wine selection and cozy atmosphere', rating: 4, relativeTime: '3 months ago' },
+    ];
+
     const candidatesWithDetails: GooglePlace[] = [
       {
         place_id: 'place-detailed',
@@ -315,10 +320,7 @@ describe('decideLunch', () => {
           accepts_cash_only: false,
           accepts_nfc: true,
         },
-        reviews: [
-          { text: 'Amazing pasta!', rating: 5 },
-          { text: 'Great wine selection', rating: 4 },
-        ],
+        reviews: reviewsData,
       },
     ];
 
@@ -340,6 +342,9 @@ describe('decideLunch', () => {
     const callBody = mockInvoke.mock.calls[0][1].body;
     expect(callBody.contents).toContain('Detailed Restaurant');
     expect(callBody.contents).toContain('Fine Italian dining');
+    // Verify reviews are included in the payload
+    expect(callBody.contents).toContain('Cacio e Pepe');
+    expect(callBody.contents).toContain('carbonara');
   });
 
   it('handles candidates without optional fields', async () => {
@@ -367,6 +372,26 @@ describe('decideLunch', () => {
         undefined
       )
     ).resolves.toEqual([]);
+  });
+
+  it('uses gemini-3.0-preview model for deep analysis', async () => {
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify([]) },
+      error: null,
+    });
+
+    await decideLunch(
+      mockCandidates,
+      HungerVibe.GRAB_AND_GO,
+      null,
+      false,
+      'Berlin',
+      [],
+      undefined
+    );
+
+    const callBody = mockInvoke.mock.calls[0][1].body;
+    expect(callBody.model).toBe('gemini-3.0-preview');
   });
 });
 

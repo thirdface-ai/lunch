@@ -20,9 +20,20 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   price: null,
   walkLimit: WalkLimit.FIFTEEN_MIN,
   noCash: false,
-  theme: ThemeMode.LIGHT,
+  theme: ThemeMode.SYSTEM,
   dietaryRestrictions: [],
   freestylePrompt: '',
+};
+
+/**
+ * Get the effective theme (light or dark) based on user preference and system setting
+ */
+const getEffectiveTheme = (theme: ThemeMode): 'light' | 'dark' => {
+  if (theme === ThemeMode.SYSTEM) {
+    if (typeof window === 'undefined') return 'light';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return theme;
 };
 
 /**
@@ -74,19 +85,42 @@ export const usePreferences = () => {
     ...loadFromStorage(),
   }));
 
+  // Track effective theme (resolved from SYSTEM if needed)
+  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>(() => 
+    getEffectiveTheme(preferences.theme)
+  );
+
   // Persist to localStorage when preferences change
   useEffect(() => {
     saveToStorage(preferences);
   }, [preferences]);
 
-  // Apply theme to document
+  // Listen for system preference changes when in SYSTEM mode
   useEffect(() => {
-    if (preferences.theme === ThemeMode.DARK) {
+    // Update effective theme when preference changes
+    setEffectiveTheme(getEffectiveTheme(preferences.theme));
+
+    // Only listen for system changes when in SYSTEM mode
+    if (preferences.theme !== ThemeMode.SYSTEM) return;
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const handleChange = (e: MediaQueryListEvent) => {
+      setEffectiveTheme(e.matches ? 'dark' : 'light');
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [preferences.theme]);
+
+  // Apply theme to document based on effective theme
+  useEffect(() => {
+    if (effectiveTheme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [preferences.theme]);
+  }, [effectiveTheme]);
 
   // Update preferences
   const setPreferences = useCallback((
@@ -108,12 +142,15 @@ export const usePreferences = () => {
     setPreferencesState(prev => ({ ...prev, address, lat, lng }));
   }, []);
 
-  // Toggle theme
+  // Toggle between light and dark (overrides system default once user makes a choice)
   const toggleTheme = useCallback(() => {
-    setPreferencesState(prev => ({
-      ...prev,
-      theme: prev.theme === ThemeMode.LIGHT ? ThemeMode.DARK : ThemeMode.LIGHT,
-    }));
+    setPreferencesState(prev => {
+      // If currently on system, switch to the opposite of what system resolved to
+      // Otherwise just toggle between light and dark
+      const currentEffective = getEffectiveTheme(prev.theme);
+      const nextTheme = currentEffective === 'dark' ? ThemeMode.LIGHT : ThemeMode.DARK;
+      return { ...prev, theme: nextTheme };
+    });
   }, []);
 
   // Toggle dietary restriction
@@ -147,6 +184,7 @@ export const usePreferences = () => {
     toggleDietaryRestriction,
     resetPreferences,
     isValidForSearch,
+    effectiveTheme,
   };
 };
 
