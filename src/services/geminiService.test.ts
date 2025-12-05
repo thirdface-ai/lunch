@@ -151,7 +151,7 @@ describe('decideLunch', () => {
     const result = await decideLunch(
       mockCandidates,
       HungerVibe.HEARTY_AND_RICH,
-      PricePoint.SENIOR,
+      PricePoint.PAYING_MYSELF,
       false,
       'Berlin, Germany',
       [],
@@ -202,7 +202,7 @@ describe('decideLunch', () => {
     const result = await decideLunch(
       mockCandidates,
       HungerVibe.LIGHT_AND_CLEAN,
-      PricePoint.INTERN,
+      PricePoint.PAYING_MYSELF,
       true,
       'Test Address',
       [DietaryRestriction.VEGAN],

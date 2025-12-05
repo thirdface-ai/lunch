@@ -142,7 +142,7 @@ export type Database = {
         | 'Spicy & Bold'
         | 'View & Vibe'
         | 'Authentic & Classic'
-      price_point: 'Bootstrapped' | 'Series A' | 'Company Card'
+      price_point: 'Paying Myself' | 'Company Card' | 'Bootstrapped' | 'Series A'  // Legacy values for backwards compatibility
       walk_limit: '5 min' | '15 min' | '30 min'
     }
     CompositeTypes: {

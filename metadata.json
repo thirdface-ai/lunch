@@ -1,6 +1,7 @@
 {
-  "name": "lunch decider",
-  "description": "A Dieter Rams inspired decision engine for lunch options using Google Places and Gemini 2.5 Flash.",
+  "name": "thirdface lunch decider",
+  "description": "AI-powered lunch recommendations that match your vibe, not just your location.",
+  "author": "thirdface",
   "requestFramePermissions": [
     "geolocation"
   ]

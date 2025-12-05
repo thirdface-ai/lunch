@@ -1,6 +1,77 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AppState, TransportMode, HungerVibe, PricePoint, UserPreferences, WalkLimit, ThemeMode, DietaryRestriction } from '../types';
+import Sounds from '../utils/sounds';
+
+// Easter egg: Text scramble effect component
+const ScrambleText: React.FC<{ text: string; className?: string }> = ({ text, className = '' }) => {
+  const [displayText, setDisplayText] = useState(text);
+  const [isHovering, setIsHovering] = useState(false);
+  const chars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`01';
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const iterationRef = useRef(0);
+
+  const scramble = useCallback(() => {
+    iterationRef.current = 0;
+    const originalText = text;
+    
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    
+    intervalRef.current = setInterval(() => {
+      setDisplayText(
+        originalText
+          .split('')
+          .map((char, index) => {
+            if (char === ' ') return ' ';
+            if (index < iterationRef.current) {
+              return originalText[index];
+            }
+            return chars[Math.floor(Math.random() * chars.length)];
+          })
+          .join('')
+      );
+      
+      iterationRef.current += 1 / 3;
+      
+      if (iterationRef.current >= originalText.length) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setDisplayText(originalText);
+      }
+    }, 30);
+  }, [text]);
+
+  const handleMouseEnter = () => {
+    setIsHovering(true);
+    scramble();
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovering(false);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setDisplayText(text);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  return (
+    <span
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className={`cursor-pointer transition-all duration-200 ${className}`}
+      style={{
+        // Use inline styles for hover color to override Tailwind class specificity
+        color: isHovering ? '#FF4400' : undefined,
+        textShadow: isHovering ? '0 0 8px rgba(255, 68, 0, 0.6), 0 0 20px rgba(255, 68, 0, 0.3)' : 'none',
+      }}
+    >
+      {displayText}
+    </span>
+  );
+};
 
 interface ControlPanelProps {
   appState: AppState;
@@ -117,6 +188,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   };
 
   const handleVibeSelect = (vibe: HungerVibe) => {
+      Sounds.click('medium');
       setPreferences(prev => ({
           ...prev,
           vibe: vibe,
@@ -432,40 +504,52 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 
                 <div className={`flex h-14 rounded-sm border p-1 gap-1 ${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'}`} role="radiogroup" aria-label="Budget">
                     
-                    {/* Explicit "ANY BUDGET" Option */}
+                    {/* Any Budget */}
                     <button
                         role="radio"
                         aria-checked={preferences.price === null}
-                        onClick={() => handlePriceSelect(null)}
-                        className={`flex-1 flex flex-col items-center justify-center rounded-[1px] transition-all duration-200 outline-none focus:ring-1 focus:ring-white/30
+                        onClick={() => { Sounds.click('soft'); handlePriceSelect(null); }}
+                        className={`flex-1 flex flex-col items-center justify-center rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30
                             ${preferences.price === null 
                                 ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md`
                                 : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
                             }
                         `}
                     >
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-wide">ANY BUDGET</span>
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-wide">Any Budget</span>
                     </button>
 
-                    {Object.values(PricePoint).map((price) => {
-                        const isSelected = preferences.price === price;
-                        return (
-                            <button
-                                key={price}
-                                role="radio"
-                                aria-checked={isSelected}
-                                onClick={() => handlePriceSelect(price)}
-                                className={`flex-1 flex flex-col items-center justify-center rounded-[1px] transition-all duration-200 outline-none focus:ring-1 focus:ring-white/30
-                                    ${isSelected 
-                                        ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md`
-                                        : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
-                                    }
-                                `}
-                            >
-                                <span className="font-mono text-[10px] font-bold uppercase tracking-wide">{price}</span>
-                            </button>
-                        );
-                    })}
+                    {/* Paying Myself ($ - $$) */}
+                    <button
+                        role="radio"
+                        aria-checked={preferences.price === PricePoint.PAYING_MYSELF}
+                        onClick={() => { Sounds.click('soft'); handlePriceSelect(PricePoint.PAYING_MYSELF); }}
+                        className={`flex-1 flex flex-col items-center justify-center rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30
+                            ${preferences.price === PricePoint.PAYING_MYSELF 
+                                ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md`
+                                : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
+                            }
+                        `}
+                    >
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-wide">Paying Myself</span>
+                        <span className={`font-mono text-[8px] mt-0.5 ${preferences.price === PricePoint.PAYING_MYSELF ? (isDark ? 'text-dark-bg/60' : 'text-white/60') : (isDark ? 'text-dark-text-muted/60' : 'text-braun-text-muted/60')}`}>$ – $$</span>
+                    </button>
+
+                    {/* Company Card ($$$ - $$$$) */}
+                    <button
+                        role="radio"
+                        aria-checked={preferences.price === PricePoint.COMPANY_CARD}
+                        onClick={() => { Sounds.click('soft'); handlePriceSelect(PricePoint.COMPANY_CARD); }}
+                        className={`flex-1 flex flex-col items-center justify-center rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30
+                            ${preferences.price === PricePoint.COMPANY_CARD 
+                                ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md`
+                                : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
+                            }
+                        `}
+                    >
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-wide">Company Card</span>
+                        <span className={`font-mono text-[8px] mt-0.5 ${preferences.price === PricePoint.COMPANY_CARD ? (isDark ? 'text-dark-bg/60' : 'text-white/60') : (isDark ? 'text-dark-text-muted/60' : 'text-braun-text-muted/60')}`}>$$$ – $$$$</span>
+                    </button>
                 </div>
             </div>
 
@@ -509,9 +593,20 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <div className={`w-px h-full opacity-20 ml-96 ${isDark ? 'bg-dark-border' : 'bg-braun-border'}`}></div>
       </div>
       
-      {/* Credit */}
-      <div className={`fixed bottom-4 right-4 font-mono text-[9px] tracking-wider ${isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'}`}>
-        Built by Noah Nawara
+      {/* Footer: Credit + Imprint */}
+      <div className={`fixed bottom-4 right-4 font-mono text-[9px] tracking-wider flex items-center gap-3 ${isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'}`}>
+        <span>
+          Built by <ScrambleText text="Noah Nawara" className={isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'} />
+        </span>
+        <span className={isDark ? 'text-dark-text-muted/20' : 'text-braun-text-muted/20'}>|</span>
+        <a 
+          href="https://thirdface.com/imprint" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className={`transition-all duration-200 hover:text-braun-orange ${isDark ? 'text-dark-text-muted/40 hover:text-braun-orange' : 'text-braun-text-muted/40 hover:text-braun-orange'}`}
+        >
+          Imprint
+        </a>
       </div>
     </div>
   );

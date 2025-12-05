@@ -56,19 +56,17 @@ export const calculateCandidateScore = (
   let priceMatchScore = 0;
   if (priceLevel !== undefined && price !== null) {
     switch (price) {
-      case PricePoint.INTERN:
-        if (priceLevel <= 1) priceMatchScore = 10;
-        else if (priceLevel === 2) priceMatchScore = 5;
+      case PricePoint.PAYING_MYSELF:
+        // $ and $$ (price_level 1-2)
+        if (priceLevel <= 2) priceMatchScore = 10;
+        else if (priceLevel === 3) priceMatchScore = 2;
         else priceMatchScore = -5;
-        break;
-      case PricePoint.SENIOR:
-        if (priceLevel >= 2 && priceLevel <= 3) priceMatchScore = 10;
-        else if (priceLevel === 1 || priceLevel === 4) priceMatchScore = 5;
         break;
       case PricePoint.COMPANY_CARD:
+        // $$$ and $$$$ (price_level 3-4)
         if (priceLevel >= 3) priceMatchScore = 10;
         else if (priceLevel === 2) priceMatchScore = 5;
-        else priceMatchScore = -5;
+        else priceMatchScore = -3;
         break;
     }
   } else {

@@ -58,12 +58,36 @@ export default {
         mono: ['Roboto Mono', 'ui-monospace', 'monospace'],
       },
       
-      // Custom animations
+      // Custom animations - Dieter Rams Inspired
+      // Principle: Subtle, purposeful, elegant - less but better
       keyframes: {
+        // Entrance animations
         'scroll-up': {
           '0%': { opacity: '0', transform: 'translateY(10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        'fade-in-up': {
+          '0%': { opacity: '0', transform: 'translateY(16px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'fade-in-scale': {
+          '0%': { opacity: '0', transform: 'scale(0.95)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        'slide-in-right': {
+          '0%': { opacity: '0', transform: 'translateX(20px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        'slide-in-left': {
+          '0%': { opacity: '0', transform: 'translateX(-20px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        
+        // Indicator animations
         'blink': {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0' },
@@ -72,11 +96,112 @@ export default {
           '0%, 100%': { boxShadow: '0 0 8px #FF4400' },
           '50%': { boxShadow: '0 0 16px #FF4400' },
         },
+        'pulse-subtle': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.7' },
+        },
+        'breathe': {
+          '0%, 100%': { transform: 'scale(1)', opacity: '1' },
+          '50%': { transform: 'scale(1.02)', opacity: '0.9' },
+        },
+        
+        // Button press animation
+        'press': {
+          '0%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(0.97)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        'press-deep': {
+          '0%': { transform: 'scale(1) translateY(0)' },
+          '50%': { transform: 'scale(0.98) translateY(1px)' },
+          '100%': { transform: 'scale(1) translateY(0)' },
+        },
+        
+        // Loading/Progress animations
+        'shimmer': {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+        'progress-pulse': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.6' },
+        },
+        'spin-slow': {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
+        },
+        
+        // Stagger entrance for lists
+        'stagger-fade': {
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        
+        // Industrial/mechanical feel
+        'mechanical-in': {
+          '0%': { opacity: '0', transform: 'translateY(-4px)' },
+          '60%': { opacity: '1', transform: 'translateY(1px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'indicator-on': {
+          '0%': { opacity: '0', boxShadow: '0 0 0 #FF4400' },
+          '50%': { opacity: '1', boxShadow: '0 0 12px #FF4400' },
+          '100%': { opacity: '1', boxShadow: '0 0 6px #FF4400' },
+        },
+        
+        // Screen/CRT effect
+        'scanline': {
+          '0%': { transform: 'translateY(-100%)' },
+          '100%': { transform: 'translateY(100%)' },
+        },
+        'flicker': {
+          '0%, 100%': { opacity: '1' },
+          '92%': { opacity: '1' },
+          '93%': { opacity: '0.8' },
+          '94%': { opacity: '1' },
+        },
       },
       animation: {
-        'scroll-up': 'scroll-up 0.5s ease-out forwards',
+        // Entrances
+        'scroll-up': 'scroll-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'fade-in': 'fade-in 0.3s ease-out forwards',
+        'fade-in-up': 'fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'fade-in-scale': 'fade-in-scale 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'slide-in-right': 'slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'slide-in-left': 'slide-in-left 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        
+        // Indicators
         'blink': 'blink 1s step-end infinite',
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+        'pulse-subtle': 'pulse-subtle 2s ease-in-out infinite',
+        'breathe': 'breathe 3s ease-in-out infinite',
+        
+        // Interactive
+        'press': 'press 0.15s ease-out',
+        'press-deep': 'press-deep 0.2s ease-out',
+        
+        // Loading
+        'shimmer': 'shimmer 2s linear infinite',
+        'progress-pulse': 'progress-pulse 1.5s ease-in-out infinite',
+        'spin-slow': 'spin-slow 3s linear infinite',
+        
+        // Lists
+        'stagger-fade': 'stagger-fade 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        
+        // Industrial
+        'mechanical-in': 'mechanical-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+        'indicator-on': 'indicator-on 0.3s ease-out forwards',
+        
+        // Effects
+        'scanline': 'scanline 8s linear infinite',
+        'flicker': 'flicker 4s linear infinite',
+      },
+      
+      // Custom timing functions for that premium feel
+      transitionTimingFunction: {
+        'bounce-sm': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'smooth-out': 'cubic-bezier(0.16, 1, 0.3, 1)',
+        'snap': 'cubic-bezier(0.7, 0, 0.3, 1)',
       },
       
       // Border radius following Dieter Rams (minimal, functional)

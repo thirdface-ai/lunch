@@ -29,11 +29,10 @@ export enum HungerVibe {
   AUTHENTIC_AND_CLASSIC = 'Authentic & Classic',
 }
 
-// Price Points
+// Price Points (Budget Tiers)
 export enum PricePoint {
-  INTERN = 'Bootstrapped',
-  SENIOR = 'Series A',
-  COMPANY_CARD = 'Company Card'
+  PAYING_MYSELF = 'Paying Myself',    // $ and $$ (1-2)
+  COMPANY_CARD = 'Company Card'       // $$$ and $$$$ (3-4)
 }
 
 // Walk Limits

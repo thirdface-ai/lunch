@@ -93,24 +93,24 @@ describe('calculateCandidateScore', () => {
   });
 
   describe('price matching', () => {
-    it('gives high score for budget match with INTERN price point', () => {
+    it('gives high score for budget match with PAYING_MYSELF price point', () => {
       const cheapPlace = createMockPlace({ price_level: 1 });
       const expensivePlace = createMockPlace({ price_level: 4 });
       
-      const cheapScore = calculateCandidateScore(cheapPlace, PricePoint.INTERN, 300, 900);
-      const expensiveScore = calculateCandidateScore(expensivePlace, PricePoint.INTERN, 300, 900);
+      const cheapScore = calculateCandidateScore(cheapPlace, PricePoint.PAYING_MYSELF, 300, 900);
+      const expensiveScore = calculateCandidateScore(expensivePlace, PricePoint.PAYING_MYSELF, 300, 900);
       
       expect(cheapScore).toBeGreaterThan(expensiveScore);
     });
 
-    it('gives high score for mid-range match with SENIOR price point', () => {
+    it('gives high score for mid-range with PAYING_MYSELF price point', () => {
       const midRangePlace = createMockPlace({ price_level: 2 });
-      const cheapPlace = createMockPlace({ price_level: 1 });
+      const expensivePlace = createMockPlace({ price_level: 4 });
       
-      const midScore = calculateCandidateScore(midRangePlace, PricePoint.SENIOR, 300, 900);
-      const cheapScore = calculateCandidateScore(cheapPlace, PricePoint.SENIOR, 300, 900);
+      const midScore = calculateCandidateScore(midRangePlace, PricePoint.PAYING_MYSELF, 300, 900);
+      const expensiveScore = calculateCandidateScore(expensivePlace, PricePoint.PAYING_MYSELF, 300, 900);
       
-      expect(midScore).toBeGreaterThan(cheapScore);
+      expect(midScore).toBeGreaterThan(expensiveScore);
     });
 
     it('gives high score for expensive match with COMPANY_CARD price point', () => {

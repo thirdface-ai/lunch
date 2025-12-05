@@ -186,9 +186,8 @@ export const decideLunch = async (
 
   // Budget context
   const budgetText = price ? {
-    'Bootstrapped': 'Budget-conscious, prefer price_level 1-2',
-    'Series A': 'Mid-range, price_level 2-3 ideal',
-    'Company Card': 'Quality over cost, any price_level welcome'
+    'Paying Myself': 'Budget-conscious, prefer price_level 1-2 ($ to $$)',
+    'Company Card': 'Quality over cost, prefer price_level 3-4 ($$$ to $$$$)'
   }[price] || '' : '';
 
   // Dietary context
