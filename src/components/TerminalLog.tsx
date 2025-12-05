@@ -50,9 +50,9 @@ const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0,
   if (appState !== AppState.PROCESSING) return null;
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-3 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
+    <div className={`min-h-screen flex items-center justify-center p-2 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
       {/* Main Chassis */}
-      <div className={`w-full max-w-5xl border p-1 relative min-h-[480px] sm:min-h-[600px] flex flex-col shadow-braun-deep transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
+      <div className={`w-full max-w-5xl border p-1 relative min-h-[80vh] sm:min-h-[600px] flex flex-col shadow-braun-deep transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
         
         {/* Screw heads decorations - hidden on mobile */}
         <div className={`hidden sm:flex absolute top-2 left-2 w-2 h-2 rounded-full border opacity-50 items-center justify-center ${isDark ? 'border-dark-text-muted' : 'border-braun-text-muted'}`}>
@@ -83,7 +83,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0,
         <div className={`flex-1 p-4 sm:p-8 flex flex-col justify-center transition-colors duration-300 ${isDark ? 'bg-[#111]' : 'bg-[#F0F0EC]'}`}>
           
           {/* The "Screen" */}
-          <div className={`p-3 sm:p-4 rounded-sm shadow-inner border-b-2 relative overflow-hidden flex flex-col h-[280px] sm:h-[400px] transition-colors duration-300 ${isDark ? 'bg-[#000] border-[#222]' : 'bg-[#222] border-[#444]'}`}>
+          <div className={`p-3 sm:p-4 rounded-sm shadow-inner border-b-2 relative overflow-hidden flex flex-col h-[55vh] sm:h-[400px] transition-colors duration-300 ${isDark ? 'bg-[#000] border-[#222]' : 'bg-[#222] border-[#444]'}`}>
             
             {/* Screen Bezel Branding */}
             <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[8px] font-sans font-bold text-[#444] tracking-widest uppercase pointer-events-none">

@@ -365,21 +365,21 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 {/* Proximity Slider */}
                 <div>
                     <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Proximity Range</label>
-                    <div className={`flex h-11 sm:h-12 rounded-sm border p-1 gap-1 ${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'}`} role="radiogroup" aria-label="Walk Limit">
+                    <div className={`flex h-14 sm:h-14 rounded-sm border p-1 gap-1 ${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'}`} role="radiogroup" aria-label="Walk Limit">
                         {Object.values(WalkLimit).map((limit) => (
                             <button
                                 key={limit}
                                 role="radio"
                                 aria-checked={preferences.walkLimit === limit}
                                 onClick={() => { Sounds.lightClick(); setPreferences(prev => ({ ...prev, walkLimit: limit })); }}
-                                className={`flex-1 flex items-center justify-center rounded-[1px] font-mono text-[11px] sm:text-[10px] font-bold uppercase tracking-wide leading-none transition-all duration-200 outline-none focus:ring-1 focus:ring-white/30
+                                className={`flex-1 flex flex-col items-center justify-center rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30
                                     ${preferences.walkLimit === limit 
-                                        ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-sm` 
+                                        ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md` 
                                         : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
                                     }
                                 `}
                             >
-                                {limit}
+                                <span className="font-mono text-[11px] sm:text-[10px] font-bold uppercase tracking-wide">{limit}</span>
                             </button>
                         ))}
                     </div>
