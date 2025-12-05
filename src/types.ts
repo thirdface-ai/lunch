@@ -132,10 +132,10 @@ export interface SearchHistoryRecord {
   vibe: string | null;
   price: string | null;
   walk_limit: string;
-  no_cash: boolean;
-  dietary_restrictions: string[];
+  no_cash: boolean | null;
+  dietary_restrictions: string[] | null;
   freestyle_prompt: string | null;
-  result_count: number;
+  result_count: number | null;
 }
 
 export interface FavoriteRecord {
@@ -149,7 +149,7 @@ export interface FavoriteRecord {
   ai_reason: string | null;
   recommended_dish: string | null;
   walking_time_text: string | null;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, unknown> | null;
 }
 
 export interface AppLogRecord {

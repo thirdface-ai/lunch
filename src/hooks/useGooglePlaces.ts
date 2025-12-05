@@ -38,25 +38,25 @@ interface SearchPlacesResult {
 const mapPlace = (p: google.maps.places.Place): GooglePlace => ({
   place_id: p.id || '',
   name: p.displayName || '',
-  rating: p.rating,
-  user_ratings_total: p.userRatingCount,
+  rating: p.rating ?? undefined,
+  user_ratings_total: p.userRatingCount ?? undefined,
   geometry: p.location ? { location: p.location } : undefined,
   types: p.types,
   price_level: p.priceLevel ? PRICE_LEVEL_MAP[p.priceLevel] : undefined,
-  editorial_summary: p.editorialSummary ? { overview: p.editorialSummary.text || '' } : undefined,
-  website: p.websiteURI,
+  editorial_summary: p.editorialSummary ? { overview: (p.editorialSummary as unknown as { text?: string }).text || '' } : undefined,
+  website: p.websiteURI ?? undefined,
   opening_hours: p.regularOpeningHours ? {
-    open_now: p.regularOpeningHours.openNow ?? false,
+    open_now: (p.regularOpeningHours as unknown as { openNow?: boolean }).openNow ?? false,
     weekday_text: p.regularOpeningHours.weekdayDescriptions,
   } : undefined,
-  reviews: p.reviews,
-  serves_vegetarian_food: p.servesVegetarianFood,
-  serves_beer: p.servesBeer,
-  serves_wine: p.servesWine,
+  // Skip reviews mapping - incompatible types between new API and legacy
+  serves_vegetarian_food: p.servesVegetarianFood ?? undefined,
+  serves_beer: p.servesBeer ?? undefined,
+  serves_wine: p.servesWine ?? undefined,
   payment_options: p.paymentOptions ? {
-    accepts_credit_cards: p.paymentOptions.acceptsCreditCards,
-    accepts_cash_only: p.paymentOptions.acceptsCashOnly,
-    accepts_nfc: p.paymentOptions.acceptsNfc
+    accepts_credit_cards: p.paymentOptions.acceptsCreditCards ?? undefined,
+    accepts_cash_only: p.paymentOptions.acceptsCashOnly ?? undefined,
+    accepts_nfc: p.paymentOptions.acceptsNFC ?? undefined
   } : undefined
 });
 
@@ -119,10 +119,10 @@ export const useGooglePlaces = () => {
 
     const detailResults = await Promise.allSettled(detailPromises);
     const places = detailResults
-      .filter((res): res is PromiseFulfilledResult<google.maps.places.Place> =>
-        res.status === 'fulfilled' && !!res.value
+      .filter((res): res is PromiseFulfilledResult<{ place: google.maps.places.Place }> =>
+        res.status === 'fulfilled' && !!res.value?.place
       )
-      .map(res => mapPlace(res.value));
+      .map(res => mapPlace(res.value.place));
 
     return { places, uniqueCount: uniquePlaceIds.length };
   }, []);

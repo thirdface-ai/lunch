@@ -468,7 +468,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <button
                     onClick={onCalculate}
                     disabled={!preferences.lat || (!preferences.vibe && !preferences.freestylePrompt)}
-                    aria-busy={appState === AppState.PROCESSING}
+                    aria-busy={(appState as AppState) === AppState.PROCESSING}
                     className={`
                         w-full h-full min-h-[60px] relative transition-all duration-200 ease-out rounded-sm flex items-center justify-center group overflow-hidden focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-braun-orange
                         ${(!preferences.lat || (!preferences.vibe && !preferences.freestylePrompt))

@@ -1,4 +1,5 @@
 import { supabase, getSessionId } from '../lib/supabase';
+import type { Json } from '../lib/database.types';
 import { 
   FinalResult, 
   UserPreferences,
@@ -58,7 +59,7 @@ export const SupabaseService = {
         return [];
       }
 
-      return data || [];
+      return (data || []) as SearchHistoryRecord[];
     } catch (e) {
       console.warn('Search history fetch exception:', e);
       return [];
@@ -70,7 +71,7 @@ export const SupabaseService = {
    */
   async addFavorite(result: FinalResult): Promise<boolean> {
     try {
-      const record: FavoriteRecord = {
+      const record = {
         session_id: getSessionId(),
         place_id: result.place_id,
         place_name: result.name,
@@ -83,7 +84,7 @@ export const SupabaseService = {
           types: result.types,
           price_level: result.price_level,
           is_new_opening: result.is_new_opening,
-        },
+        } as Json,
       };
 
       const { error } = await supabase
@@ -141,7 +142,11 @@ export const SupabaseService = {
         return [];
       }
 
-      return data || [];
+      // Cast metadata from Json to Record<string, unknown> | null
+      return (data || []).map(row => ({
+        ...row,
+        metadata: row.metadata as Record<string, unknown> | null,
+      }));
     } catch (e) {
       console.warn('Fetch favorites exception:', e);
       return [];

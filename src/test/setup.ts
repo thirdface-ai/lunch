@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import { vi, afterEach } from 'vitest';
 
 // Mock Google Maps API
 const mockGoogle = {
