@@ -118,47 +118,70 @@ interface FooterProps {
 
 const Footer: React.FC<FooterProps> = ({ isDark }) => {
   return (
-    <footer 
-      className={`
-        fixed z-50 font-mono uppercase tracking-wider
-        bottom-3 left-1/2 -translate-x-1/2
-        sm:bottom-4 sm:left-auto sm:right-4 sm:translate-x-0
-        ${isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'}
-      `}
-    >
-      <div className="flex items-center gap-2 text-[9px] sm:text-[10px]">
-        {/* Mobile: Inline row */}
-        <a 
-          href="https://www.linkedin.com/in/noahnawara/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="sm:hidden hover:text-braun-orange transition-colors"
-        >
-          NOAH NAWARA
-        </a>
-        
-        {/* Desktop: Scramble effect */}
-        <span className="hidden sm:inline">
-          Built by{' '}
-          <ScrambleText 
-            text="NOAH NAWARA" 
+    <>
+      {/* Mobile: Normal inline footer at bottom of page */}
+      <footer 
+        className={`
+          sm:hidden
+          py-6 text-center font-mono uppercase tracking-wider text-[9px]
+          ${isDark ? 'text-dark-text-muted/50 bg-dark-bg' : 'text-braun-text-muted/50 bg-braun-bg'}
+        `}
+      >
+        <div className="flex items-center justify-center gap-2">
+          <a 
             href="https://www.linkedin.com/in/noahnawara/"
-            className={isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'} 
-          />
-        </span>
-        
-        <span className={`${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
-        
-        <a 
-          href="https://thirdface.com/imprint" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="hover:text-braun-orange transition-colors"
-        >
-          Imprint
-        </a>
-      </div>
-    </footer>
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-braun-orange transition-colors"
+          >
+            NOAH NAWARA
+          </a>
+          
+          <span className={`${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
+          
+          <a 
+            href="https://thirdface.com/imprint" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:text-braun-orange transition-colors"
+          >
+            Imprint
+          </a>
+        </div>
+      </footer>
+
+      {/* Desktop: Fixed subtle footer in corner */}
+      <footer 
+        className={`
+          hidden sm:block
+          fixed z-50 bottom-4 right-4
+          font-mono uppercase tracking-wider text-[10px]
+          ${isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'}
+        `}
+      >
+        <div className="flex items-center gap-2">
+          <span>
+            Built by{' '}
+            <ScrambleText 
+              text="NOAH NAWARA" 
+              href="https://www.linkedin.com/in/noahnawara/"
+              className={isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'} 
+            />
+          </span>
+          
+          <span className={`${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
+          
+          <a 
+            href="https://thirdface.com/imprint" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:text-braun-orange transition-colors"
+          >
+            Imprint
+          </a>
+        </div>
+      </footer>
+    </>
   );
 };
 
