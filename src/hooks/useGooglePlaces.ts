@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { GooglePlace, HungerVibe, PlaceReview } from '../types';
-import { getSearchQueriesForVibe } from '../utils/lunchAlgorithm';
+import { getSearchQueriesForVibe, detectCuisineIntent, CuisineIntent } from '../utils/lunchAlgorithm';
 import Logger from '../utils/logger';
 
 // Price level mapping from Google Places API enum to numeric value
@@ -88,6 +88,7 @@ interface SearchPlacesParams {
 interface SearchPlacesResult {
   places: GooglePlace[];
   uniqueCount: number;
+  cuisineIntent: CuisineIntent;
 }
 
 /**
@@ -162,16 +163,32 @@ export const useGooglePlaces = () => {
     const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
     const location = new google.maps.LatLng(lat, lng);
 
-    // Determine search queries
-    let searchQueries = getSearchQueriesForVibe(vibe);
+    // Detect cuisine intent from freestyle prompt
+    const cuisineIntent = freestylePrompt 
+      ? detectCuisineIntent(freestylePrompt)
+      : { isCuisineSpecific: false, searchQueries: [] };
+
+    // Determine search queries based on cuisine intent
+    let searchQueries: string[];
     
     if (freestylePrompt && freestylePrompt.trim().length > 0) {
-      if (!vibe) {
-        // Freestyle only: use it as primary, but add "restaurant" as fallback
-        searchQueries = [freestylePrompt, 'restaurant', 'cafe'];
+      if (cuisineIntent.isCuisineSpecific) {
+        // Cuisine-specific query: use focused search queries, don't dilute with generic terms
+        searchQueries = cuisineIntent.searchQueries;
+        Logger.info('SYSTEM', 'Cuisine-specific search detected', { 
+          cuisineType: cuisineIntent.cuisineType,
+          queries: searchQueries 
+        });
+      } else if (!vibe) {
+        // General freestyle with no vibe: use the freestyle prompt + fallbacks
+        searchQueries = cuisineIntent.searchQueries;
       } else {
-        searchQueries = [freestylePrompt, ...searchQueries];
+        // Freestyle with vibe: combine both
+        searchQueries = [freestylePrompt, ...getSearchQueriesForVibe(vibe)];
       }
+    } else {
+      // No freestyle prompt: use vibe-based queries
+      searchQueries = getSearchQueriesForVibe(vibe);
     }
 
     // Search for place IDs
@@ -190,7 +207,7 @@ export const useGooglePlaces = () => {
     const uniquePlaceIds = [...new Set(allPlaceIds)];
 
     if (uniquePlaceIds.length === 0) {
-      return { places: [], uniqueCount: 0 };
+      return { places: [], uniqueCount: 0, cuisineIntent };
     }
 
     // Fetch detailed place information
@@ -216,7 +233,7 @@ export const useGooglePlaces = () => {
       filtered: allPlaces.length - foodPlaces.length
     });
 
-    return { places: foodPlaces, uniqueCount: uniquePlaceIds.length };
+    return { places: foodPlaces, uniqueCount: uniquePlaceIds.length, cuisineIntent };
   }, []);
 
   /**

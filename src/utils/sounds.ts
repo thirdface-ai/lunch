@@ -24,6 +24,23 @@ if (typeof window !== 'undefined') {
 
 const getAudioContext = (): AudioContext | null => audioContext;
 
+/**
+ * Get audio context only if ready to play immediately.
+ * If suspended, triggers resume (fire and forget) and returns null.
+ * This ensures sound functions never block/delay.
+ */
+const getReadyContext = (): AudioContext | null => {
+  if (!audioContext) return null;
+  
+  if (audioContext.state === 'suspended') {
+    // Fire and forget - don't wait
+    audioContext.resume();
+    return null; // Skip this sound, next one will work
+  }
+  
+  return audioContext;
+};
+
 // Play silent buffer to warm up audio pipeline
 // This primes the audio system so first real sound plays instantly
 const warmUpPipeline = () => {
@@ -100,8 +117,8 @@ const ensureAudioContext = async (): Promise<AudioContext | null> => {
 /**
  * Soft click - deep, warm
  */
-export const playSoftClick = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playSoftClick = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -125,8 +142,8 @@ export const playSoftClick = async (): Promise<void> => {
 /**
  * Medium click - deeper thunk
  */
-export const playMediumClick = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playMediumClick = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -155,8 +172,8 @@ export const playMediumClick = async (): Promise<void> => {
 /**
  * Firm click - heavy, deep thunk
  */
-export const playFirmClick = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playFirmClick = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -196,8 +213,8 @@ export const playFirmClick = async (): Promise<void> => {
 /**
  * Toggle on - deep ascending
  */
-export const playToggleOn = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playToggleOn = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -221,8 +238,8 @@ export const playToggleOn = async (): Promise<void> => {
 /**
  * Toggle off - deep descending
  */
-export const playToggleOff = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playToggleOff = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -246,15 +263,15 @@ export const playToggleOff = async (): Promise<void> => {
 /**
  * Hover - disabled/no-op (only used for special cases)
  */
-export const playHover = async (): Promise<void> => {
+export const playHover = (): void => {
   // No hover sounds
 };
 
 /**
  * Input focus - subtle deep click
  */
-export const playInputFocus = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playInputFocus = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -277,8 +294,8 @@ export const playInputFocus = async (): Promise<void> => {
 /**
  * Input blur - very subtle
  */
-export const playInputBlur = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playInputBlur = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -302,8 +319,8 @@ export const playInputBlur = async (): Promise<void> => {
 /**
  * Select - deep confirmation
  */
-export const playSelect = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playSelect = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -328,8 +345,8 @@ export const playSelect = async (): Promise<void> => {
 /**
  * Success - deep two-note
  */
-export const playSuccess = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playSuccess = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -358,8 +375,8 @@ export const playSuccess = async (): Promise<void> => {
 /**
  * Error - deep descending
  */
-export const playError = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playError = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -388,8 +405,8 @@ export const playError = async (): Promise<void> => {
 /**
  * Init - deep warm-up
  */
-export const playInit = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playInit = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -421,8 +438,8 @@ export const playInit = async (): Promise<void> => {
 /**
  * Log entry - deep tick
  */
-export const playLogEntry = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playLogEntry = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -445,8 +462,8 @@ export const playLogEntry = async (): Promise<void> => {
 /**
  * Favorite - deep pulse
  */
-export const playFavorite = async (add: boolean): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playFavorite = (add: boolean): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -477,8 +494,8 @@ export const playFavorite = async (add: boolean): Promise<void> => {
 /**
  * Locate - deep pings
  */
-export const playLocate = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
+export const playLocate = (): void => {
+  const ctx = getReadyContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
@@ -508,16 +525,8 @@ export const playLocate = async (): Promise<void> => {
  * @param durationMs - How long the rattling should last (matches animation duration)
  */
 export const playSplitFlapForDuration = (durationMs: number): void => {
-  const ctx = getAudioContext();
+  const ctx = getReadyContext();
   if (!ctx) return;
-  
-  // If context is suspended, resume and schedule with slight delay
-  if (ctx.state === 'suspended') {
-    ctx.resume().then(() => {
-      scheduleSplitFlapSounds(ctx, durationMs);
-    });
-    return;
-  }
   
   scheduleSplitFlapSounds(ctx, durationMs);
 };
@@ -580,7 +589,7 @@ const scheduleSplitFlapSounds = (ctx: AudioContext, durationMs: number): void =>
 /**
  * Split-flap display - default short duration (backwards compatibility)
  */
-export const playSplitFlap = async (): Promise<void> => {
+export const playSplitFlap = (): void => {
   playSplitFlapForDuration(400);
 };
 
@@ -588,19 +597,25 @@ export const playSplitFlap = async (): Promise<void> => {
 export const playLightClick = playSoftClick;
 export const playHeavyClick = playFirmClick;
 
-export const playClick = async (variant: 'soft' | 'medium' | 'heavy' = 'medium'): Promise<void> => {
+export const playClick = (variant: 'soft' | 'medium' | 'heavy' = 'medium'): void => {
   switch (variant) {
     case 'soft':
-      return playSoftClick();
+      playSoftClick();
+      break;
     case 'heavy':
-      return playFirmClick();
+      playFirmClick();
+      break;
     default:
-      return playMediumClick();
+      playMediumClick();
   }
 };
 
-export const playToggle = async (on: boolean): Promise<void> => {
-  return on ? playToggleOn() : playToggleOff();
+export const playToggle = (on: boolean): void => {
+  if (on) {
+    playToggleOn();
+  } else {
+    playToggleOff();
+  }
 };
 
 // Default export

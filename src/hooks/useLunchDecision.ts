@@ -146,7 +146,6 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
 
       // Rank candidates
       addLog('RANKING CANDIDATES...');
-      await new Promise(res => setTimeout(res, 1000));
 
       const sortedCandidates = candidatesWithinRange.sort((a, b) => {
         const durationA = durations.get(a.place_id)?.value;
@@ -156,7 +155,32 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         return scoreB - scoreA;
       });
 
-      const candidatesForGemini = sortedCandidates.slice(0, 40);
+      // Fetch recently recommended places to add variety
+      const recentlyRecommended = await SupabaseService.getRecentlyRecommendedIds(15);
+      
+      // Filter out recently shown restaurants for variety (but keep minimum pool)
+      const MIN_CANDIDATES_FOR_VARIETY = 8;
+      let candidatesForGemini = sortedCandidates.slice(0, 40);
+      
+      if (recentlyRecommended.size > 0) {
+        const freshCandidates = candidatesForGemini.filter(
+          c => !recentlyRecommended.has(c.place_id)
+        );
+        
+        // Only apply filter if we still have enough candidates
+        if (freshCandidates.length >= MIN_CANDIDATES_FOR_VARIETY) {
+          const filteredCount = candidatesForGemini.length - freshCandidates.length;
+          if (filteredCount > 0) {
+            addLog(`VARIETY FILTER: EXCLUDING ${filteredCount} RECENTLY SHOWN...`);
+          }
+          candidatesForGemini = freshCandidates;
+        } else {
+          Logger.info('SYSTEM', 'Skipping variety filter - limited candidate pool', {
+            freshCount: freshCandidates.length,
+            recentCount: recentlyRecommended.size
+          });
+        }
+      }
 
       if (candidatesForGemini.length === 0) {
         throw new Error('SYSTEM UNABLE TO LOCATE VIABLE TARGETS.');
@@ -210,6 +234,9 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
 
       // Save search to history
       await SupabaseService.saveSearch(preferences, finalResults.length);
+      
+      // Save recommended places for variety tracking (non-blocking)
+      SupabaseService.saveRecommendedPlaces(finalResults);
 
       setTimeout(() => {
         setResults(finalResults);

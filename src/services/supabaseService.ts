@@ -196,6 +196,58 @@ export const SupabaseService = {
       return new Set();
     }
   },
+
+  /**
+   * Save recommended places to track for variety
+   * Called after successful recommendations to avoid showing same restaurants
+   */
+  async saveRecommendedPlaces(results: FinalResult[]): Promise<void> {
+    if (results.length === 0) return;
+
+    try {
+      const records = results.map(r => ({
+        session_id: getSessionId(),
+        place_id: r.place_id,
+        place_name: r.name,
+      }));
+
+      const { error } = await supabase
+        .from('recommended_places')
+        .insert(records);
+
+      if (error) {
+        console.warn('Failed to save recommended places:', error.message);
+      }
+    } catch (e) {
+      console.warn('Save recommended places exception:', e);
+    }
+  },
+
+  /**
+   * Get recently recommended place IDs for the current session
+   * Used to filter out recently shown restaurants for variety
+   * @param limit Number of recent recommendations to fetch (default: 15 = ~5 searches)
+   */
+  async getRecentlyRecommendedIds(limit = 15): Promise<Set<string>> {
+    try {
+      const { data, error } = await supabase
+        .from('recommended_places')
+        .select('place_id')
+        .eq('session_id', getSessionId())
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.warn('Failed to fetch recently recommended:', error.message);
+        return new Set();
+      }
+
+      return new Set((data || []).map(r => r.place_id));
+    } catch (e) {
+      console.warn('Fetch recently recommended exception:', e);
+      return new Set();
+    }
+  },
 };
 
 export default SupabaseService;

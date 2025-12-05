@@ -146,7 +146,7 @@ export const decideLunch = async (
     candidateCount: candidates.length, 
     vibe, 
     price, 
-    freestylePrompt 
+    freestylePrompt
   });
 
   if (candidates.length === 0) {
@@ -252,28 +252,16 @@ GOOD: "Their Duck Confit is legendary - multiple reviewers call it 'perfectly cr
 - Each place_id in your response MUST be unique
 - If you can't find 3 different quality options, return fewer (1 or 2) rather than duplicating
 
-=== CRITICAL: CUISINE DIVERSITY ===
-Your 3 picks MUST be from DIFFERENT cuisine categories. This is mandatory, not optional.
+=== SELECTION STRATEGY ===
+Pick the 3 restaurants that BEST match the user's request.
 
-Example of GOOD diversity:
-1. Italian (pasta/pizza)
-2. Vietnamese (pho/banh mi)  
-3. Mexican (tacos/burritos)
+If the user asked for something specific (like "ramen", "pizza", "tacos"):
+- Focus on finding the best options for that specific request
+- Quality and relevance to their request matters most
 
-Example of BAD diversity (DO NOT DO THIS):
-1. Vietnamese restaurant
-2. Asian fusion with poke bowls
-3. Sushi restaurant
-^ These are all Asian cuisine - REJECTED
-
-Categories to spread across:
-- European: Italian, French, German, Spanish, Greek
-- Asian: Japanese, Chinese, Vietnamese, Thai, Korean, Indian (pick only ONE from Asian)
-- Americas: Mexican, American, Brazilian
-- Middle Eastern: Turkish, Lebanese, Israeli
-- Other: Vegetarian/Vegan cafes, Brunch spots, Delis
-
-If the candidate pool lacks diversity, pick the BEST option from each available category rather than multiple from the same category.`;
+If the user gave a general vibe (like "quick lunch", "something filling"):
+- Offer variety - pick from different cuisine types when possible
+- Show them interesting options they might not have considered`;
 
   const prompt = `Analyze these ${payload.length} restaurants and select exactly 3 best matches:
 

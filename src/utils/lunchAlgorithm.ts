@@ -1,6 +1,79 @@
 import { HungerVibe, PricePoint, GooglePlace } from '../types';
 
 /**
+ * Cuisine intent detection result
+ */
+export interface CuisineIntent {
+  isCuisineSpecific: boolean;
+  cuisineType?: string;
+  searchQueries: string[];
+}
+
+/**
+ * Cuisine keywords mapping - maps cuisine types to search queries
+ * The first keyword in each array is used for detection
+ */
+const CUISINE_KEYWORDS: Record<string, string[]> = {
+  ramen: ['ramen', 'ramen shop', 'japanese ramen', 'ramen restaurant'],
+  sushi: ['sushi', 'sushi restaurant', 'japanese sushi', 'sushi bar'],
+  pizza: ['pizza', 'pizzeria', 'italian pizza', 'pizza restaurant'],
+  burger: ['burger', 'burger joint', 'hamburger', 'burger restaurant'],
+  tacos: ['tacos', 'taco shop', 'mexican tacos', 'taqueria'],
+  pho: ['pho', 'pho restaurant', 'vietnamese pho', 'pho noodles'],
+  curry: ['curry', 'curry house', 'indian curry', 'thai curry'],
+  pasta: ['pasta', 'italian pasta', 'pasta restaurant', 'italian restaurant'],
+  korean: ['korean', 'korean restaurant', 'korean bbq', 'korean food'],
+  thai: ['thai', 'thai restaurant', 'thai food', 'thai cuisine'],
+  indian: ['indian', 'indian restaurant', 'indian food', 'indian cuisine'],
+  chinese: ['chinese', 'chinese restaurant', 'chinese food', 'dim sum'],
+  vietnamese: ['vietnamese', 'vietnamese restaurant', 'vietnamese food', 'banh mi'],
+  mexican: ['mexican', 'mexican restaurant', 'mexican food', 'burrito'],
+  mediterranean: ['mediterranean', 'mediterranean restaurant', 'greek food', 'falafel'],
+  kebab: ['kebab', 'doner', 'kebab shop', 'shawarma'],
+  sashimi: ['sashimi', 'sashimi restaurant', 'japanese sashimi', 'raw fish'],
+  udon: ['udon', 'udon noodles', 'japanese udon', 'udon restaurant'],
+  dumpling: ['dumpling', 'dumplings', 'dumpling house', 'gyoza'],
+  noodles: ['noodles', 'noodle shop', 'noodle restaurant', 'asian noodles'],
+  bbq: ['bbq', 'barbecue', 'bbq restaurant', 'grill'],
+  seafood: ['seafood', 'seafood restaurant', 'fish restaurant', 'oyster bar'],
+  steak: ['steak', 'steakhouse', 'steak restaurant', 'grill house'],
+  brunch: ['brunch', 'brunch spot', 'brunch restaurant', 'breakfast'],
+  vegan: ['vegan', 'vegan restaurant', 'plant-based', 'vegan food'],
+  vegetarian: ['vegetarian', 'vegetarian restaurant', 'veggie', 'vegetarian food'],
+};
+
+/**
+ * Detect if the user's query is asking for a specific cuisine type
+ * Returns cuisine-specific search queries if detected, otherwise general queries
+ */
+export const detectCuisineIntent = (query: string): CuisineIntent => {
+  if (!query || query.trim().length === 0) {
+    return { isCuisineSpecific: false, searchQueries: ['restaurant', 'lunch'] };
+  }
+
+  const lower = query.toLowerCase().trim();
+  
+  // Check each cuisine type
+  for (const [cuisineType, keywords] of Object.entries(CUISINE_KEYWORDS)) {
+    // Check if query contains the primary keyword (first in array)
+    const primaryKeyword = keywords[0];
+    if (lower.includes(primaryKeyword)) {
+      return {
+        isCuisineSpecific: true,
+        cuisineType,
+        searchQueries: keywords,
+      };
+    }
+  }
+  
+  // Not a specific cuisine - return the original query with fallbacks
+  return {
+    isCuisineSpecific: false,
+    searchQueries: [query, 'restaurant', 'cafe'],
+  };
+};
+
+/**
  * Parse time string like "11:00 AM", "2:30 PM", "14:00" into minutes since midnight
  */
 const parseTimeToMinutes = (timeStr: string): number | null => {
