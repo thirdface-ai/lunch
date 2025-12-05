@@ -37,18 +37,12 @@ const parseTimeToMinutes = (timeStr: string): number | null => {
 };
 
 /**
- * Check if a place is currently open based on today's hours string
- * Handles formats like "11:00 am – 10:00 pm", "12:00 – 11:30 pm", "Closed"
+ * Check if current time falls within a single time range
+ * Returns true if open, false if closed, null if can't parse
  */
-const isCurrentlyOpen = (todaysHours: string | null | undefined): boolean | null => {
-  if (!todaysHours) return null;
-  
-  const cleaned = todaysHours.trim().toLowerCase();
-  if (cleaned === 'closed') return false;
-  if (cleaned === 'open 24 hours') return true;
-  
+const isWithinTimeRange = (rangeStr: string): boolean | null => {
   // Split by common separators: "–", "-", "to"
-  const parts = todaysHours.split(/\s*[–\-]\s*|\s+to\s+/i);
+  const parts = rangeStr.split(/\s*[–\-]\s*|\s+to\s+/i);
   if (parts.length !== 2) return null;
   
   const openTime = parseTimeToMinutes(parts[0]);
@@ -65,6 +59,33 @@ const isCurrentlyOpen = (todaysHours: string | null | undefined): boolean | null
   }
   
   return currentMinutes >= openTime && currentMinutes < closeTime;
+};
+
+/**
+ * Check if a place is currently open based on today's hours string
+ * Handles formats like "11:00 am – 10:00 pm", "12:00 – 3:30 pm, 5:30 – 10:30 pm", "Closed"
+ */
+const isCurrentlyOpen = (todaysHours: string | null | undefined): boolean | null => {
+  if (!todaysHours) return null;
+  
+  const cleaned = todaysHours.trim().toLowerCase();
+  if (cleaned === 'closed') return false;
+  if (cleaned === 'open 24 hours') return true;
+  
+  // Split by comma to handle multiple time ranges (e.g., lunch and dinner)
+  const timeRanges = todaysHours.split(/\s*,\s*/);
+  
+  for (const range of timeRanges) {
+    const isOpen = isWithinTimeRange(range.trim());
+    if (isOpen === true) {
+      return true; // Open if within ANY time range
+    }
+  }
+  
+  // If we parsed at least one range and none matched, it's closed
+  // If we couldn't parse any ranges, return null to fall back to API
+  const parsedAny = timeRanges.some(range => isWithinTimeRange(range.trim()) !== null);
+  return parsedAny ? false : null;
 };
 
 interface ResultsViewProps {

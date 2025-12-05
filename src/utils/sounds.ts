@@ -437,61 +437,170 @@ export const playLocate = async (): Promise<void> => {
 };
 
 /**
- * Split-flap display - deep mechanical rattling
+ * Split-flap display - deep mechanical rattling (one-shot version for backwards compatibility)
  */
 export const playSplitFlap = async (): Promise<void> => {
-  const ctx = await ensureAudioContext();
-  if (!ctx) return;
+  const controller = await startSplitFlap();
+  // Auto-stop after default duration
+  setTimeout(() => controller?.stop(), 500);
+};
 
-  const now = ctx.currentTime;
+/**
+ * Split-flap display - continuous rattling that can be stopped
+ * Returns a controller with a stop() method to end the sound with a settling thunk
+ */
+export interface SoundController {
+  stop: () => void;
+}
+
+export const startSplitFlap = async (): Promise<SoundController | null> => {
+  const ctx = await ensureAudioContext();
+  if (!ctx) return null;
+
+  let isRunning = true;
+  let intervalId: NodeJS.Timeout | null = null;
+  const activeNodes: { osc: OscillatorNode; gain: GainNode; filter: BiquadFilterNode }[] = [];
   
-  const clickCount = 12 + Math.floor(Math.random() * 8);
-  const totalDuration = 0.4 + Math.random() * 0.2;
-  const interval = totalDuration / clickCount;
-  
-  for (let i = 0; i < clickCount; i++) {
-    const clickTime = now + i * interval;
+  // Play continuous clicks at ~30ms intervals to match animation
+  const playClick = () => {
+    if (!isRunning || !ctx) return;
     
+    const now = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     const filter = ctx.createBiquadFilter();
     
     osc.type = 'square';
-    // Much deeper frequencies
     const basePitch = 80 + Math.random() * 40;
-    osc.frequency.setValueAtTime(basePitch, clickTime);
-    osc.frequency.exponentialRampToValueAtTime(basePitch * 0.5, clickTime + 0.015);
+    osc.frequency.setValueAtTime(basePitch, now);
+    osc.frequency.exponentialRampToValueAtTime(basePitch * 0.5, now + 0.015);
     
     filter.type = 'lowpass';
     filter.frequency.value = 200;
     
-    const volumeMultiplier = i < clickCount - 3 ? 1 : (clickCount - i) / 3;
-    gain.gain.setValueAtTime(0.06 * volumeMultiplier, clickTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, clickTime + 0.02);
+    gain.gain.setValueAtTime(0.05, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
     
     osc.connect(filter);
     filter.connect(gain);
     gain.connect(ctx.destination);
-    osc.start(clickTime);
-    osc.stop(clickTime + 0.02);
-  }
+    osc.start(now);
+    osc.stop(now + 0.02);
+  };
   
-  // Deep settling thunk
-  const settleTime = now + totalDuration + 0.02;
-  const settleOsc = ctx.createOscillator();
-  const settleGain = ctx.createGain();
+  // Start the clicking loop
+  playClick();
+  intervalId = setInterval(playClick, 30);
   
-  settleOsc.type = 'sine';
-  settleOsc.frequency.setValueAtTime(80, settleTime);
-  settleOsc.frequency.exponentialRampToValueAtTime(40, settleTime + 0.04);
+  const stop = () => {
+    if (!isRunning) return;
+    isRunning = false;
+    
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+    
+    // Clean up any remaining nodes
+    activeNodes.forEach(({ osc, gain }) => {
+      try {
+        osc.stop();
+        osc.disconnect();
+        gain.disconnect();
+      } catch (e) {
+        // Node may already be stopped
+      }
+    });
+    activeNodes.length = 0;
+    
+    // Play settling thunk
+    if (ctx) {
+      const now = ctx.currentTime;
+      const settleOsc = ctx.createOscillator();
+      const settleGain = ctx.createGain();
+      
+      settleOsc.type = 'sine';
+      settleOsc.frequency.setValueAtTime(80, now);
+      settleOsc.frequency.exponentialRampToValueAtTime(40, now + 0.04);
+      
+      settleGain.gain.setValueAtTime(0.1, now);
+      settleGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      
+      settleOsc.connect(settleGain);
+      settleGain.connect(ctx.destination);
+      settleOsc.start(now);
+      settleOsc.stop(now + 0.08);
+    }
+  };
   
-  settleGain.gain.setValueAtTime(0.1, settleTime);
-  settleGain.gain.exponentialRampToValueAtTime(0.001, settleTime + 0.08);
+  return { stop };
+};
+
+/**
+ * Processing hum - continuous low frequency drone for loading states
+ * Returns a controller with a stop() method
+ */
+export const startProcessingHum = async (): Promise<SoundController | null> => {
+  const ctx = await ensureAudioContext();
+  if (!ctx) return null;
+
+  const now = ctx.currentTime;
   
-  settleOsc.connect(settleGain);
-  settleGain.connect(ctx.destination);
-  settleOsc.start(settleTime);
-  settleOsc.stop(settleTime + 0.08);
+  // Base drone
+  const droneOsc = ctx.createOscillator();
+  const droneGain = ctx.createGain();
+  const droneFilter = ctx.createBiquadFilter();
+  
+  droneOsc.type = 'sine';
+  droneOsc.frequency.value = 55; // Low A
+  
+  droneFilter.type = 'lowpass';
+  droneFilter.frequency.value = 100;
+  
+  droneGain.gain.setValueAtTime(0, now);
+  droneGain.gain.linearRampToValueAtTime(0.04, now + 0.3); // Fade in
+  
+  droneOsc.connect(droneFilter);
+  droneFilter.connect(droneGain);
+  droneGain.connect(ctx.destination);
+  droneOsc.start(now);
+  
+  // Subtle modulation oscillator for texture
+  const modOsc = ctx.createOscillator();
+  const modGain = ctx.createGain();
+  
+  modOsc.type = 'sine';
+  modOsc.frequency.value = 0.5; // Very slow modulation
+  modGain.gain.value = 3; // Modulate frequency by ±3Hz
+  
+  modOsc.connect(modGain);
+  modGain.connect(droneOsc.frequency);
+  modOsc.start(now);
+  
+  const stop = () => {
+    const stopTime = ctx.currentTime;
+    
+    // Fade out
+    droneGain.gain.setValueAtTime(droneGain.gain.value, stopTime);
+    droneGain.gain.linearRampToValueAtTime(0, stopTime + 0.2);
+    
+    // Stop after fade
+    setTimeout(() => {
+      try {
+        droneOsc.stop();
+        modOsc.stop();
+        droneOsc.disconnect();
+        modOsc.disconnect();
+        droneGain.disconnect();
+        modGain.disconnect();
+        droneFilter.disconnect();
+      } catch (e) {
+        // Already stopped
+      }
+    }, 250);
+  };
+  
+  return { stop };
 };
 
 // Convenience aliases
@@ -531,6 +640,8 @@ const Sounds = {
   favorite: playFavorite,
   locate: playLocate,
   splitFlap: playSplitFlap,
+  startSplitFlap,
+  startProcessingHum,
   lightClick: playSoftClick,
   heavyClick: playFirmClick,
   click: playClick,

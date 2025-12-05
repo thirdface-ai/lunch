@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AppState, TransportMode, HungerVibe, PricePoint, UserPreferences, WalkLimit, ThemeMode, DietaryRestriction } from '../types';
-import Sounds from '../utils/sounds';
+import Sounds, { startSplitFlap, SoundController } from '../utils/sounds';
 
 
 // Easter egg: Text scramble effect component (airport split-flap display style)
@@ -11,15 +11,16 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const iterationRef = useRef(0);
+  const soundControllerRef = useRef<SoundController | null>(null);
 
-  const scramble = useCallback(() => {
+  const scramble = useCallback(async () => {
     iterationRef.current = 0;
     const originalText = text;
     
     if (intervalRef.current) clearInterval(intervalRef.current);
     
-    // Play the split-flap rattling sound
-    Sounds.splitFlap();
+    // Start the continuous split-flap sound (synced with animation)
+    soundControllerRef.current = await startSplitFlap();
     
     intervalRef.current = setInterval(() => {
       setDisplayText(
@@ -38,7 +39,12 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
       iterationRef.current += 1 / 3;
       
       if (iterationRef.current >= originalText.length) {
+        // Animation complete - stop the sound with settling thunk
         if (intervalRef.current) clearInterval(intervalRef.current);
+        if (soundControllerRef.current) {
+          soundControllerRef.current.stop();
+          soundControllerRef.current = null;
+        }
         setDisplayText(originalText);
       }
     }, 30);
@@ -52,12 +58,21 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
   const handleMouseLeave = () => {
     setIsHovering(false);
     if (intervalRef.current) clearInterval(intervalRef.current);
+    // Stop sound immediately when mouse leaves (with settling thunk)
+    if (soundControllerRef.current) {
+      soundControllerRef.current.stop();
+      soundControllerRef.current = null;
+    }
     setDisplayText(text);
   };
 
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (soundControllerRef.current) {
+        soundControllerRef.current.stop();
+        soundControllerRef.current = null;
+      }
     };
   }, []);
 
