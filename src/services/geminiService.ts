@@ -51,28 +51,40 @@ const callGeminiProxy = async (model: string, contents: string, config: Record<s
 };
 
 export const generateLoadingLogs = async (vibe: HungerVibe | null, address: string): Promise<string[]> => {
-  const vibeText = vibe || 'Custom/User Defined';
+  const vibeText = vibe || 'good food';
   Logger.info('AI', 'Generating Loading Logs', { vibe: vibeText, address });
 
+  // Extract neighborhood/city from address for localized humor
+  const locationPart = address ? address.split(',')[0] : 'the area';
+
   const prompt = `
-    Generate 8 short, funny loading messages for a lunch finder app. Keep each under 8 words. Be witty and playful.
+    Generate 12 unique, funny loading messages for a lunch finder app searching in "${locationPart}" for "${vibeText}" vibes.
+    
+    REQUIREMENTS:
+    - Each message MUST be different and creative (no repetition of concepts)
+    - Keep each under 10 words
+    - ALL CAPS
+    - End each with "..."
+    - Be witty, playful, and slightly absurd
+    - Reference the location or vibe when possible
+    - Mix of: tech humor, food puns, self-aware AI jokes, local references
+    
+    STYLE EXAMPLES (don't copy these, make new ones):
+    - "BRIBING ${locationPart.toUpperCase()} PIGEONS FOR INTEL..."
+    - "CALCULATING IF THIS IS WORTH WEARING PANTS..."
+    - "ARGUING WITH THE AI ABOUT 'AUTHENTIC'..."
+    - "FILTERING OUT YOUR EX'S FAVORITE SPOTS..."
+    - "READING REVIEWS WRITTEN AT 3AM..."
+    - "DETERMINING OPTIMAL FOOD COMA TIMING..."
+    - "CROSS-CHECKING WITH FUTURE REGRETS..."
+    - "ASKING LOCAL CATS FOR OPINIONS..."
 
-    Location: "${address}"
-    Mood: "${vibeText}"
+    PROGRESSION:
+    - Messages 1-4: Active searching/analyzing (fun, energetic)
+    - Messages 5-8: Mid-process humor (self-aware, slightly apologetic)
+    - Messages 9-12: Reassuring finish (almost done, worth the wait)
 
-    Structure:
-    - Messages 1-4: Fun searching/analyzing messages
-    - Messages 5-6: Slightly apologetic but still funny ("worth the wait" vibes)
-    - Messages 7-8: Reassuring that results are coming, stay hungry
-
-    Examples:
-    - "SNIFFING OUT GOOD PASTA..."
-    - "BRIBING FOOD CRITICS..."
-    - "STILL HERE, STILL COOKING..."
-    - "TRUST ME, THIS IS WORTH IT..."
-    - "ALMOST DONE, DON'T ORDER PIZZA..."
-
-    Return ONLY a valid JSON string array with exactly 8 strings. ALL CAPS.
+    Return ONLY a valid JSON array with exactly 12 unique strings.
   `;
 
   try {
@@ -80,6 +92,7 @@ export const generateLoadingLogs = async (vibe: HungerVibe | null, address: stri
       GEMINI_MODEL,
       prompt,
       {
+        temperature: 0.9, // Higher temp for more creative/varied responses
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.ARRAY,
@@ -88,22 +101,31 @@ export const generateLoadingLogs = async (vibe: HungerVibe | null, address: stri
       }
     );
     
-    if (!text) return ['THINKING ABOUT FOOD...'];
-    return JSON.parse(text) as string[];
+    if (!text) return getDefaultLoadingMessages();
+    const messages = JSON.parse(text) as string[];
+    // Ensure we have enough messages
+    return messages.length >= 8 ? messages : getDefaultLoadingMessages();
   } catch (e) {
     Logger.warn('AI', 'Log generation failed, using fallbacks.', { error: e });
-    return [
-      'SNIFFING OUT OPTIONS...',
-      'JUDGING MENU FONTS...',
-      'BRIBING FOOD CRITICS...',
-      'READING SUSPICIOUS REVIEWS...',
-      'STILL HERE, STILL HUNGRY...',
-      'GOOD THINGS TAKE TIME OK...',
-      'ALMOST THERE, STAY STRONG...',
-      'WORTH THE WAIT, PROMISE...'
-    ];
+    return getDefaultLoadingMessages();
   }
 };
+
+// Fallback messages if AI generation fails
+const getDefaultLoadingMessages = (): string[] => [
+  'SNIFFING OUT THE GOOD STUFF...',
+  'JUDGING RESTAURANTS BY THEIR FONTS...',
+  'BRIBING LOCAL FOOD CRITICS...',
+  'READING SUSPICIOUSLY GLOWING REVIEWS...',
+  'CALCULATING FOOD COMA PROBABILITY...',
+  'FILTERING OUT TOURIST TRAPS...',
+  'ASKING THE ALGORITHM NICELY...',
+  'STILL HERE, STILL HUNGRY...',
+  'GOOD THINGS TAKE TIME, ALLEGEDLY...',
+  'AI IS THINKING REALLY HARD...',
+  'ALMOST THERE, DON\'T ORDER PIZZA...',
+  'WORTH THE WAIT, PROBABLY...'
+];
 
 /**
  * STREAMLINED LUNCH DECISION - Single API Call
@@ -227,6 +249,11 @@ BAD: "Great restaurant with good food."
 
 GOOD: "Their Duck Confit is legendary - multiple reviewers call it 'perfectly crispy' and 'best in Mitte'. At 4.6 stars with 340 reviews, this French bistro delivers consistent quality. Quick service makes it ideal for a satisfying lunch."
 
+=== CRITICAL: NO DUPLICATES ===
+- NEVER recommend the same restaurant twice
+- Each place_id in your response MUST be unique
+- If you can't find 3 different quality options, return fewer (1 or 2) rather than duplicating
+
 === DIVERSITY ===
 Select 3 restaurants with DIFFERENT cuisine types when possible.`;
 
@@ -265,10 +292,21 @@ Return a JSON array with exactly 3 recommendations.`;
 
     const results = JSON.parse(text) as Omit<GeminiRecommendation, 'cash_warning_msg'>[];
     
-    // Ensure we have exactly 3 results
-    const finalResults = results.slice(0, 3);
+    // CRITICAL: Deduplicate by place_id - never show the same restaurant twice
+    const seenPlaceIds = new Set<string>();
+    const deduplicatedResults = results.filter(r => {
+      if (seenPlaceIds.has(r.place_id)) {
+        Logger.warn('AI', `Duplicate place_id filtered out: ${r.place_id}`);
+        return false;
+      }
+      seenPlaceIds.add(r.place_id);
+      return true;
+    });
     
-    Logger.info('AI', `Decision complete: ${finalResults.length} recommendations`);
+    // Take up to 3 unique results
+    const finalResults = deduplicatedResults.slice(0, 3);
+    
+    Logger.info('AI', `Decision complete: ${finalResults.length} recommendations (${results.length - deduplicatedResults.length} duplicates removed)`);
     
     // Log the picks
     const pickNames = finalResults.map(r => {

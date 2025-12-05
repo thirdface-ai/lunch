@@ -1,5 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { TerminalLog, AppState } from '../types';
+import { TerminalLog, AppState, HungerVibe } from '../types';
+import { generateLoadingLogs } from '../services/geminiService';
+
+// Get random interval between 8-12 seconds
+const getRandomInterval = () => Math.floor(Math.random() * 4000) + 8000;
 
 interface UseTerminalLogsOptions {
   /** Auto-increment progress when in processing state */
@@ -15,6 +19,7 @@ interface UseTerminalLogsReturn {
   clearLogs: () => void;
   setProgress: (value: number | ((prev: number) => number)) => void;
   resetProgress: () => void;
+  startDynamicMessages: (vibe: HungerVibe | null, address: string) => void;
 }
 
 /**
@@ -28,7 +33,10 @@ export const useTerminalLogs = (
   
   const [logs, setLogs] = useState<TerminalLog[]>([]);
   const [progress, setProgress] = useState(0);
+  const [dynamicMessages, setDynamicMessages] = useState<string[]>([]);
   const logIdCounter = useRef(0);
+  const messageIndexRef = useRef(0);
+  const messageIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Add a new log entry
   const addLog = useCallback((text: string) => {
@@ -39,6 +47,54 @@ export const useTerminalLogs = (
     };
     setLogs(prev => [...prev, newLog]);
   }, []);
+
+  // Start generating and displaying dynamic messages
+  const startDynamicMessages = useCallback(async (vibe: HungerVibe | null, address: string) => {
+    // Generate fresh messages from AI
+    const messages = await generateLoadingLogs(vibe, address);
+    setDynamicMessages(messages);
+    messageIndexRef.current = 0;
+  }, []);
+
+  // Display dynamic messages periodically during processing
+  useEffect(() => {
+    if (appState !== AppState.PROCESSING || dynamicMessages.length === 0) {
+      if (messageIntervalRef.current) {
+        clearTimeout(messageIntervalRef.current);
+        messageIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const scheduleNextMessage = () => {
+      const interval = getRandomInterval();
+      messageIntervalRef.current = setTimeout(() => {
+        // Get next message (cycle through if we run out)
+        const message = dynamicMessages[messageIndexRef.current % dynamicMessages.length];
+        messageIndexRef.current++;
+        addLog(message);
+        scheduleNextMessage();
+      }, interval);
+    };
+
+    // Start the cycle
+    scheduleNextMessage();
+
+    return () => {
+      if (messageIntervalRef.current) {
+        clearTimeout(messageIntervalRef.current);
+        messageIntervalRef.current = null;
+      }
+    };
+  }, [appState, dynamicMessages, addLog]);
+
+  // Reset dynamic messages when leaving processing state
+  useEffect(() => {
+    if (appState !== AppState.PROCESSING) {
+      setDynamicMessages([]);
+      messageIndexRef.current = 0;
+    }
+  }, [appState]);
 
   // Clear all logs
   const clearLogs = useCallback(() => {
@@ -85,6 +141,7 @@ export const useTerminalLogs = (
     clearLogs,
     setProgress,
     resetProgress,
+    startDynamicMessages,
   };
 };
 

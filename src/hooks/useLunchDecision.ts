@@ -35,7 +35,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
 
   const { searchPlaces } = useGooglePlaces();
   const { calculateDistances, filterByDuration, sortByDuration } = useDistanceMatrix();
-  const { logs, progress, addLog, clearLogs, setProgress, resetProgress } = useTerminalLogs(appState);
+  const { logs, progress, addLog, clearLogs, setProgress, resetProgress, startDynamicMessages } = useTerminalLogs(appState);
 
   /**
    * Main calculation function that orchestrates the entire process
@@ -49,6 +49,9 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
     clearLogs();
     setProgress(5);
     Logger.userAction('Search Initiated', { preferences });
+
+    // Start generating dynamic funny messages in background (non-blocking)
+    startDynamicMessages(preferences.vibe, preferences.address);
 
     addLog(`ACQUIRING SATELLITE LOCK [${preferences.lat.toFixed(4)}, ${preferences.lng.toFixed(4)}]...`);
 
@@ -209,6 +212,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
     addLog,
     clearLogs,
     setProgress,
+    startDynamicMessages,
   ]);
 
   /**
