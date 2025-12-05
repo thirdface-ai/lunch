@@ -1,17 +1,36 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FinalResult, ThemeMode } from '../types';
 
-// Dark mode styles for Google Maps
+// Base styles to hide all POI markers (sightseeing, businesses, etc.)
+const HIDE_POI_STYLES: google.maps.MapTypeStyle[] = [
+  { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.attraction', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.government', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.medical', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.place_of_worship', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.school', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.sports_complex', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+];
+
+// Light mode styles (clean, minimal with hidden POIs)
+const LIGHT_MAP_STYLES: google.maps.MapTypeStyle[] = [
+  ...HIDE_POI_STYLES,
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#e5e5e0' }] },
+  { featureType: 'poi.park', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+];
+
+// Dark mode styles for Google Maps (with hidden POIs)
 const DARK_MAP_STYLES: google.maps.MapTypeStyle[] = [
+  ...HIDE_POI_STYLES,
   { elementType: 'geometry', stylers: [{ color: '#1a1a1a' }] },
   { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a1a' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#8a8a8a' }] },
   { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#2a2a2a' }] },
   { featureType: 'administrative.country', elementType: 'labels.text.fill', stylers: [{ color: '#9e9e9e' }] },
   { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#bdbdbd' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
   { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#252525' }] },
-  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
   { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#2c2c2c' }] },
   { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#8a8a8a' }] },
   { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#373737' }] },
@@ -34,7 +53,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [apiStatus, setApiStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
 
   const isDark = theme === ThemeMode.DARK;
 
@@ -46,12 +65,16 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
     const initMap = async () => {
       try {
         const { Map } = await google.maps.importLibrary('maps') as google.maps.MapsLibrary;
+        // Pre-load the marker library
+        await google.maps.importLibrary('marker');
+        
         if (isMounted && mapRef.current) {
           const mapInstance = new Map(mapRef.current, {
             center: { lat: userLat || 0, lng: userLng || 0 },
             zoom: 14,
             disableDefaultUI: true,
-            styles: isDark ? DARK_MAP_STYLES : undefined,
+            styles: isDark ? DARK_MAP_STYLES : LIGHT_MAP_STYLES,
+            mapId: 'lunch-map', // Required for AdvancedMarkerElement
           });
           setMap(mapInstance);
           setApiStatus('loaded');
@@ -71,7 +94,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
   // Update map styles when theme changes
   useEffect(() => {
     if (!map) return;
-    map.setOptions({ styles: isDark ? DARK_MAP_STYLES : [] });
+    map.setOptions({ styles: isDark ? DARK_MAP_STYLES : LIGHT_MAP_STYLES });
   }, [map, isDark]);
 
   // Update markers and viewport when map is ready or data changes
@@ -79,24 +102,29 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
     if (!map || apiStatus !== 'loaded' || !userLat || !userLng) return;
 
     const updateMap = async () => {
+      const { AdvancedMarkerElement } = await google.maps.importLibrary('marker') as google.maps.MarkerLibrary;
+      
       // Clear any existing markers
-      markersRef.current.forEach(marker => marker.setMap(null));
+      markersRef.current.forEach(marker => marker.map = null);
       markersRef.current = [];
 
       // Create user location marker (black/white dot)
-      const userMarker = new google.maps.Marker({
+      const userDot = document.createElement('div');
+      userDot.style.cssText = `
+        width: 16px;
+        height: 16px;
+        background: ${isDark ? '#FFFFFF' : '#111111'};
+        border: 2px solid ${isDark ? '#FFFFFF' : '#111111'};
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      `;
+      
+      const userMarker = new AdvancedMarkerElement({
         map,
         position: { lat: userLat, lng: userLng },
         title: 'Your Location',
         zIndex: 1,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 8,
-          fillColor: isDark ? '#FFFFFF' : '#111111',
-          fillOpacity: 1,
-          strokeColor: isDark ? '#FFFFFF' : '#111111',
-          strokeWeight: 2,
-        },
+        content: userDot,
       });
       markersRef.current.push(userMarker);
 
@@ -104,27 +132,31 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
       results.forEach((res, idx) => {
         if (!res.geometry?.location) return;
 
-        const marker = new google.maps.Marker({
+        // Create custom pin element
+        const pinElement = document.createElement('div');
+        pinElement.style.cssText = `
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 40px;
+          cursor: pointer;
+          transform: translateY(-20px);
+        `;
+        pinElement.innerHTML = `
+          <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 24 16 24s16-12 16-24c0-8.84-7.16-16-16-16z" fill="#FF4400" stroke="#CC3300" stroke-width="1"/>
+            <text x="16" y="18" text-anchor="middle" fill="white" font-family="system-ui, sans-serif" font-size="14" font-weight="bold">${idx + 1}</text>
+          </svg>
+        `;
+        pinElement.title = `${idx + 1}. ${res.name}`;
+
+        const marker = new AdvancedMarkerElement({
           map,
           position: res.geometry.location,
           title: `${idx + 1}. ${res.name}`,
           zIndex: 10 + idx,
-          label: {
-            text: (idx + 1).toString(),
-            color: '#FFFFFF',
-            fontWeight: 'bold',
-            fontSize: '12px',
-          },
-          icon: {
-            path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-            fillColor: '#FF4400',
-            fillOpacity: 1,
-            strokeColor: '#CC3300',
-            strokeWeight: 1,
-            scale: 1.8,
-            anchor: new google.maps.Point(12, 22),
-            labelOrigin: new google.maps.Point(12, 9),
-          },
+          content: pinElement,
         });
         
         marker.addListener('click', () => {
