@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { GooglePlace, HungerVibe, PlaceReview } from '../types';
 import { getSearchQueriesForVibe } from '../utils/lunchAlgorithm';
+import Logger from '../utils/logger';
 
 // Price level mapping from Google Places API enum to numeric value
 const PRICE_LEVEL_MAP: Record<string, number> = {
@@ -9,6 +10,63 @@ const PRICE_LEVEL_MAP: Record<string, number> = {
   'MODERATE': 3,
   'EXPENSIVE': 4,
   'VERY_EXPENSIVE': 5,
+};
+
+// Food-related place types - STRICT filter to eliminate non-restaurant results
+// This prevents stores, services, and other non-food establishments from appearing
+const FOOD_TYPES = new Set([
+  // Primary food establishments
+  'restaurant',
+  'cafe',
+  'bakery',
+  'bar',
+  'meal_delivery',
+  'meal_takeaway',
+  'food',
+  // Specific cuisine types from Google Places
+  'american_restaurant',
+  'asian_restaurant',
+  'barbecue_restaurant',
+  'brazilian_restaurant',
+  'breakfast_restaurant',
+  'brunch_restaurant',
+  'chinese_restaurant',
+  'coffee_shop',
+  'deli',
+  'fast_food_restaurant',
+  'french_restaurant',
+  'greek_restaurant',
+  'hamburger_restaurant',
+  'ice_cream_shop',
+  'indian_restaurant',
+  'indonesian_restaurant',
+  'italian_restaurant',
+  'japanese_restaurant',
+  'korean_restaurant',
+  'lebanese_restaurant',
+  'mediterranean_restaurant',
+  'mexican_restaurant',
+  'middle_eastern_restaurant',
+  'pizza_restaurant',
+  'ramen_restaurant',
+  'sandwich_shop',
+  'seafood_restaurant',
+  'spanish_restaurant',
+  'steak_house',
+  'sushi_restaurant',
+  'thai_restaurant',
+  'turkish_restaurant',
+  'vegan_restaurant',
+  'vegetarian_restaurant',
+  'vietnamese_restaurant',
+]);
+
+/**
+ * Check if a place is a food establishment based on its types
+ */
+const isFoodEstablishment = (types: string[] | undefined): boolean => {
+  if (!types || types.length === 0) return false;
+  return types.some(type => FOOD_TYPES.has(type));
 };
 
 // Fields to request from Places API
@@ -141,13 +199,23 @@ export const useGooglePlaces = () => {
     });
 
     const detailResults = await Promise.allSettled(detailPromises);
-    const places = detailResults
+    const allPlaces = detailResults
       .filter((res): res is PromiseFulfilledResult<{ place: google.maps.places.Place }> =>
         res.status === 'fulfilled' && !!res.value?.place
       )
       .map(res => mapPlace(res.value.place));
 
-    return { places, uniqueCount: uniquePlaceIds.length };
+    // CRITICAL: Filter out non-food establishments (e.g., cap stores, clothing shops)
+    // Only keep places that have at least one food-related type
+    const foodPlaces = allPlaces.filter(place => isFoodEstablishment(place.types));
+    
+    Logger.info('PLACES', 'Food establishment filter applied', {
+      total: allPlaces.length,
+      passed: foodPlaces.length,
+      filtered: allPlaces.length - foodPlaces.length
+    });
+
+    return { places: foodPlaces, uniqueCount: uniquePlaceIds.length };
   }, []);
 
   /**

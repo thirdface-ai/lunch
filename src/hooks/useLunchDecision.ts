@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useGooglePlaces } from './useGooglePlaces';
-import { useDistanceMatrix, PlaceDuration } from './useDistanceMatrix';
+import { useDistanceMatrix } from './useDistanceMatrix';
 import { useTerminalLogs } from './useTerminalLogs';
-import { decideLunch, generateLoadingLogs } from '../services/geminiService';
+import { decideLunch } from '../services/geminiService';
 import SupabaseService from '../services/supabaseService';
 import Logger from '../utils/logger';
 import {
@@ -13,8 +13,6 @@ import {
 import {
   AppState,
   UserPreferences,
-  GooglePlace,
-  GeminiRecommendation,
   FinalResult,
 } from '../types';
 
@@ -54,9 +52,6 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
 
     addLog(`ACQUIRING SATELLITE LOCK [${preferences.lat.toFixed(4)}, ${preferences.lng.toFixed(4)}]...`);
 
-    // Start loading wit generation in background
-    const loadingWitPromise = generateLoadingLogs(preferences.vibe, preferences.address);
-
     try {
       const { radius, maxDurationSeconds } = getWalkConfig(preferences.walkLimit);
       addLog(`CALIBRATING SCANNER RADIUS: ${radius}m...`);
@@ -79,18 +74,12 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
       }
 
       addLog(`DETECTED ${uniqueCount} UNIQUE ENTITIES...`);
+      addLog(`FILTERED TO ${places.length} VERIFIED FOOD ESTABLISHMENTS...`);
       setProgress(30);
 
       if (places.length === 0) {
-        throw new Error('FAILED TO FETCH DETAILS FOR ANY CANDIDATE.');
+        throw new Error('NO FOOD ESTABLISHMENTS FOUND. TRY A DIFFERENT LOCATION OR VIBE.');
       }
-
-      // Start showing loading wit
-      loadingWitPromise.then(witLogs => {
-        witLogs.forEach((log, idx) => {
-          setTimeout(() => addLog(log), idx * 1500);
-        });
-      });
 
       // Calculate walking distances
       addLog('CALIBRATING WALKING VECTORS...');
@@ -150,8 +139,8 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('SYSTEM UNABLE TO LOCATE VIABLE TARGETS.');
       }
 
-      // Get AI recommendations
-      addLog('ENGAGING NEURAL CORE (GEMINI-3.0-PREVIEW)...');
+      // Get AI recommendations via multi-stage deep analysis pipeline
+      addLog('ENGAGING MULTI-STAGE NEURAL CORE (GEMINI-3-PRO-PREVIEW)...');
 
       const recommendations = await decideLunch(
         candidatesForGemini,
@@ -160,53 +149,23 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         preferences.noCash,
         preferences.address,
         preferences.dietaryRestrictions,
-        preferences.freestylePrompt
+        preferences.freestylePrompt,
+        addLog // Pass the log callback for real-time personalized updates
       );
 
-      let finalRecommendations: GeminiRecommendation[] = recommendations;
-
-      // Backfill if needed
-      if (!recommendations || recommendations.length < 3) {
-        addLog('SUPPLEMENTING RESULTS WITH ALGORITHMIC BACKFILL...');
-        const needed = 3 - (recommendations?.length || 0);
-        const recommendedPlaceIds = new Set(recommendations.map(r => r.place_id));
-        const fallbackPool = candidatesForGemini
-          .filter(p => !recommendedPlaceIds.has(p.place_id))
-          .sort((a, b) => (b.rating || 0) - (a.rating || 0));
-
-        const fallbackRecs: GeminiRecommendation[] = fallbackPool.slice(0, needed).map(p => {
-          // Try to extract a specific dish from reviews if available
-          const reviewText = p.reviews?.find(r => r.text && r.text.length > 30)?.text || '';
-          const dishMatch = reviewText.match(/(?:the |their |try the |order the |loved the |best |amazing )([A-Z][a-z]+(?:\s+[A-Z]?[a-z]+){0,3})/i);
-          const extractedDish = dishMatch?.[1];
-          
-          return {
-            place_id: p.place_id,
-            ai_reason: p.editorial_summary?.overview ||
-              `A highly-rated alternative (${p.rating || 'N/A'}/5 from ${p.user_ratings_total || 0} reviews).`,
-            recommended_dish: extractedDish || 'Chef\'s recommendation (ask staff)',
-            is_cash_only: p.payment_options?.accepts_cash_only || false,
-            cash_warning_msg: p.payment_options?.accepts_cash_only
-              ? 'Note: This location may be cash-only.'
-              : null,
-            is_new_opening: (p.user_ratings_total || 0) < 50
-          };
-        });
-
-        finalRecommendations = [...finalRecommendations, ...fallbackRecs];
+      // NO GENERIC FALLBACKS - Quality over quantity
+      // The multi-stage pipeline handles all analysis including fallbacks internally
+      // We trust the AI to return quality results or nothing
+      if (!recommendations || recommendations.length === 0) {
+        throw new Error('DEEP ANALYSIS PIPELINE YIELDED NO VIABLE RECOMMENDATIONS.');
       }
 
-      if (finalRecommendations.length === 0) {
-        throw new Error('POST-PROCESSING FAILED TO YIELD RESULTS.');
-      }
-
-      // Finalize results
-      addLog('PERMUTATING OPTIONS...');
-      const finalSelection = shuffleArray(finalRecommendations).slice(0, 3);
+      // Take up to 5 results (quality over quantity - no padding with generic fallbacks)
+      const finalSelection = recommendations.slice(0, 5);
 
       setProgress(100);
-      addLog('OPTIMAL SOLUTION CALCULATED.');
-      Logger.info('SYSTEM', 'Calculation Complete', {
+      addLog(`DEEP ANALYSIS COMPLETE. ${finalSelection.length} OPTIMAL SOLUTIONS CALCULATED.`);
+      Logger.info('SYSTEM', 'Multi-Stage Pipeline Complete', {
         resultCount: finalSelection.length,
         results: finalSelection.map(r => r.place_id)
       });

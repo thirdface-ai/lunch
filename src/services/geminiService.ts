@@ -14,10 +14,55 @@ export enum Type {
   NULL = 'NULL',
 }
 
+// The ONLY model we use - gemini-3-pro-preview exclusively
+const GEMINI_MODEL = 'gemini-3-pro-preview';
+
+// Callback type for real-time logging during analysis
+export type AnalysisLogCallback = (message: string) => void;
+
+// Types for deep analysis pipeline
+interface MenuData {
+  dishes: Array<{
+    name: string;
+    description?: string;
+    price?: string;
+    category?: string;
+  }>;
+  cuisineType?: string;
+  specialties?: string[];
+}
+
+interface TriageResult {
+  place_id: string;
+  relevance_score: number;
+  is_food_establishment: boolean;
+  cuisine_category: string;
+  quick_assessment: string;
+}
+
+interface DeepAnalysisResult {
+  place_id: string;
+  dish_mentions: Array<{
+    dish_name: string;
+    mention_count: number;
+    sentiment: 'positive' | 'neutral' | 'negative';
+    sample_quote: string;
+  }>;
+  top_dish: string;
+  quality_signals: string[];
+  red_flags: string[];
+  service_speed: 'fast' | 'moderate' | 'slow' | 'unknown';
+  atmosphere: string;
+  value_assessment: string;
+  is_cash_only: boolean;
+  is_new_opening: boolean;
+  overall_score: number;
+}
+
 // Internal helper to call the Supabase Edge Function
 const callGeminiProxy = async (model: string, contents: string, config: Record<string, unknown>): Promise<string> => {
   const startTime = performance.now();
-  Logger.aiRequest(model, contents);
+  Logger.aiRequest(model, contents.substring(0, 500) + '...');
 
   try {
     const { data, error } = await supabase.functions.invoke('gemini-proxy', {
@@ -33,8 +78,6 @@ const callGeminiProxy = async (model: string, contents: string, config: Record<s
     }
 
     const duration = Math.round(performance.now() - startTime);
-    
-    // Rough estimation of output tokens based on char count
     const estimatedTokens = data.text ? Math.ceil(data.text.length / 4) : 0;
     Logger.aiResponse(model, duration, true, estimatedTokens);
 
@@ -46,30 +89,62 @@ const callGeminiProxy = async (model: string, contents: string, config: Record<s
   }
 };
 
+// Fetch menu data from restaurant website
+const fetchMenuData = async (websiteUrl: string, restaurantName: string): Promise<MenuData | null> => {
+  if (!websiteUrl || websiteUrl === 'N/A') return null;
+  
+  try {
+    Logger.info('AI', `Fetching menu from ${websiteUrl}`);
+    const { data, error } = await supabase.functions.invoke('website-scraper', {
+      body: { websiteUrl, restaurantName },
+    });
+
+    if (error || !data?.success) {
+      Logger.warn('AI', `Menu fetch failed for ${restaurantName}`, { error });
+      return null;
+    }
+
+    return data.data as MenuData;
+  } catch (e) {
+    Logger.warn('AI', `Menu scraping error for ${restaurantName}`, { error: e });
+    return null;
+  }
+};
+
 export const generateLoadingLogs = async (vibe: HungerVibe | null, address: string): Promise<string[]> => {
   const vibeText = vibe || 'Custom/User Defined';
   Logger.info('AI', 'Generating Loading Logs', { vibe: vibeText, address });
 
   const prompt = `
-    You are a system AI for a culinary logistics engine. Your task is to generate 4 short, concrete, technical-sounding log messages that narrate the process of finding lunch. The messages should feel specific to the user's request.
+    You are a system AI for a culinary logistics engine. Your task is to generate 6 short, concrete, technical-sounding log messages that narrate the process of finding lunch with DEEP analysis. The messages should feel specific to the user's request.
 
     User's Location Context: "${address}"
     User's Desired Vibe: "${vibeText}"
 
-    Generate logs that reflect a logical search sequence. Use the location and vibe to make them specific. Do not use generic "hacking" tropes. Be cool, efficient, and technical.
+    Generate logs that reflect a COMPREHENSIVE search with multiple AI analysis stages:
+    1. Initial scan
+    2. Data gathering
+    3. Deep review analysis
+    4. Menu extraction
+    5. Cross-referencing
+    6. Final ranking
+
+    Use the location and vibe to make them specific. Be cool, efficient, and technical.
 
     Example for Vibe 'Grab & Go' and Address 'Kreuzberg, Berlin, Germany':
     1. "PARSING KREUZBERG SECTOR GRID..."
-    2. "ISOLATING HIGH-THROUGHPUT VENDORS..."
-    3. "CROSS-REFERENCING DÖNER & CURRYWURST DATASTREAMS..."
-    4. "PLOTTING OPTIMAL FOOT-TRAFFIC VECTORS..."
+    2. "INITIATING DEEP REVIEW MINING PROTOCOL..."
+    3. "EXTRACTING MENU DATA FROM 15 CANDIDATES..."
+    4. "CROSS-REFERENCING DÖNER SENTIMENT PATTERNS..."
+    5. "ANALYZING DISH FREQUENCY MATRICES..."
+    6. "CALCULATING OPTIMAL LUNCH VECTORS..."
 
-    Return ONLY a valid JSON string array, with exactly 4 strings.
+    Return ONLY a valid JSON string array, with exactly 6 strings.
   `;
 
   try {
     const text = await callGeminiProxy(
-      'gemini-2.0-flash',
+      GEMINI_MODEL,
       prompt,
       {
         responseMimeType: 'application/json',
@@ -84,34 +159,184 @@ export const generateLoadingLogs = async (vibe: HungerVibe | null, address: stri
     return JSON.parse(text) as string[];
   } catch (e) {
     Logger.warn('AI', 'Log generation failed, using fallbacks.', { error: e });
-    return ['OPTIMIZING SEARCH...', 'READING MENUS...', 'CALCULATING ROUTES...'];
+    return [
+      'INITIATING DEEP ANALYSIS...',
+      'MINING REVIEW DATA...',
+      'EXTRACTING MENU INTELLIGENCE...',
+      'CROSS-REFERENCING SOURCES...',
+      'CALCULATING DISH RANKINGS...',
+      'FINALIZING RECOMMENDATIONS...'
+    ];
   }
 };
 
-export const decideLunch = async (
+/**
+ * STAGE 1: TRIAGE
+ * Quick assessment to filter out irrelevant candidates and identify top prospects
+ */
+const triageCandidates = async (
   candidates: GooglePlace[],
   vibe: HungerVibe | null,
-  price: PricePoint | null,
-  noCash: boolean,
+  freestylePrompt: string | undefined,
   address: string,
-  dietaryRestrictions: DietaryRestriction[],
-  freestylePrompt?: string
-): Promise<GeminiRecommendation[]> => {
+  onLog?: AnalysisLogCallback
+): Promise<TriageResult[]> => {
+  Logger.info('AI', `[STAGE 1] Triage - Analyzing ${candidates.length} candidates`);
+  
+  // Personalized logging
+  const sampleNames = candidates.slice(0, 3).map(c => c.name).join(', ');
+  onLog?.(`SCANNING ${candidates.length} CANDIDATES: ${sampleNames}...`);
+  
+  const cuisineTypes = [...new Set(candidates.flatMap(c => c.types || []).filter(t => t.includes('restaurant')))];
+  if (cuisineTypes.length > 0) {
+    onLog?.(`DETECTED CUISINE VECTORS: ${cuisineTypes.slice(0, 4).join(', ').toUpperCase()}...`);
+  }
 
-  Logger.info('AI', 'Starting Lunch Decision Matrix', { 
-    candidateCount: candidates.length, 
-    vibe, 
-    price, 
-    freestylePrompt 
+  const candidateSummaries = candidates.map(p => ({
+    id: p.place_id,
+    name: p.name,
+    types: p.types,
+    rating: p.rating,
+    review_count: p.user_ratings_total,
+    price_level: p.price_level,
+    summary: p.editorial_summary?.overview || '',
+  }));
+
+  const prompt = `
+ROLE: You are a restaurant relevance analyzer. Your job is to quickly assess candidates and filter out non-relevant results.
+
+LOCATION: ${address}
+USER VIBE: ${vibe || 'Any'}
+SPECIFIC REQUEST: ${freestylePrompt || 'None'}
+
+CANDIDATES:
+${JSON.stringify(candidateSummaries, null, 2)}
+
+TASK:
+For each candidate, assess:
+1. Is this actually a food establishment? (relevance_score 0-10, 0 = not food)
+2. What cuisine category does it fall into?
+3. How well does it match the user's vibe/request?
+
+CRITICAL: Set is_food_establishment to FALSE for:
+- Retail stores (clothing, accessories, caps, etc.)
+- Services (salons, gyms, etc.)
+- Entertainment venues without food focus
+- Any place where food is not the primary business
+
+Return JSON array with assessments for ALL candidates.
+`;
+
+  try {
+    const text = await callGeminiProxy(
+      GEMINI_MODEL,
+      prompt,
+      {
+        temperature: 0.3,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              place_id: { type: Type.STRING },
+              relevance_score: { type: Type.NUMBER },
+              is_food_establishment: { type: Type.BOOLEAN },
+              cuisine_category: { type: Type.STRING },
+              quick_assessment: { type: Type.STRING },
+            },
+            required: ['place_id', 'relevance_score', 'is_food_establishment', 'cuisine_category'],
+          },
+        },
+      }
+    );
+
+    const results = JSON.parse(text) as TriageResult[];
+    
+    // Filter to only food establishments with decent relevance
+    const validResults = results.filter(r => r.is_food_establishment && r.relevance_score >= 3);
+    Logger.info('AI', `[STAGE 1] Triage complete: ${validResults.length}/${results.length} passed`);
+    
+    // Log which cuisines passed
+    const passedCuisines = [...new Set(validResults.map(r => r.cuisine_category))].slice(0, 5);
+    onLog?.(`TRIAGE COMPLETE: ${validResults.length} FOOD ESTABLISHMENTS VERIFIED`);
+    if (passedCuisines.length > 0) {
+      onLog?.(`CUISINE DIVERSITY CHECK: ${passedCuisines.join(', ').toUpperCase()}`);
+    }
+    
+    return validResults;
+  } catch (error) {
+    Logger.error('AI', '[STAGE 1] Triage failed', error);
+    // Fallback: return all candidates as potentially valid
+    return candidates.map(c => ({
+      place_id: c.place_id,
+      relevance_score: 5,
+      is_food_establishment: true,
+      cuisine_category: 'unknown',
+      quick_assessment: 'Triage skipped - fallback mode',
+    }));
+  }
+};
+
+/**
+ * STAGE 2: DEEP ANALYSIS
+ * Detailed analysis of each promising candidate with review mining and menu extraction
+ */
+const deepAnalyzeCandidates = async (
+  candidates: GooglePlace[],
+  triageResults: TriageResult[],
+  address: string,
+  onLog?: AnalysisLogCallback
+): Promise<DeepAnalysisResult[]> => {
+  Logger.info('AI', `[STAGE 2] Deep Analysis - Processing ${candidates.length} candidates`);
+
+  // Create a map for quick lookup
+  const triageMap = new Map(triageResults.map(t => [t.place_id, t]));
+  
+  // Log which restaurants we're deeply analyzing
+  const topCandidates = candidates.slice(0, 5).map(c => c.name);
+  onLog?.(`INITIATING DEEP REVIEW MINING FOR ${candidates.length} CANDIDATES...`);
+  onLog?.(`PRIORITY TARGETS: ${topCandidates.join(', ').toUpperCase()}`);
+  
+  // Fetch menu data in parallel for candidates with websites
+  const candidatesWithWebsites = candidates.filter(c => c.website);
+  if (candidatesWithWebsites.length > 0) {
+    onLog?.(`SCRAPING MENUS FROM ${candidatesWithWebsites.length} RESTAURANT WEBSITES...`);
+  }
+  
+  const menuPromises = candidates.map(async (c) => {
+    if (c.website) {
+      const menu = await fetchMenuData(c.website, c.name);
+      return { place_id: c.place_id, menu };
+    }
+    return { place_id: c.place_id, menu: null };
   });
 
-  // Pre-process candidates with FULL review data for deep AI analysis
+  const menuResults = await Promise.all(menuPromises);
+  
+  // Log menu extraction results
+  const menusFound = menuResults.filter(m => m.menu && m.menu.dishes && m.menu.dishes.length > 0);
+  if (menusFound.length > 0) {
+    const totalDishes = menusFound.reduce((sum, m) => sum + (m.menu?.dishes?.length || 0), 0);
+    onLog?.(`EXTRACTED ${totalDishes} MENU ITEMS FROM ${menusFound.length} WEBSITES`);
+  }
+  const menuMap = new Map(menuResults.map(m => [m.place_id, m.menu]));
+
+  // Log review analysis
+  const totalReviews = candidates.reduce((sum, c) => sum + (c.reviews?.length || 0), 0);
+  onLog?.(`PARSING ${totalReviews} CUSTOMER REVIEWS FOR DISH MENTIONS...`);
+  
+  // Build comprehensive analysis payload
   const analysisPayload = candidates.map(p => {
-    // Extract comprehensive review data with ratings for sentiment analysis
-    const reviewsWithMetadata = p.reviews?.slice(0, 20).map(r => ({
-      text: r.text?.substring(0, 500) || '',
+    const triage = triageMap.get(p.place_id);
+    const menu = menuMap.get(p.place_id);
+    
+    // Include ALL reviews with full text for deep analysis
+    const fullReviews = p.reviews?.map(r => ({
+      text: r.text || '',
       rating: r.rating,
       time: r.relativeTime,
+      author: r.authorName,
     })).filter(r => r.text.length > 0) || [];
 
     return {
@@ -121,176 +346,342 @@ export const decideLunch = async (
       rating: p.rating,
       user_ratings_total: p.user_ratings_total,
       price_level: p.price_level,
-      virtual_menu_source: p.editorial_summary?.overview || 'No official menu summary available.',
-      website_ref: p.website || 'N/A',
+      cuisine_category: triage?.cuisine_category || 'unknown',
+      editorial_summary: p.editorial_summary?.overview || '',
+      website: p.website || 'N/A',
+      // Full reviews for deep semantic analysis
+      reviews: fullReviews,
+      review_count: fullReviews.length,
+      // Menu data from website scraping
+      menu_data: menu ? {
+        dishes: menu.dishes?.slice(0, 20) || [],
+        specialties: menu.specialties || [],
+        cuisine_type: menu.cuisineType,
+      } : null,
+      // Payment info
+      payment_options: p.payment_options,
+      // Service attributes
       attributes: {
-        is_vegetarian: p.serves_vegetarian_food,
-        has_takeout: p.takeout,
-        has_dine_in: p.dine_in,
-        has_alcohol: p.serves_beer || p.serves_wine,
-        payment_options: p.payment_options 
+        vegetarian: p.serves_vegetarian_food,
+        beer: p.serves_beer,
+        wine: p.serves_wine,
+        takeout: p.takeout,
+        dine_in: p.dine_in,
       },
-      // Full reviews with ratings for deep semantic analysis
-      reviews: reviewsWithMetadata,
-      review_count: reviewsWithMetadata.length,
     };
   });
 
-  const dietaryProtocol = `
-    7. DIETARY RESTRICTION PROTOCOL (HIGH PRIORITY & LOCALIZED):
-       - This is a critical filter ONLY if the user has specified any needs. If no needs are specified, this protocol should not influence your decision.
-       - You MUST scan reviews, virtual menus, and attributes for strong signals that a restaurant can accommodate the specified needs, using both English and the local language.
-       - EXAMPLES (Gluten-Free): "gluten-free", "glutenfrei", "celiac", "GF options".
-       - EXAMPLES (Vegan): "vegan", "pflanzlich", "vegane optionen".
-       - EXAMPLES (Vegetarian): "vegetarian", "vegetarisch".
-       - SCORING:
-         - Explicit mentions of accommodating these diets in reviews or menus should grant a candidate a SIGNIFICANT priority boost.
-         - Conversely, reviews mentioning poor handling of allergies or cross-contamination for these specific needs should be a strong negative signal.
-       - If no candidates strongly match the dietary needs, you must still select the best available options but note in the \`ai_reason\` that explicit dietary information was not available and the user should verify with the restaurant.
-  `;
-
-  const budgetProtocol = price ? `
-    6. BUDGET MATRIX (STRICT):
-       - [Bootstrapped]: Target \`price_level: 1\`. Can select \`price_level: 2\` ONLY if reviews contain strong "great value," "cheap," "affordable," or "large portions for the price" signals. ABSOLUTELY AVOID \`price_level > 2\`.
-       - [Series A]: Target \`price_level: 2-3\`. This is the standard business lunch tier. Avoid \`price_level: 1\` unless it is an acclaimed "hidden gem" with exceptional reviews.
-       - [Company Card]: Target \`price_level: 3-4\`. Prioritize quality, atmosphere, and experience over cost. \`price_level: 2\` is only acceptable if it's a known gastronomic hotspot that happens to be affordable.
-  ` : `
-    6. BUDGET MATRIX (OPEN / UNCONSTRAINED):
-       - The user has NOT specified a budget constraint.
-       - You are free to select candidates from ANY price range (from cheap eats to fine dining) as long as they represent the best match for the Vibe and Quality.
-       - Focus purely on food quality, atmosphere, and relevance to the request.
-  `;
-
   const systemInstruction = `
-    ROLE: You are an elite Culinary Intelligence Analyst operating under codename "LUNCHBOX". You specialize in deep semantic analysis of restaurant reviews to extract actionable dining intelligence.
-    MODEL: gemini-3.0-preview
+ROLE: You are a DEEP REVIEW ANALYST specializing in extracting specific, actionable dining intelligence.
 
-    CONTEXT:
-    Location: "${address}". This geographic context is CRITICAL - adapt your language analysis to include local language terms (e.g., German "glutenfrei", "lecker", "Schnitzel" in Berlin).
+LOCATION CONTEXT: ${address}
+Adapt analysis to include local language terms (German in Berlin, Spanish in Madrid, etc.)
 
-    PRIMARY OBJECTIVE: 
-    Perform DEEP REVIEW MINING to select 5-10 optimal lunch destinations. MINIMUM 3 recommendations required.
+YOUR MISSION: For each restaurant, perform exhaustive analysis:
 
-    ============================================================
-    CRITICAL: DEEP REVIEW ANALYSIS PROTOCOL (MANDATORY)
-    ============================================================
-    
-    For EACH candidate, you MUST perform multi-layer semantic analysis:
+============================================================
+DISH EXTRACTION PROTOCOL (CRITICAL)
+============================================================
 
-    LAYER 1 - DISH EXTRACTION (HIGHEST PRIORITY):
-    - Scan ALL reviews for specific dish names (not categories like "pasta" but actual dishes like "Cacio e Pepe", "Tonkotsu Ramen", "Bánh Mì")
-    - Count frequency: How many reviews mention the same dish?
-    - Extract sentiment per dish: "amazing [dish]", "best [dish] in town", "disappointing [dish]"
-    - Cross-reference with menu/editorial summary
-    - The \`recommended_dish\` MUST be the most frequently praised specific item from reviews
-    - If reviews mention "the [X] is a must-try" or "don't miss the [X]" - that's your dish
+1. SCAN every single review for SPECIFIC dish names
+2. Count how many times each dish is mentioned
+3. Note the sentiment for each mention (positive/negative)
+4. Extract a sample quote for the top dish
+5. Cross-reference with menu_data if available
 
-    LAYER 2 - QUALITY SIGNALS:
-    - Identify recurring praise patterns: "always consistent", "never disappoints", "hidden gem"
-    - Identify red flags: "went downhill", "used to be good", "overpriced", "long wait", "rude staff"
-    - Weight recent reviews (check time indicators) higher than older ones
-    - Look for specificity: Detailed reviews > vague "great food" reviews
+EXAMPLES of what to extract:
+- "Tonkotsu Ramen" NOT "ramen"
+- "Eggs Benedict with Hollandaise" NOT "breakfast"
+- "Margherita DOC" NOT "pizza"
+- "Spicy Miso with Chashu" NOT "soup"
 
-    LAYER 3 - OPERATIONAL INTELLIGENCE:
-    - Service speed signals: "quick lunch", "fast service", "waited 45 minutes"
-    - Atmosphere: "quiet", "loud", "good for meetings", "cramped"
-    - Value signals: "huge portions", "overpriced", "great value"
-    
-    ============================================================
-    DISH RECOMMENDATION RULES (ZERO TOLERANCE FOR GENERICS)
-    ============================================================
-    
-    The \`recommended_dish\` field is the most important output. Follow these rules:
+============================================================
+QUALITY SIGNAL DETECTION
+============================================================
 
-    FORBIDDEN (instant failure):
-    - "Their specialty" / "House special"
-    - "Any of the [category]" / "All pastas are good"
-    - "Check the menu" / "Daily specials"
-    - Generic categories: "Pizza", "Burger", "Salad", "Sandwich"
-    - Vague: "Everything is good"
+Look for patterns:
+- "always consistent" / "never disappoints" = POSITIVE
+- "hidden gem" / "locals' favorite" = POSITIVE  
+- "went downhill" / "not what it used to be" = NEGATIVE
+- "overpriced" / "not worth it" = NEGATIVE
+- "rude staff" / "slow service" = NEGATIVE
 
-    REQUIRED (specific extracted dishes):
-    - "Margherita DOC" not "Pizza"
-    - "Spicy Miso Ramen with Chashu" not "Ramen"
-    - "Eggs Benedict with Hollandaise" not "Breakfast"
-    - "Double Smashburger with Secret Sauce" not "Burger"
+============================================================
+CASH-ONLY DETECTION (CRITICAL)
+============================================================
 
-    If reviews don't mention specific dishes, look for:
-    - "The [X]" pattern: "The carbonara here is insane"
-    - "Order the [X]": "Order the lamb chops"
-    - "Famous for [X]": "Famous for their sourdough"
-    - Named items: "Big Mac" style proprietary names
+Scan for these signals in reviews AND payment_options:
+- English: "cash only", "no cards", "bring cash", "ATM nearby"
+- German: "nur Barzahlung", "keine Karten"
+- If payment_options.accepts_cash_only = true, set is_cash_only = true
+- If ANY review mentions cash-only, set is_cash_only = true
 
-    ============================================================
-    SELECTION CRITERIA
-    ============================================================
+============================================================
+OUTPUT REQUIREMENTS
+============================================================
 
-    1. HIDDEN GEM BIAS:
-       - Sweet spot: Rating > 4.3, Reviews between 50-750
-       - Favor independents over chains
-       - De-prioritize tourist traps
-
-    2. DIVERSITY MANDATE:
-       - Pool must span different cuisines
-       - Fail: All Italian. Success: Ramen + French Bistro + Taqueria
-
-    3. PAYMENT PROTOCOL (STRICT & LOCALIZED):
-       - Scan \`payment_options\` AND reviews for cash-only signals
-       - Local language detection required (e.g., "nur Barzahlung", "solo efectivo", "contanti")
-       - English signals: "cash only", "no cards", "ATM nearby", "bring cash"
-       - IF \`payment_options.accepts_credit_cards: false\` OR \`payment_options.accepts_cash_only: true\`:
-         - IMMEDIATELY set \`is_cash_only: true\`
-       - IF reviews mention cash-only (even once): set \`is_cash_only: true\`
-       - IF noCash=true in user request:
-         - DISCARD any candidate with cash-only signals entirely
-       - IF noCash=false (user allows cash):
-         - Include cash-only places but MUST set \`is_cash_only: true\` to warn user
-
-    ${budgetProtocol}
-
-    4. FRESH DROP DETECTION:
-       - High rating + low reviews (<50) + "just opened" mentions = \`is_new_opening: true\`
-
-    5. FREESTYLE OVERRIDE:
-       - User's specific request takes priority over vibe
-
-    ${dietaryRestrictions.length > 0 ? dietaryProtocol : ''}
-
-    ============================================================
-    AI_REASON QUALITY STANDARD
-    ============================================================
-    
-    Must include:
-    - Specific review evidence: "Reviews cite the 'Duck Confit' 6 times with unanimous praise"
-    - Data points: Rating density, review sentiment ratio
-    - Why this over alternatives: "Chosen over X because reviews confirm faster service"
-    
-    BAD: "Great Italian food with nice atmosphere!"
-    GOOD: "4.6/312 reviews with 8 mentions of 'Truffle Pasta'. Recent reviews (last 3 months) confirm consistency. Faster service than competitor 'Pasta House' based on review sentiment."
-
-    ---
-    OUTPUT: Return valid JSON array matching the schema. Your deep review analysis must be evident in specific dish recommendations and data-driven reasoning.
-  `;
+For EACH restaurant, you MUST provide:
+- dish_mentions: Array of specific dishes found with counts and sentiment
+- top_dish: The SINGLE most praised specific dish (NOT generic)
+- quality_signals: List of positive patterns found
+- red_flags: List of negative patterns found
+- service_speed: Assessment based on review mentions
+- is_cash_only: Boolean
+- is_new_opening: True if high rating + <50 reviews + "just opened" mentions
+- overall_score: 1-10 based on your analysis
+`;
 
   const prompt = `
-    USER LOCATION CONTEXT: ${address}
-    CURRENT MENTAL STATE: ${vibe || 'CUSTOM / USER DEFINED'}
-    SPECIFIC REQUEST (FREESTYLE): ${freestylePrompt ? `"${freestylePrompt}"` : 'None'}
-    BUDGET TIER: ${price || 'ANY / UNCONSTRAINED'}
-    USER REQUIRES CASHLESS: ${noCash}
-    DIETARY NEEDS: [${dietaryRestrictions.join(', ')}]
-    
-    CANDIDATES:
-    ${JSON.stringify(analysisPayload)}
-  `;
+ANALYZE THESE ${analysisPayload.length} RESTAURANTS IN DEPTH:
+
+${JSON.stringify(analysisPayload, null, 2)}
+
+Return comprehensive analysis for EACH candidate. Be thorough - this data drives the final recommendation.
+`;
 
   try {
     const text = await callGeminiProxy(
-      'gemini-3.0-preview',
+      GEMINI_MODEL,
       prompt,
       {
-        systemInstruction: systemInstruction,
-        temperature: 0.5, // Lower temperature for more precise dish extraction
+        systemInstruction,
+        temperature: 0.4,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              place_id: { type: Type.STRING },
+              dish_mentions: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    dish_name: { type: Type.STRING },
+                    mention_count: { type: Type.INTEGER },
+                    sentiment: { type: Type.STRING },
+                    sample_quote: { type: Type.STRING },
+                  },
+                },
+              },
+              top_dish: { type: Type.STRING },
+              quality_signals: { type: Type.ARRAY, items: { type: Type.STRING } },
+              red_flags: { type: Type.ARRAY, items: { type: Type.STRING } },
+              service_speed: { type: Type.STRING },
+              atmosphere: { type: Type.STRING },
+              value_assessment: { type: Type.STRING },
+              is_cash_only: { type: Type.BOOLEAN },
+              is_new_opening: { type: Type.BOOLEAN },
+              overall_score: { type: Type.NUMBER },
+            },
+            required: ['place_id', 'top_dish', 'is_cash_only', 'overall_score'],
+          },
+        },
+      }
+    );
+
+    const results = JSON.parse(text) as DeepAnalysisResult[];
+    Logger.info('AI', `[STAGE 2] Deep analysis complete for ${results.length} candidates`);
+    
+    // Log dish extraction results
+    const candidatesWithDishes = results.filter(r => r.dish_mentions && r.dish_mentions.length > 0);
+    const totalDishMentions = results.reduce((sum, r) => sum + (r.dish_mentions?.length || 0), 0);
+    if (totalDishMentions > 0) {
+      onLog?.(`DISH EXTRACTION COMPLETE: ${totalDishMentions} SPECIFIC DISHES IDENTIFIED`);
+      // Log some example dishes
+      const sampleDishes = results
+        .filter(r => r.top_dish)
+        .slice(0, 3)
+        .map(r => r.top_dish);
+      if (sampleDishes.length > 0) {
+        onLog?.(`TOP DISHES FOUND: ${sampleDishes.join(', ').toUpperCase()}`);
+      }
+    }
+    
+    // Log quality signals
+    const highScorers = results.filter(r => r.overall_score >= 7);
+    if (highScorers.length > 0) {
+      onLog?.(`${highScorers.length} HIGH-QUALITY CANDIDATES IDENTIFIED (SCORE >= 7)`);
+    }
+    
+    return results;
+  } catch (error) {
+    Logger.error('AI', '[STAGE 2] Deep analysis failed', error);
+    return [];
+  }
+};
+
+/**
+ * STAGE 3: FINAL SELECTION
+ * Synthesize all analysis into final recommendations with rich descriptions
+ */
+const finalSelection = async (
+  candidates: GooglePlace[],
+  deepAnalysis: DeepAnalysisResult[],
+  vibe: HungerVibe | null,
+  price: PricePoint | null,
+  noCash: boolean,
+  address: string,
+  dietaryRestrictions: DietaryRestriction[],
+  freestylePrompt?: string,
+  onLog?: AnalysisLogCallback
+): Promise<GeminiRecommendation[]> => {
+  Logger.info('AI', `[STAGE 3] Final Selection from ${deepAnalysis.length} analyzed candidates`);
+  
+  onLog?.(`SYNTHESIZING ${deepAnalysis.length} ANALYZED CANDIDATES INTO FINAL RECOMMENDATIONS...`);
+
+  // Filter out cash-only if user requires cashless
+  let filteredAnalysis = deepAnalysis;
+  if (noCash) {
+    const cashOnlyCount = deepAnalysis.filter(a => a.is_cash_only).length;
+    filteredAnalysis = deepAnalysis.filter(a => !a.is_cash_only);
+    Logger.info('AI', `Filtered to ${filteredAnalysis.length} after cash-only removal`);
+    if (cashOnlyCount > 0) {
+      onLog?.(`FILTERED ${cashOnlyCount} CASH-ONLY ESTABLISHMENTS (USER REQUIRES CARD PAYMENT)`);
+    }
+  }
+
+  // Sort by overall score
+  filteredAnalysis.sort((a, b) => b.overall_score - a.overall_score);
+  
+  // Log the top candidates being considered
+  const candidateMap = new Map(candidates.map(c => [c.place_id, c]));
+  const topNames = filteredAnalysis.slice(0, 5).map(a => candidateMap.get(a.place_id)?.name).filter(Boolean);
+  if (topNames.length > 0) {
+    onLog?.(`TOP CONTENDERS: ${topNames.join(', ').toUpperCase()}`);
+  }
+  
+  // Log vibe matching
+  if (vibe) {
+    onLog?.(`MATCHING CANDIDATES TO VIBE: "${vibe.toUpperCase()}"...`);
+  }
+  if (price) {
+    onLog?.(`APPLYING BUDGET FILTER: ${price.toUpperCase()}...`);
+  }
+  if (dietaryRestrictions.length > 0) {
+    onLog?.(`VERIFYING DIETARY REQUIREMENTS: ${dietaryRestrictions.join(', ').toUpperCase()}...`);
+  }
+
+  // Build selection payload with both candidate data and deep analysis
+  
+  const selectionPayload = filteredAnalysis.slice(0, 15).map(analysis => {
+    const candidate = candidateMap.get(analysis.place_id);
+    return {
+      place_id: analysis.place_id,
+      name: candidate?.name || 'Unknown',
+      rating: candidate?.rating,
+      review_count: candidate?.user_ratings_total,
+      price_level: candidate?.price_level,
+      // Deep analysis results
+      top_dish: analysis.top_dish,
+      dish_mentions: analysis.dish_mentions?.slice(0, 5) || [],
+      quality_signals: analysis.quality_signals || [],
+      red_flags: analysis.red_flags || [],
+      service_speed: analysis.service_speed,
+      atmosphere: analysis.atmosphere,
+      value_assessment: analysis.value_assessment,
+      overall_score: analysis.overall_score,
+      is_cash_only: analysis.is_cash_only,
+      is_new_opening: analysis.is_new_opening,
+    };
+  });
+
+  const budgetContext = price ? `
+USER BUDGET: ${price}
+- Bootstrapped: Prioritize price_level 1-2, value-focused
+- Series A: Standard business lunch, price_level 2-3
+- Company Card: Quality over cost, price_level 3-4 welcome
+` : 'USER BUDGET: No constraint - select based on quality';
+
+  const dietaryContext = dietaryRestrictions.length > 0 ? `
+DIETARY REQUIREMENTS (CRITICAL): ${dietaryRestrictions.join(', ')}
+- Prioritize restaurants with explicit signals for these requirements
+- Note in ai_reason if verification with restaurant is recommended
+` : '';
+
+  const systemInstruction = `
+ROLE: You are the FINAL DECISION MAKER for lunch recommendations.
+You have received DEEP ANALYSIS data for ${selectionPayload.length} pre-screened candidates.
+
+LOCATION: ${address}
+USER VIBE: ${vibe || 'Any - match based on quality'}
+SPECIFIC REQUEST: ${freestylePrompt || 'None'}
+${budgetContext}
+${dietaryContext}
+
+============================================================
+YOUR TASK: SELECT 5-10 BEST OPTIONS AND WRITE COMPELLING REASONS
+============================================================
+
+For each selection, the ai_reason MUST include:
+
+1. WHY THIS PLACE (specific to user's vibe/request)
+   - "Perfect for ${vibe || 'your request'} because..."
+   - Connect the restaurant's strengths to what the user wants
+
+2. EVIDENCE FROM REVIEWS
+   - Cite specific dish mentions: "The Tonkotsu Ramen is mentioned in X reviews"
+   - Quote sentiment: "Reviewers consistently praise the 'perfectly cooked noodles'"
+
+3. STANDOUT QUALITIES
+   - What makes this place special?
+   - Service speed if relevant
+   - Atmosphere fit
+
+4. HONEST CAVEATS (if any)
+   - Mention red flags if present
+   - Cash-only warning
+   - Long wait times
+
+============================================================
+AI_REASON EXAMPLES
+============================================================
+
+BAD (generic, useless):
+"Great Italian restaurant with good food and nice atmosphere."
+
+GOOD (specific, evidence-based):
+"The Cacio e Pepe is legendary here - mentioned in 8 reviews with phrases like 'best in Berlin' and 'authentic Roman recipe'. At 4.7 stars from 234 reviews, this hidden gem in Kreuzberg delivers quick service (most reviewers mention 15-20min meals) perfect for a fast but quality lunch. The only caveat: it gets crowded after 1pm."
+
+============================================================
+RECOMMENDED_DISH RULES (ABSOLUTE)
+============================================================
+
+The recommended_dish MUST be:
+- A SPECIFIC dish name from the analysis (use top_dish or dish_mentions)
+- NEVER generic like "pasta", "burger", "their specialty"
+- If no specific dish was found, use the most specific item you can construct from context
+
+============================================================
+DIVERSITY REQUIREMENT
+============================================================
+
+Your 5-10 selections MUST span different cuisines.
+DO NOT return all Italian or all Asian restaurants.
+
+Return the final selections as a JSON array.
+`;
+
+  const prompt = `
+SELECT THE BEST 5-10 LUNCH OPTIONS FROM THIS ANALYZED DATA:
+
+${JSON.stringify(selectionPayload, null, 2)}
+
+Remember:
+- Each ai_reason must be SPECIFIC with evidence from the deep analysis
+- recommended_dish must be the SPECIFIC top_dish from analysis
+- Include diverse cuisines
+- Respect budget and dietary requirements
+`;
+
+  try {
+    const text = await callGeminiProxy(
+      GEMINI_MODEL,
+      prompt,
+      {
+        systemInstruction,
+        temperature: 0.6,
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.ARRAY,
@@ -309,21 +700,150 @@ export const decideLunch = async (
       }
     );
 
-    if (!text) {
-      Logger.error('AI', 'Empty response from Gemini Proxy');
-      throw new Error('Empty response from Gemini Proxy');
+    const recommendations = JSON.parse(text) as Omit<GeminiRecommendation, 'cash_warning_msg'>[];
+    Logger.info('AI', `[STAGE 3] Final selection complete: ${recommendations.length} recommendations`);
+    
+    // Log final recommendations
+    const finalNames = recommendations.slice(0, 3).map(r => {
+      const candidate = candidateMap.get(r.place_id);
+      return candidate?.name || 'Unknown';
+    });
+    onLog?.(`FINAL SELECTION: ${recommendations.length} OPTIMAL MATCHES IDENTIFIED`);
+    if (finalNames.length > 0) {
+      onLog?.(`YOUR TOP PICKS: ${finalNames.join(', ').toUpperCase()}`);
     }
 
-    const recommendations = JSON.parse(text) as Omit<GeminiRecommendation, 'cash_warning_msg'>[];
-    Logger.info('AI', 'Decision Matrix Complete', { count: recommendations.length });
-    
     return recommendations.map(rec => ({
       ...rec,
       cash_warning_msg: rec.is_cash_only ? 'Note: This location may be cash-only.' : null,
     }));
+  } catch (error) {
+    Logger.error('AI', '[STAGE 3] Final selection failed', error);
+    return [];
+  }
+};
+
+/**
+ * MAIN ENTRY POINT: Multi-stage lunch decision pipeline
+ * 
+ * Stage 1: Triage - Quick filter to identify food establishments and relevance
+ * Stage 2: Deep Analysis - Exhaustive review mining and menu extraction  
+ * Stage 3: Final Selection - Synthesize analysis into compelling recommendations
+ * 
+ * @param onLog - Optional callback to receive real-time analysis logs for UI display
+ */
+export const decideLunch = async (
+  candidates: GooglePlace[],
+  vibe: HungerVibe | null,
+  price: PricePoint | null,
+  noCash: boolean,
+  address: string,
+  dietaryRestrictions: DietaryRestriction[],
+  freestylePrompt?: string,
+  onLog?: AnalysisLogCallback
+): Promise<GeminiRecommendation[]> => {
+  Logger.info('AI', '=== MULTI-STAGE LUNCH DECISION PIPELINE ===', { 
+    candidateCount: candidates.length, 
+    vibe, 
+    price, 
+    freestylePrompt 
+  });
+
+  if (candidates.length === 0) {
+    Logger.warn('AI', 'No candidates provided to decision pipeline');
+    return [];
+  }
+
+  try {
+    // STAGE 1: TRIAGE
+    Logger.info('AI', '[PIPELINE] Starting Stage 1: Triage');
+    onLog?.(`STAGE 1: TRIAGE - ANALYZING ${candidates.length} CANDIDATES...`);
+    const triageResults = await triageCandidates(candidates, vibe, freestylePrompt, address, onLog);
+    
+    if (triageResults.length === 0) {
+      Logger.warn('AI', 'Triage returned no valid food establishments');
+      return [];
+    }
+
+    // Get candidates that passed triage
+    const validPlaceIds = new Set(triageResults.map(t => t.place_id));
+    const triagePassed = candidates.filter(c => validPlaceIds.has(c.place_id));
+    
+    // Sort by triage relevance and take top 20 for deep analysis
+    const sortedTriage = triageResults.sort((a, b) => b.relevance_score - a.relevance_score);
+    const topCandidateIds = new Set(sortedTriage.slice(0, 20).map(t => t.place_id));
+    const candidatesForDeepAnalysis = triagePassed.filter(c => topCandidateIds.has(c.place_id));
+
+    Logger.info('AI', `[PIPELINE] ${candidatesForDeepAnalysis.length} candidates passed triage for deep analysis`);
+
+    // STAGE 2: DEEP ANALYSIS
+    Logger.info('AI', '[PIPELINE] Starting Stage 2: Deep Analysis');
+    onLog?.(`STAGE 2: DEEP ANALYSIS - MINING DATA FOR ${candidatesForDeepAnalysis.length} RESTAURANTS...`);
+    const deepAnalysisResults = await deepAnalyzeCandidates(
+      candidatesForDeepAnalysis,
+      triageResults,
+      address,
+      onLog
+    );
+
+    if (deepAnalysisResults.length === 0) {
+      Logger.warn('AI', 'Deep analysis returned no results, falling back to triage data');
+      // Create minimal analysis from triage
+      const fallbackAnalysis: DeepAnalysisResult[] = candidatesForDeepAnalysis.slice(0, 10).map(c => ({
+        place_id: c.place_id,
+        dish_mentions: [],
+        top_dish: c.editorial_summary?.overview?.split('.')[0] || 'Chef\'s selection',
+        quality_signals: [],
+        red_flags: [],
+        service_speed: 'unknown' as const,
+        atmosphere: 'unknown',
+        value_assessment: 'unknown',
+        is_cash_only: c.payment_options?.accepts_cash_only || false,
+        is_new_opening: (c.user_ratings_total || 0) < 50,
+        overall_score: c.rating ?? 4,
+      }));
+      
+      // Still proceed to stage 3 with fallback data
+      Logger.info('AI', '[PIPELINE] Using fallback analysis data');
+      onLog?.(`USING FALLBACK ANALYSIS DATA - PROCEEDING TO FINAL SELECTION...`);
+      const recommendations = await finalSelection(
+        candidatesForDeepAnalysis,
+        fallbackAnalysis,
+        vibe,
+        price,
+        noCash,
+        address,
+        dietaryRestrictions,
+        freestylePrompt,
+        onLog
+      );
+      return recommendations;
+    }
+
+    // STAGE 3: FINAL SELECTION
+    Logger.info('AI', '[PIPELINE] Starting Stage 3: Final Selection');
+    onLog?.(`STAGE 3: FINAL SELECTION - RANKING AND SELECTING BEST MATCHES...`);
+    const recommendations = await finalSelection(
+      candidatesForDeepAnalysis,
+      deepAnalysisResults,
+      vibe,
+      price,
+      noCash,
+      address,
+      dietaryRestrictions,
+      freestylePrompt,
+      onLog
+    );
+
+    Logger.info('AI', '=== PIPELINE COMPLETE ===', { 
+      finalCount: recommendations.length,
+      stages: '3/3'
+    });
+
+    return recommendations;
 
   } catch (error) {
-    Logger.error('AI', 'Gemini Decision Failed', error);
+    Logger.error('AI', 'Multi-stage pipeline failed', error);
     return [];
   }
 };
