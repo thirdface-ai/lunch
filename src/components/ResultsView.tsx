@@ -5,15 +5,6 @@ import { useFavorites } from '../hooks/useFavorites';
 import Logger from '../utils/logger';
 import Sounds from '../utils/sounds';
 
-// Throttle function for hover sounds
-let lastHoverTime = 0;
-const throttledHover = () => {
-  const now = Date.now();
-  if (now - lastHoverTime > 100) {
-    lastHoverTime = now;
-    Sounds.hover();
-  }
-};
 
 /**
  * Parse time string like "11:00 am", "2:30 pm", "14:00" into minutes since midnight
@@ -201,7 +192,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({
           </div>
           <button 
             onClick={handleReset}
-            onMouseEnter={throttledHover}
             className={`font-mono text-[10px] font-bold uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-white/30 px-2 py-1 ${isDark ? 'text-[#999] hover:text-braun-orange' : 'text-braun-text-muted hover:text-braun-orange'}`}
           >
             [ RESET SYSTEM ]
@@ -241,7 +231,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                           <h2 
                             className={`font-sans font-bold text-xl leading-none group-hover:text-braun-orange transition-colors cursor-pointer ${isDark ? 'text-dark-text' : 'text-braun-dark'}`} 
                             onClick={() => handlePlaceClick(place.place_id)}
-                            onMouseEnter={throttledHover}
                           >
                             {place.name}
                           </h2>
@@ -249,7 +238,6 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                           {/* Favorite Button */}
                           <button
                             onClick={() => handleToggleFavorite(place)}
-                            onMouseEnter={throttledHover}
                             disabled={isSavingAny}
                             aria-label={isPlaceFavorite ? 'Remove from favorites' : 'Add to favorites'}
                             className={`p-1.5 rounded transition-all focus:outline-none focus:ring-2 focus:ring-white/30 ${

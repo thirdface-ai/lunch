@@ -3,15 +3,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AppState, TransportMode, HungerVibe, PricePoint, UserPreferences, WalkLimit, ThemeMode, DietaryRestriction } from '../types';
 import Sounds from '../utils/sounds';
 
-// Throttle function for hover sounds to prevent audio spam
-let lastHoverTime = 0;
-const throttledHover = () => {
-  const now = Date.now();
-  if (now - lastHoverTime > 100) {
-    lastHoverTime = now;
-    Sounds.hover();
-  }
-};
 
 // Easter egg: Text scramble effect component (airport split-flap display style)
 const ScrambleText: React.FC<{ text: string; className?: string; href?: string }> = ({ text, className = '', href }) => {
@@ -314,7 +305,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <div className="flex flex-col items-end gap-2">
                 <button 
                     onClick={toggleTheme} 
-                    onMouseEnter={throttledHover}
                     aria-label={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
                     className={`flex items-center gap-2 px-2 py-1 rounded-[1px] border transition-colors ${isDark ? 'border-dark-border bg-dark-bg' : 'border-braun-border bg-[#E5E5E0]'}`}
                 >
@@ -362,7 +352,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                          role="option"
                                          onMouseDown={(e) => e.preventDefault()}
                                          onClick={() => handlePredictionSelect(p)}
-                                         onMouseEnter={throttledHover}
                                          className={`w-full text-left p-3 border-b cursor-pointer font-mono text-xs truncate transition-colors group/item focus:outline-none focus:ring-1 focus:ring-white/30 ${isDark ? 'border-dark-border hover:bg-white/5 text-dark-text' : 'border-braun-border/50 hover:bg-braun-orange/10 text-braun-dark'}`}
                                      >
                                          <div className="flex flex-col pointer-events-none">
@@ -377,7 +366,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     
                     <button 
                         onClick={handleLocateMe}
-                        onMouseEnter={throttledHover}
                         aria-label="Use Current Location"
                         className={`ml-2 w-12 h-12 border rounded-sm flex items-center justify-center transition-all shadow-md group-hover:shadow-[0_0_8px_rgba(255,68,0,0.1)] z-20 ${isDark ? 'bg-[#111] border-[#333] text-[#666] hover:text-braun-orange hover:border-braun-orange active:bg-black' : 'bg-[#333] border-[#555] text-[#888] hover:text-braun-orange hover:border-braun-orange active:bg-[#222]'}`}
                         title="Acquire GPS Lock"
@@ -407,7 +395,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             role="radio"
                             aria-checked={preferences.vibe === vibe}
                             onClick={() => handleVibeSelect(vibe)}
-                            onMouseEnter={throttledHover}
                             className={`
                                 relative p-3 flex flex-col justify-between items-start min-h-[90px]
                                 transition-all duration-75 ease-out rounded-sm text-left group
@@ -478,7 +465,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 role="radio"
                                 aria-checked={preferences.walkLimit === limit}
                                 onClick={() => { Sounds.lightClick(); setPreferences(prev => ({ ...prev, walkLimit: limit })); }}
-                                onMouseEnter={throttledHover}
                                 className={`flex-1 flex items-center justify-center rounded-[1px] font-mono text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none focus:ring-1 focus:ring-white/30
                                     ${preferences.walkLimit === limit 
                                         ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-sm` 
@@ -499,7 +485,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         role="switch"
                         aria-checked={preferences.noCash}
                         onClick={() => { Sounds.toggle(!preferences.noCash); setPreferences(prev => ({ ...prev, noCash: !prev.noCash })); }}
-                        onMouseEnter={throttledHover}
                         className={`
                             w-full h-12 border rounded-sm flex items-center justify-center transition-all duration-150 group outline-none focus:ring-1 focus:ring-white/30
                             ${preferences.noCash 
@@ -524,7 +509,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 role="checkbox"
                                 aria-checked={(preferences.dietaryRestrictions || []).includes(restriction)}
                                 onClick={() => handleDietaryToggle(restriction)}
-                                onMouseEnter={throttledHover}
                                 className={`px-3 py-2 rounded-[1px] font-mono text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none border focus:ring-1 focus:ring-white/30
                                     ${(preferences.dietaryRestrictions || []).includes(restriction)
                                         ? `${isDark ? 'bg-dark-text text-dark-bg border-dark-text' : 'bg-braun-dark text-white border-braun-dark'} shadow-sm` 
@@ -556,7 +540,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         role="radio"
                         aria-checked={preferences.price === null}
                         onClick={() => handlePriceSelect(null)}
-                        onMouseEnter={throttledHover}
                         className={`flex-1 flex flex-col items-center justify-center rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30
                             ${preferences.price === null 
                                 ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md`
@@ -572,7 +555,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         role="radio"
                         aria-checked={preferences.price === PricePoint.PAYING_MYSELF}
                         onClick={() => handlePriceSelect(PricePoint.PAYING_MYSELF)}
-                        onMouseEnter={throttledHover}
                         className={`flex-1 flex flex-col items-center justify-center rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30
                             ${preferences.price === PricePoint.PAYING_MYSELF 
                                 ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md`
@@ -589,7 +571,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         role="radio"
                         aria-checked={preferences.price === PricePoint.COMPANY_CARD}
                         onClick={() => handlePriceSelect(PricePoint.COMPANY_CARD)}
-                        onMouseEnter={throttledHover}
                         className={`flex-1 flex flex-col items-center justify-center rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30
                             ${preferences.price === PricePoint.COMPANY_CARD 
                                 ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md`
@@ -607,7 +588,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <div className="col-span-12 md:col-span-4 p-8 flex">
                 <button
                     onClick={() => { Sounds.firmClick(); onCalculate(); }}
-                    onMouseEnter={() => { if (preferences.lat && (preferences.vibe || preferences.freestylePrompt)) throttledHover(); }}
                     disabled={!preferences.lat || (!preferences.vibe && !preferences.freestylePrompt)}
                     aria-busy={(appState as AppState) === AppState.PROCESSING}
                     className={`
