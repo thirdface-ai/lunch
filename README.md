@@ -1,240 +1,139 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/LUNCH-DECIDER-FF4400?style=for-the-badge&labelColor=1A1A1A" alt="Lunch Decider" />
-</p>
+# Lunch Decider
 
-<h1 align="center">🍜 Lunch Decider</h1>
-
-<p align="center">
-  <strong>AI-powered lunch recommendations that match your vibe, not just your location.</strong>
-</p>
-
-<p align="center">
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-features">Features</a> •
-  <a href="#%EF%B8%8F-architecture">Architecture</a> •
-  <a href="#-api-reference">API</a> •
-  <a href="#-contributing">Contributing</a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=white" alt="React" />
-  <img src="https://img.shields.io/badge/TypeScript-5.4-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Vite-5.2-646CFF?logo=vite&logoColor=white" alt="Vite" />
-  <img src="https://img.shields.io/badge/Supabase-2.39-3FCF8E?logo=supabase&logoColor=white" alt="Supabase" />
-  <img src="https://img.shields.io/badge/Gemini_AI-Pro-4285F4?logo=google&logoColor=white" alt="Gemini" />
-  <img src="https://img.shields.io/badge/License-MIT-FF4400" alt="License" />
-</p>
-
-<br />
+**Stop scrolling through 50 mediocre restaurants. Tell us your vibe, we'll tell you what to order.**
 
 ---
 
-## 🎯 What is this?
+## The Problem
 
-Lunch Decider is an **open-source AI-powered restaurant recommendation engine** that goes beyond basic location search. Instead of showing you 50 mediocre options, it:
+Every lunch recommendation app does the same thing: here's a list of places, sorted by rating, good luck. You scroll for 10 minutes, pick something safe, and wonder why you bothered.
 
-1. **Understands your vibe** — "Grab & Go", "Spicy & Bold", "View & Vibe"
-2. **Reads the reviews** — AI analyzes hundreds of reviews to find actual gems
-3. **Recommends specific dishes** — Not just "try this place", but "get the Tonkotsu Ramen"
-4. **Respects your constraints** — Budget, dietary needs, distance, payment preferences
+Lunch Decider does something different. Instead of asking "what cuisine do you want?" (you don't know, that's the whole problem), we ask "what's your vibe?" Feeling efficient? Grab & Go. Need comfort? Hearty & Rich. Want to wake up? Spicy & Bold.
 
-Built with React, Google Maps, Google Gemini AI, and Supabase.
+Then our AI reads through hundreds of reviews to find the actual gems - not just "this place is good" but "get the Tonkotsu Ramen, it's legendary." Specific dish recommendations from real people who bothered to write about them.
 
-<br />
+---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-# Clone it
 git clone https://github.com/thirdface/lunch-decider.git
 cd lunch-decider
-
-# Install dependencies
 npm install
-
-# Set up environment (see below for details)
 cp env.example .env.local
-# Edit .env.local with your API keys
-
-# Run it
+# Add your API keys (see Environment Setup below)
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) and find lunch.
+Open http://localhost:5173 and find lunch.
 
-<br />
+---
 
-## ✨ Features
+## What Makes This Different
 
-### 🧠 Vibe-Based Search
+### Vibe-Based Search
 
-Choose your mental state, get matching recommendations:
+Pick your mental state, not your cuisine:
 
 | Vibe | What You Get |
 |------|-------------|
-| **Grab & Go** | Quick bites, food trucks, bakeries — in and out |
-| **Light & Clean** | Salads, poke, Vietnamese — keep it fresh |
-| **Hearty & Rich** | Ramen, burgers, Italian — comfort mode |
-| **Spicy & Bold** | Thai, Sichuan, Indian — wake up your tastebuds |
-| **View & Vibe** | Rooftops, scenic spots — Instagram-worthy |
+| **Grab & Go** | Quick bites, food trucks, bakeries - in and out |
+| **Light & Clean** | Salads, poke, Vietnamese - keep it fresh |
+| **Hearty & Rich** | Ramen, burgers, Italian - comfort mode |
+| **Spicy & Bold** | Thai, Sichuan, Indian - wake up your tastebuds |
+| **View & Vibe** | Rooftops, scenic spots - the Instagram lunch |
 | **Authentic & Classic** | Traditional, time-tested, no gimmicks |
 
-### 🤖 AI-Powered Analysis
+Or just type what you want. "Schnitzel" works too.
 
-Gemini AI reads through reviews to:
+### AI That Actually Reads Reviews
+
+Gemini AI digs through reviews to:
 - Extract specific dish recommendations ("the Duck Confit is legendary")
 - Identify quality signals ("hidden gem", "locals' favorite")
-- Detect red flags ("went downhill", "cash only")
-- Match restaurants to your exact vibe
+- Detect red flags ("went downhill", "used to be better")
+- Catch cash-only warnings - even in German ("nur Barzahlung")
 
-### 📍 Smart Location Awareness
+You get 3 recommendations with actual reasoning, not a ranked list of 50.
 
-- Google Maps integration with Places API
-- Walking distance calculations
-- Radius-based search (5/15/30 min walking)
-- Interactive map with all results
+### Budget Tiers With Personality
 
-### 💰 Budget Tiers
+| Tier | Translation |
+|------|------------|
+| **Personal** | You're paying, keep it reasonable ($ - $$) |
+| **Company** | Someone else is paying, live a little ($$$ - $$$$) |
 
-| Tier | Price Level | For When... |
-|------|-------------|-------------|
-| **Bootstrapped** | $ - $$ | Watching every dollar |
-| **Series A** | $$ - $$$ | Comfortable spending |
-| **Company Card** | $$$ - $$$$ | Expensing this one |
+### The Terminal UI
 
-### 🥗 Dietary Support
+Yes, it looks like a piece of Braun equipment from 1968. That's intentional. The loading screen has scanlines, generates contextual jokes while it thinks, and makes satisfying click sounds. We're not trying to look like every other food app.
 
-- Gluten-Free
-- Vegan  
-- Vegetarian
+---
 
-### 💳 Payment Preferences
-
-Toggle "No Cash" to exclude cash-only establishments (AI detects this from reviews too).
-
-### ⭐ Favorites
-
-Save recommendations for quick access later. Persisted via Supabase.
-
-### 🌙 Dark Mode
-
-Beautiful Braun-inspired design with light/dark themes. Follows system preference by default.
-
-<br />
-
-## 🏗️ Architecture
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           FRONTEND (React + Vite)                        │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────────┐   │
-│   │  ControlPanel   │   │   TerminalLog   │   │    ResultsView      │   │
-│   │                 │   │                 │   │                     │   │
-│   │  • Vibe select  │   │  • AI progress  │   │  • Restaurant cards │   │
-│   │  • Location     │   │  • Funny logs   │   │  • Interactive map  │   │
-│   │  • Filters      │   │  • Status       │   │  • Dish recs        │   │
-│   └─────────────────┘   └─────────────────┘   └─────────────────────┘   │
-│                                                                         │
-│   ┌─────────────────────────────────────────────────────────────────┐   │
-│   │                        Custom Hooks                             │   │
-│   │  useGooglePlaces • useDistanceMatrix • useLunchDecision         │   │
-│   │  usePreferences • useFavorites • useTerminalLogs                │   │
-│   └─────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           SERVICES LAYER                                 │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   ┌────────────────────────────┐   ┌────────────────────────────────┐   │
-│   │      geminiService.ts      │   │      supabaseService.ts        │   │
-│   │                            │   │                                │   │
-│   │  • decideLunch()           │   │  • saveSearchHistory()         │   │
-│   │  • generateLoadingLogs()   │   │  • saveFavorite()              │   │
-│   │  • Calls Edge Function     │   │  • getFavorites()              │   │
-│   └────────────────────────────┘   └────────────────────────────────┘   │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-           ┌────────────────────────┼────────────────────────┐
-           │                        │                        │
-           ▼                        ▼                        ▼
-┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
-│    Google Maps      │  │   Supabase Edge     │  │     Supabase        │
-│    Platform         │  │   Function          │  │     PostgreSQL      │
-│                     │  │                     │  │                     │
-│  • Places API       │  │  • gemini-proxy     │  │  • search_history   │
-│  • Distance Matrix  │  │  • Secure API key   │  │  • favorites        │
-│  • Maps JavaScript  │  │  • Rate limiting    │  │  • app_logs         │
-└─────────────────────┘  └─────────────────────┘  └─────────────────────┘
-        (client)              (server-side)            (database)
+Frontend (React + Vite)
+    |
+    v
+Services Layer
+    |
+    +---> Google Maps Platform (Places API, Distance Matrix)
+    +---> Supabase Edge Function ---> Gemini AI
+    +---> Supabase PostgreSQL (search history, favorites)
 ```
 
 ### Data Flow
 
-```
-User Input → Google Places API → Candidate Restaurants (15-20)
-                                         │
-                                         ▼
-                              Gemini AI (via Edge Function)
-                              • Analyzes reviews
-                              • Extracts dish mentions
-                              • Scores vibe match
-                                         │
-                                         ▼
-                              Top 3 Recommendations
-                              • Specific dishes
-                              • AI explanations
-                              • Cash warnings
-```
+1. User picks location + vibe + constraints
+2. Google Places API returns ~20 candidates
+3. Gemini AI analyzes reviews, extracts dish mentions, scores vibe match
+4. You get 3 recommendations with specific dishes and honest explanations
 
-<br />
+The Gemini API key stays server-side in an Edge Function. Google Maps key uses HTTP referrer restrictions. Your API bills are protected.
 
-## 📦 Installation
+---
 
-### Prerequisites
+## Environment Setup
 
-- **Node.js 18+** (we recommend using [fnm](https://github.com/Schniz/fnm) or [nvm](https://github.com/nvm-sh/nvm))
-- **npm** or **yarn**
-- **Google Cloud Account** — for Maps & Gemini APIs
-- **Supabase Account** — free tier works great
+You need three things:
 
-### Step 1: Clone & Install
+### 1. Supabase Project
 
-```bash
-git clone https://github.com/thirdface/lunch-decider.git
-cd lunch-decider
-npm install
-```
-
-### Step 2: Environment Variables
-
-Create `.env.local` from the example:
-
-```bash
-cp env.example .env.local
-```
-
-Edit `.env.local`:
+Free tier works fine. Get your credentials from the dashboard.
 
 ```env
-# Supabase (get from: supabase.com/dashboard/project/_/settings/api)
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
-
-# Google Maps (get from: console.cloud.google.com/apis/credentials)
-VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key
 ```
 
-### Step 3: Set Up Supabase
+### 2. Google Cloud APIs
 
-#### Database Tables
+Enable these in Google Cloud Console:
+- Maps JavaScript API
+- Places API (New)
+- Distance Matrix API
+- Geocoding API
 
-Run these migrations in your Supabase SQL editor:
+Then restrict your key to HTTP referrers (localhost for dev, your domain for prod).
+
+```env
+VITE_GOOGLE_MAPS_API_KEY=your-maps-key
+```
+
+### 3. Gemini API Key (Server-Side)
+
+This one stays in Supabase as a secret, not in your frontend:
+
+```bash
+supabase secrets set GEMINI_API_KEY=your-gemini-key
+supabase functions deploy gemini-proxy
+```
+
+---
+
+## Database Setup
+
+Run these in your Supabase SQL editor:
 
 ```sql
 -- Search History
@@ -284,321 +183,86 @@ alter table search_history enable row level security;
 alter table favorites enable row level security;
 alter table app_logs enable row level security;
 
--- RLS Policies (session-based)
-create policy "Users can view their own search history"
-  on search_history for select
-  using (session_id = current_setting('request.jwt.claims')::json->>'session_id');
-
-create policy "Users can insert their own search history"
-  on search_history for insert
-  with check (true);
-
-create policy "Users can manage their own favorites"
-  on favorites for all
-  using (true);
-
-create policy "Anyone can insert logs"
-  on app_logs for insert
-  with check (true);
+-- Policies (permissive for anonymous users)
+create policy "Users can insert search history" on search_history for insert with check (true);
+create policy "Users can manage favorites" on favorites for all using (true);
+create policy "Anyone can insert logs" on app_logs for insert with check (true);
 ```
-
-#### Deploy Edge Function
-
-```bash
-# Install Supabase CLI if you haven't
-npm install -g supabase
-
-# Link to your project
-supabase link --project-ref your-project-ref
-
-# Set the Gemini API key as a secret
-supabase secrets set GEMINI_API_KEY=your-gemini-key
-
-# Deploy the proxy function
-supabase functions deploy gemini-proxy
-```
-
-### Step 4: Configure Google Cloud
-
-#### Enable APIs
-
-In [Google Cloud Console](https://console.cloud.google.com/apis/library), enable:
-
-- ✅ Maps JavaScript API
-- ✅ Places API (New)
-- ✅ Distance Matrix API
-- ✅ Geocoding API
-
-#### Restrict Your API Key
-
-1. Go to **APIs & Services → Credentials**
-2. Click your API key → **Edit**
-3. Under **Application restrictions**, select **HTTP referrers**
-4. Add:
-   - `localhost:*` (development)
-   - `your-domain.com/*` (production)
-5. Under **API restrictions**, select **Restrict key** and choose only the 4 APIs above
-
-### Step 5: Run
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:5173](http://localhost:5173) 🎉
-
-<br />
-
-## 🔐 Security
-
-### API Key Strategy
-
-| Key | Location | Protection |
-|-----|----------|------------|
-| `GOOGLE_MAPS_API_KEY` | Client `.env` | HTTP referrer restrictions |
-| `GEMINI_API_KEY` | Edge Function secret | Server-side only, never exposed |
-| `SUPABASE_ANON_KEY` | Client `.env` | Row Level Security (RLS) |
-
-### Why Edge Functions?
-
-The Gemini API key **cannot** be restricted by HTTP referrer, so it must stay server-side. We use Supabase Edge Functions as a proxy:
-
-```
-Client → Supabase Edge Function → Gemini API
-              (secret key)
-```
-
-This keeps your AI costs protected while maintaining sub-second latency.
-
-<br />
-
-## 📁 Project Structure
-
-```
-lunch-decider/
-├── 📄 index.html                 # Entry point
-├── 📄 package.json               # Dependencies & scripts
-├── 📄 vite.config.ts             # Vite configuration
-├── 📄 tsconfig.json              # TypeScript config
-├── 📄 tailwind.config.js         # Tailwind CSS config
-│
-├── 📁 src/
-│   ├── 📄 App.tsx                # Root component
-│   ├── 📄 index.css              # Global styles
-│   ├── 📄 types.ts               # TypeScript definitions
-│   │
-│   ├── 📁 components/
-│   │   ├── ControlPanel.tsx      # Input form, vibe selection
-│   │   ├── TerminalLog.tsx       # AI progress animation
-│   │   ├── ResultsView.tsx       # Results display + map
-│   │   ├── MapComponent.tsx      # Google Maps wrapper
-│   │   └── ErrorBoundary.tsx     # Error handling
-│   │
-│   ├── 📁 hooks/
-│   │   ├── index.ts              # Barrel export
-│   │   ├── useGooglePlaces.ts    # Places API integration
-│   │   ├── useDistanceMatrix.ts  # Walking time calculation
-│   │   ├── useLunchDecision.ts   # Main orchestration hook
-│   │   ├── usePreferences.ts     # LocalStorage persistence
-│   │   ├── useFavorites.ts       # Favorites management
-│   │   └── useTerminalLogs.ts    # Log state management
-│   │
-│   ├── 📁 services/
-│   │   ├── geminiService.ts      # AI recommendation logic
-│   │   ├── geminiService.test.ts # Service tests
-│   │   └── supabaseService.ts    # Database operations
-│   │
-│   ├── 📁 lib/
-│   │   ├── supabase.ts           # Supabase client setup
-│   │   └── database.types.ts     # Generated DB types
-│   │
-│   └── 📁 utils/
-│       ├── logger.ts             # Structured logging
-│       ├── lunchAlgorithm.ts     # Scoring & filtering
-│       └── lunchAlgorithm.test.ts
-│
-├── 📁 supabase/
-│   └── 📁 functions/
-│       └── 📁 gemini-proxy/
-│           └── index.ts          # Edge Function
-│
-└── 📁 test/
-    └── setup.ts                  # Test configuration
-```
-
-<br />
-
-## 🧪 Testing
-
-```bash
-# Run tests
-npm test
-
-# Run with UI
-npm run test:ui
-
-# Coverage report
-npm run test:coverage
-```
-
-Tests use [Vitest](https://vitest.dev/) + [Testing Library](https://testing-library.com/).
-
-<br />
-
-## 🚢 Deployment
-
-### Frontend (Vercel)
-
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel
-
-# Set environment variables in Vercel Dashboard:
-# - VITE_SUPABASE_URL
-# - VITE_SUPABASE_ANON_KEY
-# - VITE_GOOGLE_MAPS_API_KEY
-```
-
-### Frontend (Netlify)
-
-```bash
-npm run build
-# Deploy dist/ folder
-```
-
-### Edge Functions (Supabase)
-
-```bash
-supabase functions deploy gemini-proxy
-```
-
-<br />
-
-## 📜 Scripts Reference
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start dev server (Vite) |
-| `npm run build` | Build for production |
-| `npm run preview` | Preview production build |
-| `npm run start` | Start production server |
-| `npm test` | Run tests |
-| `npm run test:ui` | Run tests with UI |
-| `npm run test:coverage` | Generate coverage report |
-
-<br />
-
-## 🎨 Design System
-
-Built on [Dieter Rams' principles](https://www.vitsoe.com/us/about/good-design) with a Braun-inspired aesthetic.
-
-### Colors
-
-```css
-/* Light Mode */
---braun-bg: #F5F5F0;        /* Warm off-white */
---braun-surface: #F9F9F7;   /* Slightly elevated */
---braun-border: #D4D4D0;    /* Subtle borders */
---braun-text: #3D3D3D;      /* Primary text */
---braun-accent: #FF4400;    /* Action orange */
-
-/* Dark Mode */
---dark-bg: #0A0A0A;         /* Deep black */
---dark-surface: #141414;    /* Elevated surfaces */
---dark-border: #2A2A2A;     /* Subtle borders */
---dark-text: #E0E0E0;       /* Primary text */
-```
-
-### Typography
-
-- **Sans-serif**: Inter — for UI and body text
-- **Monospace**: Roboto Mono — for terminal logs and data
-
-### Spacing
-
-Uses an 8px base unit system. See `.cursorrules` for the complete design system documentation.
-
-<br />
-
-## 🤝 Contributing
-
-We love contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Quick Contribution Guide
-
-```bash
-# Fork the repo, then:
-git clone https://github.com/YOUR_USERNAME/lunch-decider.git
-cd lunch-decider
-npm install
-
-# Create a branch
-git checkout -b feature/amazing-feature
-
-# Make your changes, then:
-npm test
-npm run build
-
-# Commit and push
-git commit -m "Add amazing feature"
-git push origin feature/amazing-feature
-
-# Open a Pull Request!
-```
-
-### Areas We'd Love Help With
-
-- 🌍 **Internationalization** — Support for more languages
-- 🍽️ **Cuisine Support** — Better vibe→cuisine mapping
-- 📱 **PWA** — Offline support, installability
-- ♿ **Accessibility** — Screen reader improvements
-- 🧪 **Tests** — More coverage is always better
-- 📖 **Docs** — Tutorials, guides, examples
-
-<br />
-
-## 📄 License
-
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
-
-```
-MIT License — do whatever you want, just don't blame us.
-```
-
-<br />
-
-## 🙏 Acknowledgments
-
-Built with these incredible tools:
-
-- [React](https://react.dev/) — UI library
-- [Vite](https://vitejs.dev/) — Build tool
-- [TypeScript](https://www.typescriptlang.org/) — Type safety
-- [Tailwind CSS](https://tailwindcss.com/) — Styling
-- [Google Maps Platform](https://developers.google.com/maps) — Location services
-- [Google Gemini](https://ai.google.dev/) — AI recommendations
-- [Supabase](https://supabase.com/) — Backend & Edge Functions
-- [Vitest](https://vitest.dev/) — Testing
-
-<br />
-
-## 💬 Support
-
-- 🐛 **Found a bug?** [Open an issue](https://github.com/thirdface/lunch-decider/issues)
-- 💡 **Have an idea?** [Start a discussion](https://github.com/thirdface/lunch-decider/discussions)
-- 📧 **Need help?** [Email us](mailto:hello@thirdface.com)
-
-<br />
 
 ---
 
-<p align="center">
-  <strong>Built with 🍜 by <a href="https://thirdface.com">thirdface</a></strong>
-</p>
+## Project Structure
 
-<p align="center">
-  <sub>Good design is as little design as possible — Dieter Rams</sub>
-</p>
+```
+lunch-decider/
+├── src/
+│   ├── components/
+│   │   ├── ControlPanel.tsx      # Input form, vibe selection
+│   │   ├── TerminalLog.tsx       # The loading screen with jokes
+│   │   ├── ResultsView.tsx       # Results + map
+│   │   └── MapComponent.tsx      # Google Maps wrapper
+│   ├── hooks/
+│   │   ├── useGooglePlaces.ts    # Places API
+│   │   ├── useDistanceMatrix.ts  # Walking times
+│   │   └── useLunchDecision.ts   # Main orchestration
+│   ├── services/
+│   │   ├── geminiService.ts      # AI logic
+│   │   └── supabaseService.ts    # Database ops
+│   └── utils/
+│       ├── lunchAlgorithm.ts     # Scoring logic
+│       └── sounds.ts             # Click sounds
+└── supabase/
+    └── functions/
+        └── gemini-proxy/         # Edge Function
+```
+
+---
+
+## Scripts
+
+| Command | What it does |
+|---------|-------------|
+| `npm run dev` | Start dev server |
+| `npm run build` | Build for production |
+| `npm test` | Run tests |
+| `npm run test:coverage` | Coverage report |
+
+---
+
+## The Scoring Algorithm
+
+Not just "highest rated wins." We factor in:
+
+- **Proximity** - closer is better (weighted by walk time preference)
+- **Price match** - respects your budget setting
+- **Hidden gems** - 4.3+ rating with 50-750 reviews gets a boost
+- **Fresh drops** - new places (<50 reviews) with 4.0+ rating get highlighted
+- **Will it be open?** - filters out places closed by the time you'd arrive
+
+Then Gemini picks the best 3 from the top 15 candidates.
+
+---
+
+## Design Philosophy
+
+The UI follows Dieter Rams' principles: less but better, nothing arbitrary, every element earns its place. The Braun-inspired aesthetic isn't just for looks - it's a statement that a lunch app doesn't need to look like every other app.
+
+Light mode uses warm off-whites (#F5F5F0). Dark mode uses deep blacks (#0A0A0A). The accent orange (#FF4400) is used sparingly. The terminal screen has actual scanlines because we thought it would be funny.
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## License
+
+MIT - do what you want, don't blame us.
+
+---
+
+Built by [thirdface](https://thirdface.com)
+
+*"Good design is as little design as possible." - Dieter Rams*

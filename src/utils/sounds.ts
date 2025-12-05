@@ -392,38 +392,6 @@ export const playLogEntry = (): void => {
 };
 
 /**
- * Favorite - deep pulse
- */
-export const playFavorite = (add: boolean): void => {
-  const ctx = getReadyContext();
-  if (!ctx) return;
-
-  const now = ctx.currentTime;
-  
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  
-  osc.type = 'sine';
-  
-  if (add) {
-    osc.frequency.setValueAtTime(60, now);
-    osc.frequency.exponentialRampToValueAtTime(100, now + 0.06);
-    gain.gain.setValueAtTime(0.1, now);
-  } else {
-    osc.frequency.setValueAtTime(90, now);
-    osc.frequency.exponentialRampToValueAtTime(50, now + 0.06);
-    gain.gain.setValueAtTime(0.07, now);
-  }
-  
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-  
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(now);
-  osc.stop(now + 0.1);
-};
-
-/**
  * Locate - deep pings
  */
 export const playLocate = (): void => {
@@ -565,7 +533,6 @@ const Sounds = {
   error: playError,
   init: playInit,
   logEntry: playLogEntry,
-  favorite: playFavorite,
   locate: playLocate,
   splitFlap: playSplitFlap,
   splitFlapForDuration: playSplitFlapForDuration,

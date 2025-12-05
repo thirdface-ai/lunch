@@ -146,20 +146,6 @@ export interface SearchHistoryRecord {
   result_count: number | null;
 }
 
-export interface FavoriteRecord {
-  id?: string;
-  created_at?: string;
-  session_id: string;
-  place_id: string;
-  place_name: string;
-  place_rating: number | null;
-  place_address: string | null;
-  ai_reason: string | null;
-  recommended_dish: string | null;
-  walking_time_text: string | null;
-  metadata: Record<string, unknown> | null;
-}
-
 export interface AppLogRecord {
   id?: number;
   created_at?: string;

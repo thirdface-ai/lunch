@@ -1,8 +1,6 @@
 import React from 'react';
 import { AppState, FinalResult, ThemeMode } from '../types';
 import MapComponent from './MapComponent';
-import { useFavorites } from '../hooks/useFavorites';
-import Logger from '../utils/logger';
 import Sounds from '../utils/sounds';
 
 
@@ -160,46 +158,17 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   
   // Generate title once per results set using useMemo
   const funnyTitle = React.useMemo(() => generateFunnyTitle(results), [results]);
-  
-  // Use TanStack Query-powered favorites hook
-  const {
-    isFavorite,
-    toggleFavorite,
-    isAddingFavorite,
-    isRemovingFavorite,
-  } = useFavorites();
-
-  const handleToggleFavorite = async (result: FinalResult) => {
-    try {
-      const wasAlreadyFavorite = isFavorite(result.place_id);
-      Sounds.favorite(!wasAlreadyFavorite);
-      const isNowFavorite = await toggleFavorite(result);
-      
-      if (isNowFavorite) {
-        Logger.userAction('Added Favorite', { placeId: result.place_id, placeName: result.name });
-      } else {
-        Logger.userAction('Removed Favorite', { placeId: result.place_id, placeName: result.name });
-      }
-    } catch (error) {
-      Sounds.error();
-      Logger.error('USER', 'Failed to toggle favorite', error);
-    }
-  };
 
   const handleReset = () => {
     Sounds.firmClick();
     onReset();
   };
 
-  const handlePlaceClick = (placeId: string) => {
-    Sounds.mediumClick();
-    window.open(`https://www.google.com/maps/place/?q=place_id:${placeId}`, '_blank');
-  };
+  // Generate Google Maps URL for a place
+  const getPlaceUrl = (placeId: string) => 
+    `https://www.google.com/maps/place/?q=place_id:${placeId}`;
 
   if (appState !== AppState.RESULTS) return null;
-
-  // Check if any mutation is pending
-  const isSavingAny = isAddingFavorite || isRemovingFavorite;
 
   return (
     <div className={`min-h-screen flex items-center justify-center p-2 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
@@ -234,49 +203,25 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                 text => text.toLowerCase().startsWith(todayName.toLowerCase())
               );
               const todaysHours = todaysHoursRaw ? todaysHoursRaw.substring(todaysHoursRaw.indexOf(':') + 2) : null;
-              const isPlaceFavorite = isFavorite(place.place_id);
 
               return (
                 <article 
                   key={place.place_id} 
                   className={`p-4 sm:p-8 border-b last:border-b-0 transition-colors group ${isDark ? 'border-dark-border hover:bg-dark-surface' : 'border-braun-border hover:bg-white'}`}
                 >
-                  {/* Header: Number + Name inline */}
+                  {/* Header: Number + Name inline - using <a> for iOS compatibility */}
                   <div className="mb-3 sm:mb-4">
-                    <h2 
-                      className={`font-sans font-bold text-base sm:text-xl leading-snug group-hover:text-braun-orange transition-colors cursor-pointer inline ${isDark ? 'text-dark-text' : 'text-braun-dark'}`} 
-                      onClick={() => handlePlaceClick(place.place_id)}
+                    <span className="font-mono text-braun-orange text-xs sm:text-sm font-bold tabular-nums mr-3">
+                      {(idx + 1).toString().padStart(2, '0')}
+                    </span>
+                    <a 
+                      href={getPlaceUrl(place.place_id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`font-sans font-bold text-base sm:text-xl leading-snug group-hover:text-braun-orange transition-colors ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}
                     >
-                      <span className="font-mono text-braun-orange text-xs sm:text-sm font-bold tabular-nums mr-3">
-                        {(idx + 1).toString().padStart(2, '0')}
-                      </span>
                       {place.name}
-                    </h2>
-                    
-                    {/* Favorite Button - inline after name */}
-                    <button
-                      onClick={() => handleToggleFavorite(place)}
-                      disabled={isSavingAny}
-                      aria-label={isPlaceFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                      className={`inline-flex align-middle ml-2 transition-all focus:outline-none focus:ring-2 focus:ring-white/30 ${
-                        isSavingAny ? 'opacity-50 cursor-wait' : ''
-                      } ${
-                        isPlaceFavorite 
-                          ? 'text-braun-orange' 
-                          : `${isDark ? 'text-dark-text-muted hover:text-braun-orange' : 'text-braun-text-muted hover:text-braun-orange'}`
-                      }`}
-                    >
-                      <svg 
-                        width="16" 
-                        height="16" 
-                        viewBox="0 0 24 24" 
-                        fill={isPlaceFavorite ? 'currentColor' : 'none'} 
-                        stroke="currentColor" 
-                        strokeWidth="2"
-                      >
-                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                      </svg>
-                    </button>
+                    </a>
                     
                     {/* NEW OPENING BADGE */}
                     {place.is_new_opening && (

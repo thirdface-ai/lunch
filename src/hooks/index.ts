@@ -4,6 +4,5 @@ export { useTerminalLogs, default as useTerminalLogsDefault } from './useTermina
 export { useGooglePlaces, default as useGooglePlacesDefault } from './useGooglePlaces';
 export { useDistanceMatrix, default as useDistanceMatrixDefault } from './useDistanceMatrix';
 export { useLunchDecision, default as useLunchDecisionDefault } from './useLunchDecision';
-export { useFavorites, default as useFavoritesDefault } from './useFavorites';
 export type { PlaceDuration } from './useDistanceMatrix';
 
