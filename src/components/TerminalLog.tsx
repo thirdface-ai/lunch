@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { AppState, TerminalLog as LogType, ThemeMode } from '../types';
-import Sounds, { startProcessingHum, SoundController } from '../utils/sounds';
+import Sounds from '../utils/sounds';
 
 interface TerminalLogProps {
   appState: AppState;
@@ -13,40 +13,18 @@ const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0,
   const endRef = useRef<HTMLDivElement>(null);
   const prevLogsLengthRef = useRef(0);
   const hasPlayedInitRef = useRef(false);
-  const humControllerRef = useRef<SoundController | null>(null);
+  const hasPlayedSuccessRef = useRef(false);
   const isDark = theme === ThemeMode.DARK;
 
-  // Play init sound and start processing hum when processing starts
+  // Play init sound when processing starts
   useEffect(() => {
     if (appState === AppState.PROCESSING && !hasPlayedInitRef.current) {
       hasPlayedInitRef.current = true;
+      hasPlayedSuccessRef.current = false;
       Sounds.init();
-      
-      // Start continuous processing hum after init sound
-      const startHum = async () => {
-        // Small delay to let init sound play first
-        await new Promise(resolve => setTimeout(resolve, 300));
-        if (hasPlayedInitRef.current) {
-          humControllerRef.current = await startProcessingHum();
-        }
-      };
-      startHum();
     } else if (appState !== AppState.PROCESSING) {
       hasPlayedInitRef.current = false;
-      // Stop the processing hum when leaving processing state
-      if (humControllerRef.current) {
-        humControllerRef.current.stop();
-        humControllerRef.current = null;
-      }
     }
-    
-    return () => {
-      // Cleanup on unmount
-      if (humControllerRef.current) {
-        humControllerRef.current.stop();
-        humControllerRef.current = null;
-      }
-    };
   }, [appState]);
 
   // Play log entry sounds when new logs appear
@@ -57,17 +35,13 @@ const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0,
     prevLogsLengthRef.current = logs.length;
   }, [logs]);
 
-  // Play success sound and stop hum when progress hits 100
+  // Play success sound when progress hits 100
   useEffect(() => {
-    if (progress >= 100) {
-      // Stop the hum before playing success
-      if (humControllerRef.current) {
-        humControllerRef.current.stop();
-        humControllerRef.current = null;
-      }
+    if (progress >= 100 && !hasPlayedSuccessRef.current) {
+      hasPlayedSuccessRef.current = true;
       Sounds.success();
     }
-  }, [progress >= 100]);
+  }, [progress]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });

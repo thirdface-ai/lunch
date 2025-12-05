@@ -1,26 +1,34 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AppState, TransportMode, HungerVibe, PricePoint, UserPreferences, WalkLimit, ThemeMode, DietaryRestriction } from '../types';
-import Sounds, { startSplitFlap, SoundController } from '../utils/sounds';
+import Sounds, { playSplitFlapForDuration } from '../utils/sounds';
 
 
 // Easter egg: Text scramble effect component (airport split-flap display style)
 const ScrambleText: React.FC<{ text: string; className?: string; href?: string }> = ({ text, className = '', href }) => {
   const [displayText, setDisplayText] = useState(text);
   const [isHovering, setIsHovering] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const iterationRef = useRef(0);
-  const soundControllerRef = useRef<SoundController | null>(null);
 
-  const scramble = useCallback(async () => {
+  const scramble = useCallback(() => {
+    // Prevent overlapping animations
+    if (isAnimating) return;
+    
     iterationRef.current = 0;
+    setIsAnimating(true);
     const originalText = text;
+    const charCount = originalText.replace(/\s/g, '').length; // Count non-space chars
+    
+    // Calculate exact animation duration: charCount * 3 iterations * 30ms per iteration
+    const animationDuration = charCount * 3 * 30;
+    
+    // Play sound for exact animation duration - immediate, no async
+    playSplitFlapForDuration(animationDuration);
     
     if (intervalRef.current) clearInterval(intervalRef.current);
-    
-    // Start the continuous split-flap sound (synced with animation)
-    soundControllerRef.current = await startSplitFlap();
     
     intervalRef.current = setInterval(() => {
       setDisplayText(
@@ -39,16 +47,12 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
       iterationRef.current += 1 / 3;
       
       if (iterationRef.current >= originalText.length) {
-        // Animation complete - stop the sound with settling thunk
         if (intervalRef.current) clearInterval(intervalRef.current);
-        if (soundControllerRef.current) {
-          soundControllerRef.current.stop();
-          soundControllerRef.current = null;
-        }
         setDisplayText(originalText);
+        setIsAnimating(false);
       }
     }, 30);
-  }, [text]);
+  }, [text, isAnimating]);
 
   const handleMouseEnter = () => {
     setIsHovering(true);
@@ -57,22 +61,12 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
 
   const handleMouseLeave = () => {
     setIsHovering(false);
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    // Stop sound immediately when mouse leaves (with settling thunk)
-    if (soundControllerRef.current) {
-      soundControllerRef.current.stop();
-      soundControllerRef.current = null;
-    }
-    setDisplayText(text);
+    // Let animation complete naturally - sound is already scheduled
   };
 
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      if (soundControllerRef.current) {
-        soundControllerRef.current.stop();
-        soundControllerRef.current = null;
-      }
     };
   }, []);
 
