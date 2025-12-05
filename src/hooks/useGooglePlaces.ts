@@ -167,7 +167,8 @@ export const useGooglePlaces = () => {
     
     if (freestylePrompt && freestylePrompt.trim().length > 0) {
       if (!vibe) {
-        searchQueries = [freestylePrompt];
+        // Freestyle only: use it as primary, but add "restaurant" as fallback
+        searchQueries = [freestylePrompt, 'restaurant', 'cafe'];
       } else {
         searchQueries = [freestylePrompt, ...searchQueries];
       }

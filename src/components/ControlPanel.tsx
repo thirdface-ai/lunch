@@ -9,13 +9,14 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
   const [displayText, setDisplayText] = useState(text);
   const [isHovering, setIsHovering] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [cooldown, setCooldown] = useState(false);
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const iterationRef = useRef(0);
 
   const scramble = useCallback(() => {
-    // Prevent overlapping animations
-    if (isAnimating) return;
+    // Prevent overlapping animations and rapid re-triggering
+    if (isAnimating || cooldown) return;
     
     iterationRef.current = 0;
     setIsAnimating(true);
@@ -24,12 +25,14 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
     
     // Animation interval
     const intervalMs = 47;
-    
-    // Sound duration matches animation exactly
     const animationDuration = charCount * 3 * intervalMs;
     
+    // Sound should be shorter - settling thunk adds ~60ms at the end
+    // So sound duration = animation - 80ms to land the thunk right at animation end
+    const soundDuration = animationDuration - 80;
+    
     // Play sound - immediate, no async
-    playSplitFlapForDuration(animationDuration);
+    playSplitFlapForDuration(soundDuration);
     
     if (intervalRef.current) clearInterval(intervalRef.current);
     
@@ -53,9 +56,13 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
         if (intervalRef.current) clearInterval(intervalRef.current);
         setDisplayText(originalText);
         setIsAnimating(false);
+        
+        // Cooldown prevents immediate re-trigger
+        setCooldown(true);
+        setTimeout(() => setCooldown(false), 300);
       }
     }, intervalMs);
-  }, [text, isAnimating]);
+  }, [text, isAnimating, cooldown]);
 
   const handleMouseEnter = () => {
     setIsHovering(true);
@@ -64,7 +71,6 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
 
   const handleMouseLeave = () => {
     setIsHovering(false);
-    // Let animation complete naturally - sound is already scheduled
   };
 
   useEffect(() => {
