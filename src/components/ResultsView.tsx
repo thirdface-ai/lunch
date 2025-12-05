@@ -3,6 +3,17 @@ import { AppState, FinalResult, ThemeMode } from '../types';
 import MapComponent from './MapComponent';
 import { useFavorites } from '../hooks/useFavorites';
 import Logger from '../utils/logger';
+import Sounds from '../utils/sounds';
+
+// Throttle function for hover sounds
+let lastHoverTime = 0;
+const throttledHover = () => {
+  const now = Date.now();
+  if (now - lastHoverTime > 100) {
+    lastHoverTime = now;
+    Sounds.hover();
+  }
+};
 
 /**
  * Parse time string like "11:00 am", "2:30 pm", "14:00" into minutes since midnight
@@ -148,6 +159,8 @@ const ResultsView: React.FC<ResultsViewProps> = ({
 
   const handleToggleFavorite = async (result: FinalResult) => {
     try {
+      const wasAlreadyFavorite = isFavorite(result.place_id);
+      Sounds.favorite(!wasAlreadyFavorite);
       const isNowFavorite = await toggleFavorite(result);
       
       if (isNowFavorite) {
@@ -156,8 +169,19 @@ const ResultsView: React.FC<ResultsViewProps> = ({
         Logger.userAction('Removed Favorite', { placeId: result.place_id, placeName: result.name });
       }
     } catch (error) {
+      Sounds.error();
       Logger.error('USER', 'Failed to toggle favorite', error);
     }
+  };
+
+  const handleReset = () => {
+    Sounds.heavyClick();
+    onReset();
+  };
+
+  const handlePlaceClick = (placeId: string) => {
+    Sounds.mediumClick();
+    window.open(`https://www.google.com/maps/place/?q=place_id:${placeId}`, '_blank');
   };
 
   if (appState !== AppState.RESULTS) return null;
@@ -176,7 +200,8 @@ const ResultsView: React.FC<ResultsViewProps> = ({
             <h1 className={`font-sans font-bold text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>{funnyTitle}</h1>
           </div>
           <button 
-            onClick={onReset}
+            onClick={handleReset}
+            onMouseEnter={throttledHover}
             className={`font-mono text-[10px] font-bold uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-white/30 px-2 py-1 ${isDark ? 'text-[#999] hover:text-braun-orange' : 'text-braun-text-muted hover:text-braun-orange'}`}
           >
             [ RESET SYSTEM ]
@@ -215,7 +240,8 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                         <div className="flex items-center gap-3 flex-wrap">
                           <h2 
                             className={`font-sans font-bold text-xl leading-none group-hover:text-braun-orange transition-colors cursor-pointer ${isDark ? 'text-dark-text' : 'text-braun-dark'}`} 
-                            onClick={() => window.open(`https://www.google.com/maps/place/?q=place_id:${place.place_id}`, '_blank')}
+                            onClick={() => handlePlaceClick(place.place_id)}
+                            onMouseEnter={throttledHover}
                           >
                             {place.name}
                           </h2>
@@ -223,6 +249,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                           {/* Favorite Button */}
                           <button
                             onClick={() => handleToggleFavorite(place)}
+                            onMouseEnter={throttledHover}
                             disabled={isSavingAny}
                             aria-label={isPlaceFavorite ? 'Remove from favorites' : 'Add to favorites'}
                             className={`p-1.5 rounded transition-all focus:outline-none focus:ring-2 focus:ring-white/30 ${

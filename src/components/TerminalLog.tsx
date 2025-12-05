@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { AppState, TerminalLog as LogType, ThemeMode } from '../types';
+import Sounds from '../utils/sounds';
 
 interface TerminalLogProps {
   appState: AppState;
@@ -10,7 +11,34 @@ interface TerminalLogProps {
 
 const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0, theme }) => {
   const endRef = useRef<HTMLDivElement>(null);
+  const prevLogsLengthRef = useRef(0);
+  const hasPlayedInitRef = useRef(false);
   const isDark = theme === ThemeMode.DARK;
+
+  // Play init sound when processing starts
+  useEffect(() => {
+    if (appState === AppState.PROCESSING && !hasPlayedInitRef.current) {
+      hasPlayedInitRef.current = true;
+      Sounds.init();
+    } else if (appState !== AppState.PROCESSING) {
+      hasPlayedInitRef.current = false;
+    }
+  }, [appState]);
+
+  // Play log entry sounds when new logs appear
+  useEffect(() => {
+    if (logs.length > prevLogsLengthRef.current) {
+      Sounds.logEntry();
+    }
+    prevLogsLengthRef.current = logs.length;
+  }, [logs]);
+
+  // Play success sound when progress hits 100
+  useEffect(() => {
+    if (progress >= 100) {
+      Sounds.success();
+    }
+  }, [progress >= 100]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
