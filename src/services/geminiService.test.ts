@@ -105,7 +105,7 @@ describe('generateLoadingLogs', () => {
     await generateLoadingLogs(HungerVibe.HEARTY_AND_RICH, 'Address');
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.model).toBe('gemini-2.0-flash');
+    expect(callBody.model).toBe('gemini-2.5-flash');
   });
 });
 
@@ -374,7 +374,7 @@ describe('decideLunch', () => {
     ).resolves.toEqual([]);
   });
 
-  it('uses gemini-3.0-preview model for deep analysis', async () => {
+  it('passes correct model to API for deep analysis', async () => {
     mockInvoke.mockResolvedValueOnce({
       data: { text: JSON.stringify([]) },
       error: null,
@@ -391,7 +391,7 @@ describe('decideLunch', () => {
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.model).toBe('gemini-3.0-preview');
+    expect(callBody.model).toBe('gemini-2.5-flash');
   });
 });
 

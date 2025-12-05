@@ -163,7 +163,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
       }
 
       // Get AI recommendations via multi-stage deep analysis pipeline
-      addLog('ENGAGING MULTI-STAGE NEURAL CORE (GEMINI-3-PRO-PREVIEW)...');
+      addLog('ENGAGING NEURAL ANALYSIS CORE...');
 
       const recommendations = await decideLunch(
         candidatesForGemini,

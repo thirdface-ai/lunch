@@ -6,56 +6,36 @@
  * Deep, warm, minimal sounds. Only when necessary.
  */
 
-// Audio context singleton
+// Audio context - created immediately on page load
 let audioContext: AudioContext | null = null;
 let isWarmedUp = false;
 
-const getAudioContext = (): AudioContext | null => {
-  if (typeof window === 'undefined') return null;
-  
-  if (!audioContext) {
-    try {
-      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    } catch (e) {
-      console.warn('Web Audio API not supported');
-      return null;
-    }
-  }
-  return audioContext;
-};
-
-/**
- * Pre-warm the audio context on first user interaction
- * This eliminates the delay on first sound playback
- */
-const warmUpAudioContext = (): void => {
-  if (isWarmedUp) return;
-  
-  const ctx = getAudioContext();
-  if (ctx && ctx.state === 'suspended') {
-    ctx.resume().then(() => {
-      isWarmedUp = true;
-    });
-  } else if (ctx) {
-    isWarmedUp = true;
-  }
-};
-
-// Auto-warm on first user interaction (click, touch, keydown)
+// Create context immediately on module load (doesn't require user gesture)
 if (typeof window !== 'undefined') {
-  const warmUpOnce = () => {
-    warmUpAudioContext();
-    // Remove listeners after first interaction
-    window.removeEventListener('click', warmUpOnce);
-    window.removeEventListener('touchstart', warmUpOnce);
-    window.removeEventListener('keydown', warmUpOnce);
-    window.removeEventListener('mousedown', warmUpOnce);
+  try {
+    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  } catch (e) {
+    console.warn('Web Audio API not supported');
+  }
+}
+
+const getAudioContext = (): AudioContext | null => audioContext;
+
+// Resume context on first user interaction (required by browsers)
+if (typeof window !== 'undefined' && audioContext) {
+  const warmUp = () => {
+    if (isWarmedUp || !audioContext) return;
+    
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+    isWarmedUp = true;
   };
   
-  window.addEventListener('click', warmUpOnce, { passive: true });
-  window.addEventListener('touchstart', warmUpOnce, { passive: true });
-  window.addEventListener('keydown', warmUpOnce, { passive: true });
-  window.addEventListener('mousedown', warmUpOnce, { passive: true });
+  // Use capture phase to run before any other handlers
+  document.addEventListener('mousedown', warmUp, { capture: true, once: true });
+  document.addEventListener('touchstart', warmUp, { capture: true, once: true });
+  document.addEventListener('keydown', warmUp, { capture: true, once: true });
 }
 
 const ensureAudioContext = async (): Promise<AudioContext | null> => {

@@ -14,8 +14,7 @@ export enum Type {
   NULL = 'NULL',
 }
 
-// The ONLY model we use - gemini-3-pro-preview exclusively
-const GEMINI_MODEL = 'gemini-3-pro-preview';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 // Callback type for real-time logging during analysis
 export type AnalysisLogCallback = (message: string) => void;
