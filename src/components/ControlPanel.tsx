@@ -193,30 +193,30 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const lightMuted = 'text-braun-text-muted';
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
+    <div className={`min-h-screen flex items-center justify-center p-3 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
       {/* Main Chassis */}
       <div className={`w-full max-w-5xl transition-colors duration-300 border shadow-braun-deep p-1 relative ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
         
-        {/* Screw heads decorations */}
-        <div className={`absolute top-2 left-2 w-2 h-2 rounded-full border opacity-50 flex items-center justify-center ${isDark ? 'border-dark-text-muted' : 'border-braun-text-muted'}`}><div className={`w-1.5 h-[1px] rotate-45 ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div></div>
-        <div className={`absolute top-2 right-2 w-2 h-2 rounded-full border opacity-50 flex items-center justify-center ${isDark ? 'border-dark-text-muted' : 'border-braun-text-muted'}`}><div className={`w-1.5 h-[1px] rotate-45 ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div></div>
-        <div className={`absolute bottom-2 left-2 w-2 h-2 rounded-full border opacity-50 flex items-center justify-center ${isDark ? 'border-dark-text-muted' : 'border-braun-text-muted'}`}><div className={`w-1.5 h-[1px] rotate-45 ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div></div>
-        <div className={`absolute bottom-2 right-2 w-2 h-2 rounded-full border opacity-50 flex items-center justify-center ${isDark ? 'border-dark-text-muted' : 'border-braun-text-muted'}`}><div className={`w-1.5 h-[1px] rotate-45 ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div></div>
+        {/* Screw heads decorations - hidden on mobile */}
+        <div className={`hidden sm:flex absolute top-2 left-2 w-2 h-2 rounded-full border opacity-50 items-center justify-center ${isDark ? 'border-dark-text-muted' : 'border-braun-text-muted'}`}><div className={`w-1.5 h-[1px] rotate-45 ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div></div>
+        <div className={`hidden sm:flex absolute top-2 right-2 w-2 h-2 rounded-full border opacity-50 items-center justify-center ${isDark ? 'border-dark-text-muted' : 'border-braun-text-muted'}`}><div className={`w-1.5 h-[1px] rotate-45 ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div></div>
+        <div className={`hidden sm:flex absolute bottom-2 left-2 w-2 h-2 rounded-full border opacity-50 items-center justify-center ${isDark ? 'border-dark-text-muted' : 'border-braun-text-muted'}`}><div className={`w-1.5 h-[1px] rotate-45 ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div></div>
+        <div className={`hidden sm:flex absolute bottom-2 right-2 w-2 h-2 rounded-full border opacity-50 items-center justify-center ${isDark ? 'border-dark-text-muted' : 'border-braun-text-muted'}`}><div className={`w-1.5 h-[1px] rotate-45 ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div></div>
 
         {/* Branding Header */}
-        <div className={`pt-6 pb-6 px-8 flex justify-between items-end border-b transition-colors duration-300 ${isDark ? 'border-dark-border bg-dark-surface' : 'border-braun-border bg-[#F4F4F0]'}`}>
+        <div className={`pt-4 pb-4 px-4 sm:pt-6 sm:pb-6 sm:px-8 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end border-b transition-colors duration-300 ${isDark ? 'border-dark-border bg-dark-surface' : 'border-braun-border bg-[#F4F4F0]'}`}>
             <div>
-                <h1 className={`font-sans font-bold text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>THIRDFACE LUNCH DECIDER</h1>
+                <h1 className={`font-sans font-bold text-lg sm:text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>THIRDFACE LUNCH DECIDER</h1>
                 <p className={`font-mono text-[9px] tracking-[0.2em] mt-1 ${isDark ? darkMuted : lightMuted}`}>UNIT 01 / MK.III</p>
             </div>
-            <div className="flex flex-col items-end gap-2">
+            <div className="flex flex-col items-start sm:items-end gap-2">
                 <button 
                     onClick={toggleTheme} 
                     aria-label={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
-                    className={`flex items-center gap-2 px-2 py-1 rounded-[1px] border transition-colors ${isDark ? 'border-dark-border bg-dark-bg' : 'border-braun-border bg-[#E5E5E0]'}`}
+                    className={`flex items-center gap-2 px-3 py-2 sm:px-2 sm:py-1 rounded-[1px] border transition-colors ${isDark ? 'border-dark-border bg-dark-bg' : 'border-braun-border bg-[#E5E5E0]'}`}
                 >
                     <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-braun-dark' : 'bg-braun-orange'}`}></div>
-                    <span className={`font-mono text-[8px] uppercase tracking-wider ${isDark ? darkMuted : lightMuted}`}>
+                    <span className={`font-mono text-[9px] sm:text-[8px] uppercase tracking-wider ${isDark ? darkMuted : lightMuted}`}>
                         {isDark ? 'NIGHT MODE' : 'DAY MODE'}
                     </span>
                 </button>
@@ -224,15 +224,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
 
         {/* Input Module (LCD Style) */}
-        <div className={`p-8 border-b transition-colors duration-300 ${isDark ? 'border-dark-border bg-[#111]' : 'border-braun-border bg-[#F0F0EC]'}`}>
+        <div className={`p-4 sm:p-8 border-b transition-colors duration-300 ${isDark ? 'border-dark-border bg-[#111]' : 'border-braun-border bg-[#F0F0EC]'}`}>
             <div className="flex justify-between items-center mb-2">
-                <label htmlFor="address-input" className={`font-mono text-[9px] font-bold uppercase tracking-widest ${isDark ? darkMuted : 'text-braun-dark'}`}>Target Vector</label>
+                <label htmlFor="address-input" className={`font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest ${isDark ? darkMuted : 'text-braun-dark'}`}>Target Vector</label>
                 {locating && <span className="font-mono text-[9px] text-braun-orange animate-pulse" role="status">TRIANGULATING...</span>}
             </div>
             
-            <div className={`p-4 pb-2 pt-2 rounded-sm shadow-inner border-b-2 relative group z-30 transition-colors duration-300 ${isDark ? 'bg-[#000] border-[#222]' : 'bg-[#222] border-[#444]'}`}>
+            <div className={`p-3 sm:p-4 pb-2 pt-2 rounded-sm shadow-inner border-b-2 relative group z-30 transition-colors duration-300 ${isDark ? 'bg-[#000] border-[#222]' : 'bg-[#222] border-[#444]'}`}>
                 <div className="relative flex items-center">
-                    <div className={`relative flex-grow h-14 flex items-center px-4 ${isDark ? 'bg-[#050505]' : 'bg-[#2A2A2A]'}`}>
+                    <div className={`relative flex-grow h-14 sm:h-14 flex items-center px-3 sm:px-4 ${isDark ? 'bg-[#050505]' : 'bg-[#2A2A2A]'}`}>
                          <input
                             id="address-input"
                             type="text"
@@ -274,7 +274,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     <button 
                         onClick={handleLocateMe}
                         aria-label="Use Current Location"
-                        className={`ml-2 w-12 h-12 border rounded-sm flex items-center justify-center transition-all shadow-md group-hover:shadow-[0_0_8px_rgba(255,68,0,0.1)] z-20 ${isDark ? 'bg-[#111] border-[#333] text-[#666] hover:text-braun-orange hover:border-braun-orange active:bg-black' : 'bg-[#333] border-[#555] text-[#888] hover:text-braun-orange hover:border-braun-orange active:bg-[#222]'}`}
+                        className={`ml-2 w-14 h-14 sm:w-12 sm:h-12 border rounded-sm flex items-center justify-center transition-all shadow-md group-hover:shadow-[0_0_8px_rgba(255,68,0,0.1)] z-20 flex-shrink-0 ${isDark ? 'bg-[#111] border-[#333] text-[#666] hover:text-braun-orange hover:border-braun-orange active:bg-black' : 'bg-[#333] border-[#555] text-[#888] hover:text-braun-orange hover:border-braun-orange active:bg-[#222]'}`}
                         title="Acquire GPS Lock"
                     >
                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -292,10 +292,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         <div className={`grid grid-cols-12 border-b ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
             
             {/* Top Left: Vibes Matrix (8 cols) */}
-            <div className={`col-span-12 md:col-span-8 p-8 border-r border-b md:border-b-0 ${isDark ? 'bg-[#151515] border-dark-border' : 'bg-[#F9F9F7] border-braun-border'}`}>
-                <label className={`block font-mono text-[9px] font-bold uppercase tracking-widest mb-4 ${isDark ? darkMuted : lightMuted}`}>Select Mental State</label>
+            <div className={`col-span-12 md:col-span-8 p-4 sm:p-8 border-r border-b md:border-b-0 ${isDark ? 'bg-[#151515] border-dark-border' : 'bg-[#F9F9F7] border-braun-border'}`}>
+                <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Select Mental State</label>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4" role="radiogroup" aria-label="Mental State">
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 mb-4" role="radiogroup" aria-label="Mental State">
                     {Object.values(HungerVibe).map((vibe) => (
                         <button
                             key={vibe}
@@ -303,7 +303,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             aria-checked={preferences.vibe === vibe}
                             onClick={() => handleVibeSelect(vibe)}
                             className={`
-                                relative p-3 flex flex-col justify-between items-start min-h-[90px]
+                                relative p-3 sm:p-3 flex flex-col justify-between items-start min-h-[72px] sm:min-h-[90px]
                                 transition-all duration-75 ease-out rounded-sm text-left group
                                 border focus:outline-none focus:ring-1 focus:ring-white/30
                                 ${preferences.vibe === vibe 
@@ -315,11 +315,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 <div className={`w-2 h-2 rounded-full transition-all duration-300 ${preferences.vibe === vibe ? 'bg-braun-orange shadow-[0_0_6px_#FF4400]' : `${isDark ? 'bg-dark-border' : 'bg-braun-border'} group-hover:bg-braun-text-muted`}`}></div>
                             </div>
                             <div>
-                                <span className={`block font-sans text-[11px] font-bold uppercase tracking-tight leading-none mb-1 ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>
+                                <span className={`block font-sans text-[10px] sm:text-[11px] font-bold uppercase tracking-tight leading-tight sm:leading-none mb-1 ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>
                                     {vibe}
                                 </span>
                                 {preferences.vibe === vibe && (
-                                    <span className={`block font-mono text-[8px] leading-tight tracking-tight mt-1 animate-scroll-up ${isDark ? darkMuted : lightMuted}`}>
+                                    <span className={`hidden sm:block font-mono text-[8px] leading-tight tracking-tight mt-1 animate-scroll-up ${isDark ? darkMuted : lightMuted}`}>
                                         {getVibeSubtitle(vibe)}
                                     </span>
                                 )}
@@ -329,10 +329,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </div>
 
                 {/* Freestyle Input as Alternative Option */}
-                <div className="relative mt-6">
+                <div className="relative mt-4 sm:mt-6">
                      <div className="flex items-center gap-2 mb-2">
                         <div className={`h-[1px] flex-grow ${isDark ? 'bg-dark-border' : 'bg-braun-border'}`}></div>
-                        <span className={`font-mono text-[8px] uppercase ${isDark ? darkMuted : lightMuted}`}>OR DEFINE CUSTOM PARAMETERS</span>
+                        <span className={`font-mono text-[8px] uppercase whitespace-nowrap ${isDark ? darkMuted : lightMuted}`}>OR CUSTOM</span>
                         <div className={`h-[1px] flex-grow ${isDark ? 'bg-dark-border' : 'bg-braun-border'}`}></div>
                      </div>
 
@@ -361,18 +361,18 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </div>
 
             {/* Top Right: Range & Payment (4 cols) */}
-            <div className={`col-span-12 md:col-span-4 p-8 flex flex-col justify-start gap-8 ${isDark ? 'bg-[#111]' : 'bg-[#F0F0EC]'}`}>
+            <div className={`col-span-12 md:col-span-4 p-4 sm:p-8 flex flex-col justify-start gap-5 sm:gap-8 ${isDark ? 'bg-[#111]' : 'bg-[#F0F0EC]'}`}>
                 {/* Proximity Slider */}
                 <div>
-                    <label className={`block font-mono text-[9px] font-bold uppercase tracking-widest mb-4 ${isDark ? darkMuted : lightMuted}`}>Proximity Range</label>
-                    <div className={`flex h-12 rounded-sm border p-1 gap-1 ${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'}`} role="radiogroup" aria-label="Walk Limit">
+                    <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Proximity Range</label>
+                    <div className={`flex h-12 sm:h-12 rounded-sm border p-1 gap-1 ${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'}`} role="radiogroup" aria-label="Walk Limit">
                         {Object.values(WalkLimit).map((limit) => (
                             <button
                                 key={limit}
                                 role="radio"
                                 aria-checked={preferences.walkLimit === limit}
                                 onClick={() => { Sounds.lightClick(); setPreferences(prev => ({ ...prev, walkLimit: limit })); }}
-                                className={`flex-1 flex items-center justify-center rounded-[1px] font-mono text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none focus:ring-1 focus:ring-white/30
+                                className={`flex-1 flex items-center justify-center rounded-[1px] font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none focus:ring-1 focus:ring-white/30
                                     ${preferences.walkLimit === limit 
                                         ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-sm` 
                                         : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
@@ -387,20 +387,20 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
                 {/* Payment Override */}
                 <div>
-                    <label className={`block font-mono text-[9px] font-bold uppercase tracking-widest mb-4 ${isDark ? darkMuted : lightMuted}`}>Payment Constraint</label>
+                    <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Payment Constraint</label>
                     <button
                         role="switch"
                         aria-checked={preferences.noCash}
                         onClick={() => { Sounds.toggle(!preferences.noCash); setPreferences(prev => ({ ...prev, noCash: !prev.noCash })); }}
                         className={`
-                            w-full h-12 border rounded-sm flex items-center justify-center transition-all duration-150 group outline-none focus:ring-1 focus:ring-white/30
+                            w-full h-12 sm:h-12 border rounded-sm flex items-center justify-center transition-all duration-150 group outline-none focus:ring-1 focus:ring-white/30
                             ${preferences.noCash 
                                 ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-sm` 
                                 : `${isDark ? 'bg-dark-surface border-dark-border shadow-dark-raised hover:shadow-[0_2px_0_#333]' : 'bg-[#E5E5E0] border-braun-border shadow-braun-raised hover:shadow-[0_2px_0_#D4D4D0]'} hover:translate-y-[1px]`
                             }
                         `}
                     >
-                        <span className={`font-mono text-[10px] font-bold uppercase tracking-widest ${preferences.noCash ? (isDark ? 'text-dark-bg' : 'text-white') : (isDark ? 'text-dark-text' : 'text-braun-dark')}`}>
+                        <span className={`font-mono text-[11px] sm:text-[10px] font-bold uppercase tracking-widest ${preferences.noCash ? (isDark ? 'text-dark-bg' : 'text-white') : (isDark ? 'text-dark-text' : 'text-braun-dark')}`}>
                              {preferences.noCash ? 'Cashless Only' : 'All Payment Types'}
                         </span>
                     </button>
@@ -408,7 +408,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
                 {/* Dietary Needs */}
                 <div>
-                    <label className={`block font-mono text-[9px] font-bold uppercase tracking-widest mb-4 ${isDark ? darkMuted : lightMuted}`}>Dietary Needs</label>
+                    <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Dietary Needs</label>
                     <div className="flex flex-wrap gap-2" role="group" aria-label="Dietary Restrictions">
                         {Object.values(DietaryRestriction).map((restriction) => (
                             <button
@@ -416,7 +416,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 role="checkbox"
                                 aria-checked={(preferences.dietaryRestrictions || []).includes(restriction)}
                                 onClick={() => handleDietaryToggle(restriction)}
-                                className={`px-3 py-2 rounded-[1px] font-mono text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none border focus:ring-1 focus:ring-white/30
+                                className={`px-3 py-2.5 sm:py-2 rounded-[1px] font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none border focus:ring-1 focus:ring-white/30
                                     ${(preferences.dietaryRestrictions || []).includes(restriction)
                                         ? `${isDark ? 'bg-dark-text text-dark-bg border-dark-text' : 'bg-braun-dark text-white border-braun-dark'} shadow-sm` 
                                         : `${isDark ? 'text-dark-text-muted border-dark-border hover:bg-white/10 hover:text-white' : 'text-braun-text-muted border-braun-border hover:bg-white/50 hover:text-braun-dark'}`
@@ -435,12 +435,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         <div className={`grid grid-cols-12 ${isDark ? 'bg-dark-bg' : 'bg-[#F4F4F0]'}`}>
             
             {/* Bottom Left: Budget (8 cols) */}
-            <div className={`col-span-12 md:col-span-8 p-8 border-r border-b md:border-b-0 flex flex-col justify-center ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
-                <div className="flex justify-between items-center mb-4">
-                    <label className={`block font-mono text-[9px] font-bold uppercase tracking-widest ${isDark ? darkMuted : lightMuted}`}>Budget Protocol</label>
+            <div className={`col-span-12 md:col-span-8 p-4 sm:p-8 border-r border-b md:border-b-0 flex flex-col justify-center ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
+                <div className="flex justify-between items-center mb-3 sm:mb-4">
+                    <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest ${isDark ? darkMuted : lightMuted}`}>Budget Protocol</label>
                 </div>
                 
-                <div className={`flex h-14 rounded-sm border p-1 gap-1 ${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'}`} role="radiogroup" aria-label="Budget">
+                <div className={`flex h-14 sm:h-14 rounded-sm border p-1 gap-1 ${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'}`} role="radiogroup" aria-label="Budget">
                     
                     {/* Any Budget */}
                     <button
@@ -454,7 +454,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             }
                         `}
                     >
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-wide">Any Budget</span>
+                        <span className="font-mono text-[11px] sm:text-[10px] font-bold uppercase tracking-wide">Any</span>
                     </button>
 
                     {/* Paying Myself ($ - $$) */}
@@ -469,8 +469,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             }
                         `}
                     >
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-wide">Paying Myself</span>
-                        <span className={`font-mono text-[8px] mt-0.5 ${preferences.price === PricePoint.PAYING_MYSELF ? (isDark ? 'text-dark-bg/60' : 'text-white/60') : (isDark ? 'text-dark-text-muted/60' : 'text-braun-text-muted/60')}`}>$ – $$</span>
+                        <span className="font-mono text-[11px] sm:text-[10px] font-bold uppercase tracking-wide">Personal</span>
+                        <span className={`font-mono text-[9px] sm:text-[8px] mt-0.5 ${preferences.price === PricePoint.PAYING_MYSELF ? (isDark ? 'text-dark-bg/60' : 'text-white/60') : (isDark ? 'text-dark-text-muted/60' : 'text-braun-text-muted/60')}`}>$ – $$</span>
                     </button>
 
                     {/* Company Card ($$$ - $$$$) */}
@@ -485,20 +485,20 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             }
                         `}
                     >
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-wide">Company Card</span>
-                        <span className={`font-mono text-[8px] mt-0.5 ${preferences.price === PricePoint.COMPANY_CARD ? (isDark ? 'text-dark-bg/60' : 'text-white/60') : (isDark ? 'text-dark-text-muted/60' : 'text-braun-text-muted/60')}`}>$$$ – $$$$</span>
+                        <span className="font-mono text-[11px] sm:text-[10px] font-bold uppercase tracking-wide">Company</span>
+                        <span className={`font-mono text-[9px] sm:text-[8px] mt-0.5 ${preferences.price === PricePoint.COMPANY_CARD ? (isDark ? 'text-dark-bg/60' : 'text-white/60') : (isDark ? 'text-dark-text-muted/60' : 'text-braun-text-muted/60')}`}>$$$ – $$$$</span>
                     </button>
                 </div>
             </div>
 
             {/* Bottom Right: Action Button (4 cols) */}
-            <div className="col-span-12 md:col-span-4 p-8 flex">
+            <div className="col-span-12 md:col-span-4 p-4 sm:p-8 flex">
                 <button
                     onClick={() => { Sounds.firmClick(); onCalculate(); }}
                     disabled={!preferences.lat || (!preferences.vibe && !preferences.freestylePrompt)}
                     aria-busy={(appState as AppState) === AppState.PROCESSING}
                     className={`
-                        w-full h-full min-h-[60px] relative transition-all duration-200 ease-out rounded-sm flex items-center justify-center group overflow-hidden focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/30
+                        w-full h-full min-h-[56px] sm:min-h-[60px] relative transition-all duration-200 ease-out rounded-sm flex items-center justify-center group overflow-hidden focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/30
                         ${(!preferences.lat || (!preferences.vibe && !preferences.freestylePrompt))
                             ? `${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'} cursor-not-allowed opacity-60` 
                             : 'bg-braun-orange border border-braun-orange shadow-braun-deep hover:shadow-[0_0_20px_rgba(255,68,0,0.4)] hover:scale-[1.02] active:scale-[0.98]'
@@ -525,8 +525,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
       </div>
       
-      {/* Background decoration lines */}
-      <div className="fixed inset-0 pointer-events-none -z-10 flex justify-center">
+      {/* Background decoration lines - hidden on mobile */}
+      <div className="hidden sm:flex fixed inset-0 pointer-events-none -z-10 justify-center">
             <div className={`w-px h-full opacity-20 mr-96 ${isDark ? 'bg-dark-border' : 'bg-braun-border'}`}></div>
             <div className={`w-px h-full opacity-20 ml-96 ${isDark ? 'bg-dark-border' : 'bg-braun-border'}`}></div>
       </div>

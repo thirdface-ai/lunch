@@ -118,20 +118,31 @@ interface FooterProps {
 
 const Footer: React.FC<FooterProps> = ({ isDark }) => {
   return (
-    <div className={`fixed bottom-4 right-4 font-mono text-[9px] tracking-wider flex items-center gap-3 z-50 ${isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'}`}>
-      <span>
+    <div className={`fixed bottom-3 left-3 sm:bottom-4 sm:left-auto sm:right-4 font-mono text-[8px] sm:text-[9px] tracking-wider flex items-center gap-2 sm:gap-3 z-50 ${isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'}`}>
+      {/* Mobile: simplified text, Desktop: scramble effect */}
+      <span className="sm:hidden">
+        <a 
+          href="https://www.linkedin.com/in/noahnawara/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`transition-all duration-200 ${isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'}`}
+        >
+          NOAH NAWARA
+        </a>
+      </span>
+      <span className="hidden sm:inline">
         Built by <ScrambleText 
           text="NOAH NAWARA" 
           href="https://www.linkedin.com/in/noahnawara/"
           className={isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'} 
         />
       </span>
-      <span className={isDark ? 'text-dark-text-muted/20' : 'text-braun-text-muted/20'}>|</span>
+      <span className={`hidden sm:inline ${isDark ? 'text-dark-text-muted/20' : 'text-braun-text-muted/20'}`}>|</span>
       <a 
         href="https://thirdface.com/imprint" 
         target="_blank" 
         rel="noopener noreferrer"
-        className={`transition-all duration-200 hover:text-braun-orange ${isDark ? 'text-dark-text-muted/40 hover:text-braun-orange' : 'text-braun-text-muted/40 hover:text-braun-orange'}`}
+        className={`hidden sm:inline transition-all duration-200 hover:text-braun-orange ${isDark ? 'text-dark-text-muted/40 hover:text-braun-orange' : 'text-braun-text-muted/40 hover:text-braun-orange'}`}
       >
         Imprint
       </a>

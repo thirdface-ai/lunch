@@ -202,20 +202,21 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   const isSavingAny = isAddingFavorite || isRemovingFavorite;
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
+    <div className={`min-h-screen flex items-center justify-center p-2 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
       {/* Main Chassis */}
       <div className={`w-full max-w-7xl border shadow-braun-deep flex flex-col transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
         
         {/* Header */}
-        <div className={`p-8 flex justify-between items-end border-b transition-colors duration-300 ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
+        <div className={`p-4 sm:p-8 flex justify-between items-center sm:items-end border-b transition-colors duration-300 ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
           <div>
-            <h1 className={`font-sans font-bold text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>{funnyTitle}</h1>
+            <h1 className={`font-sans font-bold text-base sm:text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>{funnyTitle}</h1>
           </div>
           <button 
             onClick={handleReset}
-            className={`font-mono text-[10px] font-bold uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-white/30 px-2 py-1 ${isDark ? 'text-[#999] hover:text-braun-orange' : 'text-braun-text-muted hover:text-braun-orange'}`}
+            className={`font-mono text-[10px] sm:text-[10px] font-bold uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-white/30 px-2 py-2 sm:py-1 ${isDark ? 'text-[#999] hover:text-braun-orange' : 'text-braun-text-muted hover:text-braun-orange'}`}
           >
-            [ RESET SYSTEM ]
+            <span className="hidden sm:inline">[ RESET SYSTEM ]</span>
+            <span className="sm:hidden">RESET</span>
           </button>
         </div>
 
@@ -223,7 +224,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
         <div className={`flex flex-col lg:flex-row transition-colors duration-300 ${isDark ? 'bg-[#151515]' : 'bg-[#F9F9F7]'}`}>
           
           {/* List Column */}
-          <div className="flex-1 overflow-y-auto max-h-[80vh]">
+          <div className="flex-1 overflow-y-auto max-h-[50vh] sm:max-h-[80vh]">
             {results.map((place, idx) => {
               // Find today's hours by matching the day name in the weekday_text strings
               // Use the browser's locale to match Google Places API's weekdayDescriptions language
@@ -238,19 +239,19 @@ const ResultsView: React.FC<ResultsViewProps> = ({
               return (
                 <article 
                   key={place.place_id} 
-                  className={`p-8 border-b last:border-b-0 transition-colors group ${isDark ? 'border-dark-border hover:bg-dark-surface' : 'border-braun-border hover:bg-white'}`}
+                  className={`p-4 sm:p-8 border-b last:border-b-0 transition-colors group ${isDark ? 'border-dark-border hover:bg-dark-surface' : 'border-braun-border hover:bg-white'}`}
                 >
-                  <div className="flex gap-6">
-                    <div className="font-mono text-braun-orange text-sm font-bold pt-1">
+                  <div className="flex gap-3 sm:gap-6">
+                    <div className="font-mono text-braun-orange text-xs sm:text-sm font-bold pt-1">
                       {(idx + 1).toString().padStart(2, '0')}
                     </div>
 
-                    <div className="flex-1 space-y-4">
+                    <div className="flex-1 space-y-3 sm:space-y-4">
                       
                       <div>
-                        <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                           <h2 
-                            className={`font-sans font-bold text-xl leading-none group-hover:text-braun-orange transition-colors cursor-pointer ${isDark ? 'text-dark-text' : 'text-braun-dark'}`} 
+                            className={`font-sans font-bold text-base sm:text-xl leading-tight sm:leading-none group-hover:text-braun-orange transition-colors cursor-pointer ${isDark ? 'text-dark-text' : 'text-braun-dark'}`} 
                             onClick={() => handlePlaceClick(place.place_id)}
                           >
                             {place.name}
@@ -290,7 +291,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                         </div>
                       </div>
 
-                      <div className={`flex flex-wrap gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-wider ${isDark ? 'text-[#999]' : 'text-braun-text-muted'}`}>
+                      <div className={`grid grid-cols-2 sm:flex sm:flex-wrap gap-x-4 sm:gap-x-6 gap-y-1.5 sm:gap-y-2 font-mono text-[10px] sm:text-[10px] uppercase tracking-wider ${isDark ? 'text-[#999]' : 'text-braun-text-muted'}`}>
                         <span className="flex items-center gap-1">
                           <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>RATING:</span> {(place.rating || 0).toFixed(1)}
                         </span>
@@ -303,7 +304,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                         <span className="flex items-center gap-1">
                           <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>WALK:</span> {place.walking_time_text || 'N/A'}
                         </span>
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 col-span-2 sm:col-span-1">
                           <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>HOURS:</span>
                           {place.opening_hours ? (
                             <>
@@ -319,27 +320,28 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                                   ? <span className="text-green-500 font-bold">Open</span>
                                   : <span className="text-red-500 font-bold">Closed</span>;
                               })()}
-                              {todaysHours && <span className="ml-1 normal-case">({todaysHours})</span>}
+                              <span className="hidden sm:inline ml-1 normal-case">{todaysHours && `(${todaysHours})`}</span>
                             </>
                           ) : 'N/A'}
                         </span>
                       </div>
 
-                      <p className={`font-sans text-sm leading-relaxed max-w-2xl ${isDark ? 'text-[#BBB]' : 'text-[#333]'}`}>
+                      <p className={`font-sans text-xs sm:text-sm leading-relaxed max-w-2xl ${isDark ? 'text-[#BBB]' : 'text-[#333]'}`}>
                         {place.ai_reason}
                       </p>
 
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 pt-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-8 pt-1 sm:pt-2">
                         <div className="flex items-baseline gap-2">
                           <span className={`font-mono text-[10px] font-bold uppercase ${isDark ? 'text-[#999]' : 'text-braun-text-muted'}`}>TRY:</span>
-                          <span className={`font-sans text-sm font-medium border-b pb-0.5 ${isDark ? 'text-dark-text border-dark-border' : 'text-braun-dark border-braun-border/50'}`}>
+                          <span className={`font-sans text-xs sm:text-sm font-medium border-b pb-0.5 ${isDark ? 'text-dark-text border-dark-border' : 'text-braun-dark border-braun-border/50'}`}>
                             {place.recommended_dish}
                           </span>
                         </div>
 
                         {place.is_cash_only && (
-                          <span className="font-mono text-[10px] font-bold text-braun-orange uppercase tracking-widest border border-braun-orange/30 px-2 py-0.5 rounded-[1px]">
-                            LEGACY PAYMENT METHOD DETECTED
+                          <span className="font-mono text-[9px] sm:text-[10px] font-bold text-braun-orange uppercase tracking-widest border border-braun-orange/30 px-2 py-0.5 rounded-[1px]">
+                            <span className="hidden sm:inline">LEGACY PAYMENT METHOD DETECTED</span>
+                            <span className="sm:hidden">CASH ONLY</span>
                           </span>
                         )}
                       </div>
@@ -351,7 +353,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
           </div>
 
           {/* Map Column */}
-          <div className={`lg:w-[500px] w-full border-t lg:border-t-0 lg:border-l min-h-[400px] lg:min-h-[600px] relative flex-shrink-0 ${isDark ? 'border-dark-border bg-[#181818]' : 'border-braun-border bg-[#E5E5E0]'}`}>
+          <div className={`lg:w-[500px] w-full border-t lg:border-t-0 lg:border-l min-h-[280px] sm:min-h-[400px] lg:min-h-[600px] relative flex-shrink-0 ${isDark ? 'border-dark-border bg-[#181818]' : 'border-braun-border bg-[#E5E5E0]'}`}>
             <MapComponent
               userLat={userLat}
               userLng={userLng}
