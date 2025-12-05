@@ -9,6 +9,7 @@ import {
   calculateCandidateScore,
   shuffleArray,
   getWalkConfig,
+  filterByOpenOnArrival,
 } from '../utils/lunchAlgorithm';
 import {
   AppState,
@@ -105,17 +106,36 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
 
       // Adaptive filtering logic
       let candidatesWithinRange = filterByDuration(allMeasuredCandidates, durations, maxDurationSeconds);
+      
+      // Filter to only places that will be open when user arrives
+      addLog('VERIFYING OPERATIONAL STATUS ON ARRIVAL...');
+      const openOnArrival = filterByOpenOnArrival(candidatesWithinRange, durations);
+      const closedCount = candidatesWithinRange.length - openOnArrival.length;
+      if (closedCount > 0) {
+        addLog(`FILTERED ${closedCount} ESTABLISHMENTS: CLOSED OR NOT OPEN ON ARRIVAL.`);
+      }
+      candidatesWithinRange = openOnArrival;
 
       if (candidatesWithinRange.length === 0) {
         addLog('WARNING: STRICT FILTER YIELDED 0 RESULTS. EXPANDING HORIZON...');
         Logger.warn('SYSTEM', 'Expanding Proximity Search', { originalLimit: maxDurationSeconds });
-        candidatesWithinRange = filterByDuration(allMeasuredCandidates, durations, maxDurationSeconds * 1.5);
+        let expanded = filterByDuration(allMeasuredCandidates, durations, maxDurationSeconds * 1.5);
+        candidatesWithinRange = filterByOpenOnArrival(expanded, durations);
       }
 
       if (candidatesWithinRange.length === 0) {
-        addLog('WARNING: NO RESULTS IN RANGE. RETRIEVING CLOSEST ENTITIES...');
+        addLog('WARNING: NO OPEN RESULTS IN RANGE. RETRIEVING CLOSEST OPEN ENTITIES...');
         Logger.warn('SYSTEM', 'Emergency Fallback Triggered', { count: 5 });
-        candidatesWithinRange = sortByDuration(allMeasuredCandidates, durations).slice(0, 5);
+        // Get closest places that will be open on arrival
+        const sortedByDistance = sortByDuration(allMeasuredCandidates, durations);
+        const openPlaces = filterByOpenOnArrival(sortedByDistance, durations);
+        candidatesWithinRange = openPlaces.slice(0, 5);
+        
+        // If still nothing open, fall back to closest regardless (with warning)
+        if (candidatesWithinRange.length === 0) {
+          addLog('WARNING: NO OPEN ESTABLISHMENTS DETECTED. SHOWING CLOSEST REGARDLESS.');
+          candidatesWithinRange = sortedByDistance.slice(0, 5);
+        }
       }
 
       addLog(`PROXIMITY FILTER COMPLETE. ${candidatesWithinRange.length} CANDIDATES SELECTED.`);

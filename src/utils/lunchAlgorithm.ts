@@ -1,6 +1,134 @@
 import { HungerVibe, PricePoint, GooglePlace } from '../types';
 
 /**
+ * Parse time string like "11:00 AM", "2:30 PM", "14:00" into minutes since midnight
+ */
+const parseTimeToMinutes = (timeStr: string): number | null => {
+  const cleaned = timeStr.trim().toLowerCase();
+  
+  // Handle 24-hour format (e.g., "14:00")
+  const match24 = cleaned.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    const hours = parseInt(match24[1], 10);
+    const minutes = parseInt(match24[2], 10);
+    return hours * 60 + minutes;
+  }
+  
+  // Handle 12-hour format (e.g., "2:30 pm", "11:00 am")
+  const match12 = cleaned.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = parseInt(match12[2], 10);
+    const period = match12[3];
+    
+    if (period === 'pm' && hours !== 12) hours += 12;
+    if (period === 'am' && hours === 12) hours = 0;
+    
+    return hours * 60 + minutes;
+  }
+  
+  return null;
+};
+
+/**
+ * Parse today's hours string like "11:00 AM – 10:00 PM" into open/close minutes
+ */
+const parseTodaysHours = (todaysHours: string): { openMinutes: number; closeMinutes: number } | null => {
+  const cleaned = todaysHours.trim().toLowerCase();
+  if (cleaned === 'closed') return null;
+  if (cleaned === 'open 24 hours') return { openMinutes: 0, closeMinutes: 24 * 60 };
+  
+  // Split by common separators: "–", "-", "to"
+  const parts = todaysHours.split(/\s*[–\-]\s*|\s+to\s+/i);
+  if (parts.length !== 2) return null;
+  
+  const openMinutes = parseTimeToMinutes(parts[0]);
+  const closeMinutes = parseTimeToMinutes(parts[1]);
+  
+  if (openMinutes === null || closeMinutes === null) return null;
+  
+  return { openMinutes, closeMinutes };
+};
+
+/**
+ * Get today's hours string from weekday_text array
+ */
+const getTodaysHoursString = (weekdayText: string[] | undefined): string | null => {
+  if (!weekdayText || weekdayText.length === 0) return null;
+  
+  // Get today's day name in the browser's locale (to match Google's format)
+  const browserLocale = typeof navigator !== 'undefined' ? navigator.language : 'en-US';
+  const todayName = new Date().toLocaleDateString(browserLocale, { weekday: 'long' });
+  
+  // Find today's entry
+  const todayEntry = weekdayText.find(
+    text => text.toLowerCase().startsWith(todayName.toLowerCase())
+  );
+  
+  if (!todayEntry) return null;
+  
+  // Extract hours part (after the colon)
+  const colonIndex = todayEntry.indexOf(':');
+  if (colonIndex === -1) return null;
+  
+  return todayEntry.substring(colonIndex + 1).trim();
+};
+
+/**
+ * Check if a place will be open when the user arrives (current time + walking time)
+ * Returns true if:
+ * - Place is currently open, OR
+ * - Place will be open by the time user walks there
+ */
+export const willBeOpenOnArrival = (
+  place: GooglePlace,
+  walkingTimeSeconds: number | undefined
+): boolean => {
+  // If no opening hours data, assume open (don't filter out)
+  if (!place.opening_hours) return true;
+  
+  // If currently open, good to go
+  if (place.opening_hours.open_now) return true;
+  
+  // Get today's hours
+  const todaysHoursStr = getTodaysHoursString(place.opening_hours.weekday_text);
+  if (!todaysHoursStr) return true; // No data, assume open
+  
+  const hours = parseTodaysHours(todaysHoursStr);
+  if (!hours) return true; // Can't parse, assume open
+  
+  // Calculate arrival time
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const walkingMinutes = walkingTimeSeconds ? Math.ceil(walkingTimeSeconds / 60) : 0;
+  const arrivalMinutes = currentMinutes + walkingMinutes;
+  
+  // Handle overnight hours (e.g., 6pm - 2am)
+  if (hours.closeMinutes < hours.openMinutes) {
+    // Place closes after midnight
+    // Open if arrival is after open time OR before close time (next day)
+    return arrivalMinutes >= hours.openMinutes || arrivalMinutes < hours.closeMinutes;
+  }
+  
+  // Normal hours: check if arrival time falls within open hours
+  // Also allow if the place opens within the walking time window
+  return arrivalMinutes >= hours.openMinutes && arrivalMinutes < hours.closeMinutes;
+};
+
+/**
+ * Filter places to only those that will be open on arrival
+ */
+export const filterByOpenOnArrival = (
+  places: GooglePlace[],
+  durations: Map<string, { text: string; value: number }>
+): GooglePlace[] => {
+  return places.filter(place => {
+    const duration = durations.get(place.place_id);
+    return willBeOpenOnArrival(place, duration?.value);
+  });
+};
+
+/**
  * Generate search queries based on the user's vibe
  */
 export const getSearchQueriesForVibe = (vibe: HungerVibe | null): string[] => {

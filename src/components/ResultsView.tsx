@@ -175,7 +175,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   };
 
   const handleReset = () => {
-    Sounds.heavyClick();
+    Sounds.firmClick();
     onReset();
   };
 

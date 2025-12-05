@@ -13,11 +13,11 @@ const throttledHover = () => {
   }
 };
 
-// Easter egg: Text scramble effect component
-const ScrambleText: React.FC<{ text: string; className?: string }> = ({ text, className = '' }) => {
+// Easter egg: Text scramble effect component (airport split-flap display style)
+const ScrambleText: React.FC<{ text: string; className?: string; href?: string }> = ({ text, className = '', href }) => {
   const [displayText, setDisplayText] = useState(text);
   const [isHovering, setIsHovering] = useState(false);
-  const chars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`01';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const iterationRef = useRef(0);
 
@@ -26,6 +26,9 @@ const ScrambleText: React.FC<{ text: string; className?: string }> = ({ text, cl
     const originalText = text;
     
     if (intervalRef.current) clearInterval(intervalRef.current);
+    
+    // Play the split-flap rattling sound
+    Sounds.splitFlap();
     
     intervalRef.current = setInterval(() => {
       setDisplayText(
@@ -53,7 +56,6 @@ const ScrambleText: React.FC<{ text: string; className?: string }> = ({ text, cl
   const handleMouseEnter = () => {
     setIsHovering(true);
     scramble();
-    throttledHover();
   };
 
   const handleMouseLeave = () => {
@@ -68,18 +70,36 @@ const ScrambleText: React.FC<{ text: string; className?: string }> = ({ text, cl
     };
   }, []);
 
-  return (
+  const content = (
     <span
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      className={`cursor-pointer transition-all duration-200 ${className}`}
+      className={`cursor-pointer transition-all duration-200 font-mono tracking-wider ${className}`}
       style={{
-        // Use inline styles for hover color to override Tailwind class specificity
         color: isHovering ? '#FF4400' : undefined,
         textShadow: isHovering ? '0 0 8px rgba(255, 68, 0, 0.6), 0 0 20px rgba(255, 68, 0, 0.3)' : 'none',
       }}
     >
       {displayText}
+    </span>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className="no-underline"
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <span onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+      {content}
     </span>
   );
 };
@@ -586,7 +606,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* Bottom Right: Action Button (4 cols) */}
             <div className="col-span-12 md:col-span-4 p-8 flex">
                 <button
-                    onClick={() => { Sounds.heavyClick(); onCalculate(); }}
+                    onClick={() => { Sounds.firmClick(); onCalculate(); }}
                     onMouseEnter={() => { if (preferences.lat && (preferences.vibe || preferences.freestylePrompt)) throttledHover(); }}
                     disabled={!preferences.lat || (!preferences.vibe && !preferences.freestylePrompt)}
                     aria-busy={(appState as AppState) === AppState.PROCESSING}
@@ -627,7 +647,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       {/* Footer: Credit + Imprint */}
       <div className={`fixed bottom-4 right-4 font-mono text-[9px] tracking-wider flex items-center gap-3 ${isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'}`}>
         <span>
-          Built by <ScrambleText text="Noah Nawara" className={isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'} />
+          Built by <ScrambleText 
+            text="NOAH NAWARA" 
+            href="https://www.linkedin.com/in/noahnawara/"
+            className={isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'} 
+          />
         </span>
         <span className={isDark ? 'text-dark-text-muted/20' : 'text-braun-text-muted/20'}>|</span>
         <a 
