@@ -22,14 +22,14 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
     const originalText = text;
     const charCount = originalText.replace(/\s/g, '').length; // Count non-space chars
     
-    // Sound duration (fixed)
-    const soundDuration = charCount * 3 * 36;
-    
-    // Animation interval - 30% slower than sound for perfect alignment
+    // Animation interval
     const intervalMs = 47;
     
+    // Sound duration matches animation exactly
+    const animationDuration = charCount * 3 * intervalMs;
+    
     // Play sound - immediate, no async
-    playSplitFlapForDuration(soundDuration);
+    playSplitFlapForDuration(animationDuration);
     
     if (intervalRef.current) clearInterval(intervalRef.current);
     

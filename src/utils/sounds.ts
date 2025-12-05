@@ -23,12 +23,12 @@ if (typeof window !== 'undefined') {
 const getAudioContext = (): AudioContext | null => audioContext;
 
 // Play silent tick to keep audio pipeline warm
-const playSilentTick = () => {
+const playSilentTick = (force = false) => {
   if (!audioContext || audioContext.state !== 'running') return;
   
   const now = Date.now();
-  // Only warm every 2 seconds max
-  if (now - lastWarmTime < 2000) return;
+  // Only warm every 2 seconds max (unless forced)
+  if (!force && now - lastWarmTime < 2000) return;
   lastWarmTime = now;
   
   const osc = audioContext.createOscillator();
@@ -43,26 +43,38 @@ const playSilentTick = () => {
 // Resume context on first user interaction (required by browsers)
 // Then keep it warm with silent ticks on mousemove
 if (typeof window !== 'undefined' && audioContext) {
+  let firstMove = true;
+  
   const resume = () => {
     if (isResumed || !audioContext) return;
     
     if (audioContext.state === 'suspended') {
       audioContext.resume().then(() => {
         isResumed = true;
-        playSilentTick();
+        playSilentTick(true); // Force immediate tick
       });
     } else {
       isResumed = true;
+      playSilentTick(true);
     }
   };
   
-  // Resume on first interaction
-  document.addEventListener('mousedown', resume, { capture: true, once: true });
-  document.addEventListener('touchstart', resume, { capture: true, once: true });
-  document.addEventListener('keydown', resume, { capture: true, once: true });
+  const onMouseMove = () => {
+    // First mousemove: try to resume and warm up immediately
+    if (firstMove) {
+      firstMove = false;
+      resume();
+    }
+    playSilentTick();
+  };
   
-  // Keep warm on mousemove (throttled via lastWarmTime)
-  document.addEventListener('mousemove', playSilentTick, { passive: true });
+  // Resume on first interaction
+  document.addEventListener('mousedown', resume, { capture: true });
+  document.addEventListener('touchstart', resume, { capture: true });
+  document.addEventListener('keydown', resume, { capture: true });
+  
+  // Warm up on mousemove - first one triggers resume attempt
+  document.addEventListener('mousemove', onMouseMove, { passive: true });
 }
 
 const ensureAudioContext = async (): Promise<AudioContext | null> => {
