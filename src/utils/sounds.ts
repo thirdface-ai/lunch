@@ -8,7 +8,8 @@
 
 // Audio context - created immediately on page load
 let audioContext: AudioContext | null = null;
-let isWarmedUp = false;
+let isResumed = false;
+let lastWarmTime = 0;
 
 // Create context immediately on module load (doesn't require user gesture)
 if (typeof window !== 'undefined') {
@@ -21,28 +22,54 @@ if (typeof window !== 'undefined') {
 
 const getAudioContext = (): AudioContext | null => audioContext;
 
+// Play silent tick to keep audio pipeline warm
+const playSilentTick = () => {
+  if (!audioContext || audioContext.state !== 'running') return;
+  
+  const now = Date.now();
+  // Only warm every 2 seconds max
+  if (now - lastWarmTime < 2000) return;
+  lastWarmTime = now;
+  
+  const osc = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  gain.gain.value = 0; // Completely silent
+  osc.connect(gain);
+  gain.connect(audioContext.destination);
+  osc.start();
+  osc.stop(audioContext.currentTime + 0.001);
+};
+
 // Resume context on first user interaction (required by browsers)
+// Then keep it warm with silent ticks on mousemove
 if (typeof window !== 'undefined' && audioContext) {
-  const warmUp = () => {
-    if (isWarmedUp || !audioContext) return;
+  const resume = () => {
+    if (isResumed || !audioContext) return;
     
     if (audioContext.state === 'suspended') {
-      audioContext.resume();
+      audioContext.resume().then(() => {
+        isResumed = true;
+        playSilentTick();
+      });
+    } else {
+      isResumed = true;
     }
-    isWarmedUp = true;
   };
   
-  // Use capture phase to run before any other handlers
-  document.addEventListener('mousedown', warmUp, { capture: true, once: true });
-  document.addEventListener('touchstart', warmUp, { capture: true, once: true });
-  document.addEventListener('keydown', warmUp, { capture: true, once: true });
+  // Resume on first interaction
+  document.addEventListener('mousedown', resume, { capture: true, once: true });
+  document.addEventListener('touchstart', resume, { capture: true, once: true });
+  document.addEventListener('keydown', resume, { capture: true, once: true });
+  
+  // Keep warm on mousemove (throttled via lastWarmTime)
+  document.addEventListener('mousemove', playSilentTick, { passive: true });
 }
 
 const ensureAudioContext = async (): Promise<AudioContext | null> => {
   const ctx = getAudioContext();
   if (ctx && ctx.state === 'suspended') {
     await ctx.resume();
-    isWarmedUp = true;
+    isResumed = true;
   }
   return ctx;
 };
