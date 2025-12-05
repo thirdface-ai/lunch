@@ -352,8 +352,8 @@ const ResultsView: React.FC<ResultsViewProps> = ({
             })}
           </div>
 
-          {/* Map Column */}
-          <div className={`lg:w-[500px] w-full border-t lg:border-t-0 lg:border-l min-h-[280px] sm:min-h-[400px] lg:min-h-[600px] relative flex-shrink-0 ${isDark ? 'border-dark-border bg-[#181818]' : 'border-braun-border bg-[#E5E5E0]'}`}>
+          {/* Map Column - hidden on mobile, shown on lg+ screens */}
+          <div className={`hidden lg:block lg:w-[500px] lg:border-l lg:min-h-[600px] relative flex-shrink-0 ${isDark ? 'border-dark-border bg-[#181818]' : 'border-braun-border bg-[#E5E5E0]'}`}>
             <MapComponent
               userLat={userLat}
               userLng={userLng}
