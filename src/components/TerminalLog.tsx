@@ -60,7 +60,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0,
             </div>
 
             {/* Terminal Content */}
-            <div className="flex-1 overflow-y-auto font-mono text-xs md:text-sm space-y-2 p-2 pt-6 relative z-10" role="log" aria-live="polite">
+            <div className="flex-1 overflow-y-auto scrollbar-hide font-mono text-xs md:text-sm space-y-2 p-2 pt-6 relative z-10" role="log" aria-live="polite">
               {logs.map((log) => (
                 <div key={log.id} className="flex gap-4 text-braun-orange/90 animate-scroll-up">
                   <span className="opacity-50 text-[10px] w-10 text-right shrink-0 mt-0.5">

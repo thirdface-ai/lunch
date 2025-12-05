@@ -87,8 +87,12 @@
   
   /* Focus styles for accessibility */
   :focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid rgba(255, 255, 255, 0.3);
     outline-offset: 2px;
+  }
+  
+  .dark :focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.2);
   }
   
   /* Selection styling */
@@ -127,6 +131,16 @@
   background: #555;
 }
 
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* ===========================================
    Component Layer
    =========================================== */
@@ -135,7 +149,7 @@
   .btn {
     @apply px-4 py-2 font-mono text-xs uppercase tracking-widest;
     @apply transition-all duration-150;
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-braun-orange;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30;
   }
   
   .btn-primary {
@@ -161,7 +175,7 @@
     @apply w-full px-3 py-2 bg-transparent;
     @apply border border-braun-border rounded;
     @apply text-braun-dark placeholder:text-braun-text-muted;
-    @apply focus:outline-none focus:border-braun-orange;
+    @apply focus:outline-none focus:border-white/50;
     @apply dark:border-dark-border dark:text-dark-text dark:placeholder:text-dark-text-muted;
     @apply transition-colors duration-150;
   }

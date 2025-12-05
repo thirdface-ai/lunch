@@ -249,7 +249,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                          role="option"
                                          onMouseDown={(e) => e.preventDefault()}
                                          onClick={() => handlePredictionSelect(p)}
-                                         className={`w-full text-left p-3 border-b cursor-pointer font-mono text-xs truncate transition-colors group/item focus:outline-none focus:ring-1 focus:ring-braun-orange ${isDark ? 'border-dark-border hover:bg-white/5 text-dark-text' : 'border-braun-border/50 hover:bg-braun-orange/10 text-braun-dark'}`}
+                                         className={`w-full text-left p-3 border-b cursor-pointer font-mono text-xs truncate transition-colors group/item focus:outline-none focus:ring-1 focus:ring-white/30 ${isDark ? 'border-dark-border hover:bg-white/5 text-dark-text' : 'border-braun-border/50 hover:bg-braun-orange/10 text-braun-dark'}`}
                                      >
                                          <div className="flex flex-col pointer-events-none">
                                              <span className="font-bold group-hover/item:text-braun-orange">{p.displayName}</span>
@@ -295,7 +295,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             className={`
                                 relative p-3 flex flex-col justify-between items-start min-h-[90px]
                                 transition-all duration-75 ease-out rounded-sm text-left group
-                                border focus:outline-none focus:ring-1 focus:ring-braun-orange
+                                border focus:outline-none focus:ring-1 focus:ring-white/30
                                 ${preferences.vibe === vibe 
                                     ? `${isDark ? 'bg-black border-dark-text' : 'bg-white border-braun-dark'} shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)] translate-y-[1px]` 
                                     : `${isDark ? 'bg-dark-surface border-dark-border shadow-[0_3px_0_#333]' : 'bg-[#F4F4F0] border-braun-border shadow-[0_3px_0_#D4D4D0]'} hover:-translate-y-[1px] ${isDark ? 'hover:shadow-[0_4px_0_#333]' : 'hover:shadow-[0_4px_0_#D4D4D0]'}`}
@@ -362,7 +362,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 role="radio"
                                 aria-checked={preferences.walkLimit === limit}
                                 onClick={() => setPreferences(prev => ({ ...prev, walkLimit: limit }))}
-                                className={`flex-1 flex items-center justify-center rounded-[1px] font-mono text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none focus:ring-1 focus:ring-braun-orange
+                                className={`flex-1 flex items-center justify-center rounded-[1px] font-mono text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none focus:ring-1 focus:ring-white/30
                                     ${preferences.walkLimit === limit 
                                         ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-sm` 
                                         : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
@@ -383,7 +383,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         aria-checked={preferences.noCash}
                         onClick={() => setPreferences(prev => ({ ...prev, noCash: !prev.noCash }))}
                         className={`
-                            w-full h-12 border rounded-sm flex items-center justify-center transition-all duration-150 group outline-none focus:ring-1 focus:ring-braun-orange
+                            w-full h-12 border rounded-sm flex items-center justify-center transition-all duration-150 group outline-none focus:ring-1 focus:ring-white/30
                             ${preferences.noCash 
                                 ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-sm` 
                                 : `${isDark ? 'bg-dark-surface border-dark-border shadow-dark-raised hover:shadow-[0_2px_0_#333]' : 'bg-[#E5E5E0] border-braun-border shadow-braun-raised hover:shadow-[0_2px_0_#D4D4D0]'} hover:translate-y-[1px]`
@@ -406,7 +406,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 role="checkbox"
                                 aria-checked={(preferences.dietaryRestrictions || []).includes(restriction)}
                                 onClick={() => handleDietaryToggle(restriction)}
-                                className={`px-3 py-2 rounded-[1px] font-mono text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none border focus:ring-1 focus:ring-braun-orange
+                                className={`px-3 py-2 rounded-[1px] font-mono text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none border focus:ring-1 focus:ring-white/30
                                     ${(preferences.dietaryRestrictions || []).includes(restriction)
                                         ? `${isDark ? 'bg-dark-text text-dark-bg border-dark-text' : 'bg-braun-dark text-white border-braun-dark'} shadow-sm` 
                                         : `${isDark ? 'text-dark-text-muted border-dark-border hover:bg-white/10 hover:text-white' : 'text-braun-text-muted border-braun-border hover:bg-white/50 hover:text-braun-dark'}`
@@ -437,7 +437,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         role="radio"
                         aria-checked={preferences.price === null}
                         onClick={() => handlePriceSelect(null)}
-                        className={`flex-1 flex flex-col items-center justify-center rounded-[1px] transition-all duration-200 outline-none focus:ring-1 focus:ring-braun-orange
+                        className={`flex-1 flex flex-col items-center justify-center rounded-[1px] transition-all duration-200 outline-none focus:ring-1 focus:ring-white/30
                             ${preferences.price === null 
                                 ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md`
                                 : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
@@ -455,7 +455,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 role="radio"
                                 aria-checked={isSelected}
                                 onClick={() => handlePriceSelect(price)}
-                                className={`flex-1 flex flex-col items-center justify-center rounded-[1px] transition-all duration-200 outline-none focus:ring-1 focus:ring-braun-orange
+                                className={`flex-1 flex flex-col items-center justify-center rounded-[1px] transition-all duration-200 outline-none focus:ring-1 focus:ring-white/30
                                     ${isSelected 
                                         ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md`
                                         : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
@@ -476,7 +476,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     disabled={!preferences.lat || (!preferences.vibe && !preferences.freestylePrompt)}
                     aria-busy={(appState as AppState) === AppState.PROCESSING}
                     className={`
-                        w-full h-full min-h-[60px] relative transition-all duration-200 ease-out rounded-sm flex items-center justify-center group overflow-hidden focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-braun-orange
+                        w-full h-full min-h-[60px] relative transition-all duration-200 ease-out rounded-sm flex items-center justify-center group overflow-hidden focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/30
                         ${(!preferences.lat || (!preferences.vibe && !preferences.freestylePrompt))
                             ? `${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'} cursor-not-allowed opacity-60` 
                             : 'bg-braun-orange border border-braun-orange shadow-braun-deep hover:shadow-[0_0_20px_rgba(255,68,0,0.4)] hover:scale-[1.02] active:scale-[0.98]'
@@ -507,6 +507,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       <div className="fixed inset-0 pointer-events-none -z-10 flex justify-center">
             <div className={`w-px h-full opacity-20 mr-96 ${isDark ? 'bg-dark-border' : 'bg-braun-border'}`}></div>
             <div className={`w-px h-full opacity-20 ml-96 ${isDark ? 'bg-dark-border' : 'bg-braun-border'}`}></div>
+      </div>
+      
+      {/* Credit */}
+      <div className={`fixed bottom-4 right-4 font-mono text-[9px] tracking-wider ${isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'}`}>
+        Built by Noah Nawara
       </div>
     </div>
   );

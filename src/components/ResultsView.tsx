@@ -74,6 +74,57 @@ interface ResultsViewProps {
   theme: ThemeMode;
 }
 
+/**
+ * Generate a funny, short title based on the results
+ */
+const generateFunnyTitle = (results: FinalResult[]): string => {
+  const titles: string[] = [];
+  
+  // Based on number of results
+  if (results.length === 1) {
+    titles.push("THE CHOSEN ONE", "FATE HAS SPOKEN", "YOUR DESTINY");
+  } else if (results.length >= 5) {
+    titles.push("FEAST MODE", "OPTION OVERLOAD", "DECISION PARALYSIS");
+  }
+  
+  // Based on top result characteristics
+  const topResult = results[0];
+  if (topResult) {
+    if (topResult.rating && topResult.rating >= 4.5) {
+      titles.push("CERTIFIED BANGERS", "ELITE SELECTIONS", "PEAK CUISINE");
+    }
+    if (topResult.price_level === 1) {
+      titles.push("BUDGET WINNERS", "CHEAP EATS SECURED", "WALLET FRIENDLY");
+    }
+    if (topResult.price_level && topResult.price_level >= 3) {
+      titles.push("TREAT YOURSELF", "FANCY HOUR", "BOUGIE BITES");
+    }
+    if (topResult.walking_time_text?.includes("1 min") || topResult.walking_time_text?.includes("2 min")) {
+      titles.push("LAZY MODE ENGAGED", "ALMOST THERE", "AROUND THE CORNER");
+    }
+    if (topResult.is_new_opening) {
+      titles.push("FRESH FINDS", "NEW KID ALERT", "VIRGIN TERRITORY");
+    }
+  }
+  
+  // Fallback options
+  titles.push(
+    "CALCULATED OUTPUT",
+    "LUNCH VERDICT",
+    "HUNGER SOLUTIONS",
+    "FEED THE BEAST",
+    "SUSTENANCE ACQUIRED",
+    "MISSION RESULTS",
+    "OPERATION: LUNCH",
+    "CHOW DETECTED",
+    "FOOD RADAR RESULTS",
+    "OPTIMAL FUEL SOURCES"
+  );
+  
+  // Pick a random title
+  return titles[Math.floor(Math.random() * titles.length)];
+};
+
 const ResultsView: React.FC<ResultsViewProps> = ({
   appState,
   results,
@@ -83,6 +134,9 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   theme
 }) => {
   const isDark = theme === ThemeMode.DARK;
+  
+  // Generate title once per results set using useMemo
+  const funnyTitle = React.useMemo(() => generateFunnyTitle(results), [results]);
   
   // Use TanStack Query-powered favorites hook
   const {
@@ -119,11 +173,11 @@ const ResultsView: React.FC<ResultsViewProps> = ({
         {/* Header */}
         <div className={`p-8 flex justify-between items-end border-b transition-colors duration-300 ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
           <div>
-            <h1 className={`font-sans font-bold text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>CALCULATED OPTIONS</h1>
+            <h1 className={`font-sans font-bold text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>{funnyTitle}</h1>
           </div>
           <button 
             onClick={onReset}
-            className={`font-mono text-[10px] font-bold uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-braun-orange px-2 py-1 ${isDark ? 'text-[#999] hover:text-braun-orange' : 'text-braun-text-muted hover:text-braun-orange'}`}
+            className={`font-mono text-[10px] font-bold uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-white/30 px-2 py-1 ${isDark ? 'text-[#999] hover:text-braun-orange' : 'text-braun-text-muted hover:text-braun-orange'}`}
           >
             [ RESET SYSTEM ]
           </button>
@@ -171,7 +225,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                             onClick={() => handleToggleFavorite(place)}
                             disabled={isSavingAny}
                             aria-label={isPlaceFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                            className={`p-1.5 rounded transition-all focus:outline-none focus:ring-2 focus:ring-braun-orange ${
+                            className={`p-1.5 rounded transition-all focus:outline-none focus:ring-2 focus:ring-white/30 ${
                               isSavingAny ? 'opacity-50 cursor-wait' : ''
                             } ${
                               isPlaceFavorite 

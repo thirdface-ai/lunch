@@ -64,7 +64,7 @@ class ErrorBoundary extends Component<Props, State> {
 
             <button 
               onClick={this.handleReset}
-              className="w-full h-12 bg-[#222] border border-[#444] hover:border-braun-orange hover:text-braun-orange text-[#999] font-bold text-xs uppercase tracking-widest transition-all focus:outline-none focus:ring-2 focus:ring-braun-orange focus:ring-offset-2 focus:ring-offset-[#141414]"
+              className="w-full h-12 bg-[#222] border border-[#444] hover:border-braun-orange hover:text-braun-orange text-[#999] font-bold text-xs uppercase tracking-widest transition-all focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-[#141414]"
             >
               Initiate System Reboot
             </button>
