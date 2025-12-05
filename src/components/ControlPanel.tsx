@@ -21,15 +21,17 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
     iterationRef.current = 0;
     setIsAnimating(true);
     const originalText = text;
-    const charCount = originalText.replace(/\s/g, '').length; // Count non-space chars
     
     // Animation interval
     const intervalMs = 47;
-    const animationDuration = charCount * 3 * intervalMs;
+    // Animation runs until iterationRef >= originalText.length (including spaces)
+    // Each interval increments by 1/3, so total intervals = length * 3
+    const animationDuration = originalText.length * 3 * intervalMs;
     
-    // Sound should be shorter - settling thunk adds ~60ms at the end
-    // So sound duration = animation - 80ms to land the thunk right at animation end
-    const soundDuration = animationDuration - 80;
+    // The settling thunk is ~60ms long and plays at the END of soundDuration
+    // We want the thunk to FINISH as the animation ends, not start
+    // So offset = thunk duration (~60ms) + small buffer for feel
+    const soundDuration = animationDuration - 70;
     
     // Play sound - immediate, no async
     playSplitFlapForDuration(soundDuration);

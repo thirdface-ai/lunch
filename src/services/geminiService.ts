@@ -255,9 +255,19 @@ GOOD: "Their Duck Confit is legendary - multiple reviewers call it 'perfectly cr
 === SELECTION STRATEGY ===
 Pick the 3 restaurants that BEST match the user's request.
 
-If the user asked for something specific (like "ramen", "pizza", "tacos"):
-- Focus on finding the best options for that specific request
-- Quality and relevance to their request matters most
+CRITICAL - SPECIFIC REQUEST PRIORITY:
+If the user asked for something specific (like "schnitzel", "ramen", "pizza", "tacos", "pho", etc.):
+- This is their PRIMARY requirement - ALL 3 recommendations should serve this item
+- Search reviews for mentions of the specific dish/cuisine they requested
+- Do NOT recommend restaurants that don't serve what the user asked for
+- Better to return fewer high-quality matches than dilute with unrelated options
+- If a restaurant doesn't have the specific item in reviews or menu hints, SKIP IT
+
+Example: If user asked for "schnitzel", ONLY recommend:
+- German restaurants known for schnitzel
+- Austrian restaurants with wiener schnitzel
+- European restaurants where reviews mention schnitzel
+- DO NOT recommend Italian pizzerias, ramen shops, etc.
 
 If the user gave a general vibe (like "quick lunch", "something filling"):
 - Offer variety - pick from different cuisine types when possible

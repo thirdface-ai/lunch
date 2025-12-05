@@ -169,9 +169,12 @@ export const useGooglePlaces = () => {
       : { isCuisineSpecific: false, searchQueries: [] };
 
     // Determine search queries based on cuisine intent
+    // CRITICAL: Freestyle prompt should DOMINATE when provided - don't dilute with vibe queries
     let searchQueries: string[];
     
     if (freestylePrompt && freestylePrompt.trim().length > 0) {
+      const trimmedPrompt = freestylePrompt.trim();
+      
       if (cuisineIntent.isCuisineSpecific) {
         // Cuisine-specific query: use focused search queries, don't dilute with generic terms
         searchQueries = cuisineIntent.searchQueries;
@@ -179,12 +182,27 @@ export const useGooglePlaces = () => {
           cuisineType: cuisineIntent.cuisineType,
           queries: searchQueries 
         });
-      } else if (!vibe) {
-        // General freestyle with no vibe: use the freestyle prompt + fallbacks
-        searchQueries = cuisineIntent.searchQueries;
       } else {
-        // Freestyle with vibe: combine both
-        searchQueries = [freestylePrompt, ...getSearchQueriesForVibe(vibe)];
+        // User has a specific freestyle request - make it the PRIMARY search focus
+        // Create multiple variations of the query to maximize relevant results
+        searchQueries = [
+          trimmedPrompt,                           // Exact query: "schnitzel"
+          `${trimmedPrompt} restaurant`,           // With restaurant: "schnitzel restaurant"
+          `best ${trimmedPrompt}`,                 // Quality variant: "best schnitzel"
+          `${trimmedPrompt} near me`,              // Location variant (helps Google)
+        ];
+        
+        // Only add 1-2 vibe queries as secondary fallback, not the full list
+        if (vibe) {
+          const vibeQueries = getSearchQueriesForVibe(vibe);
+          // Take only the first vibe query as a minor supplement
+          searchQueries.push(vibeQueries[0]);
+        }
+        
+        Logger.info('SYSTEM', 'Freestyle-focused search', { 
+          originalPrompt: trimmedPrompt,
+          queries: searchQueries 
+        });
       }
     } else {
       // No freestyle prompt: use vibe-based queries

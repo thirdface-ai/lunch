@@ -6,112 +6,38 @@
  * Deep, warm, minimal sounds. Only when necessary.
  */
 
-// Audio context - created immediately on page load with low-latency hint
+// Audio context - created on page load with low-latency hint
 let audioContext: AudioContext | null = null;
-let isResumed = false;
-let lastWarmTime = 0;
 
-// Create context immediately on module load with interactive latency hint
+// Create context immediately with interactive latency hint
 if (typeof window !== 'undefined') {
   try {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    // latencyHint: "interactive" tells browser to prioritize low latency
     audioContext = new AudioContextClass({ latencyHint: 'interactive' });
   } catch (e) {
     console.warn('Web Audio API not supported');
   }
 }
 
-const getAudioContext = (): AudioContext | null => audioContext;
+// Resume on first user interaction (browser autoplay policy)
+if (typeof window !== 'undefined' && audioContext) {
+  const resume = () => { audioContext?.resume(); };
+  document.addEventListener('click', resume, { once: true });
+  document.addEventListener('touchstart', resume, { once: true });
+  document.addEventListener('keydown', resume, { once: true });
+}
 
 /**
  * Get audio context only if ready to play immediately.
- * If suspended, triggers resume (fire and forget) and returns null.
- * This ensures sound functions never block/delay.
+ * If suspended, triggers resume and returns null (skip this sound).
  */
 const getReadyContext = (): AudioContext | null => {
   if (!audioContext) return null;
-  
   if (audioContext.state === 'suspended') {
-    // Fire and forget - don't wait
     audioContext.resume();
-    return null; // Skip this sound, next one will work
+    return null;
   }
-  
   return audioContext;
-};
-
-// Play silent buffer to warm up audio pipeline
-// This primes the audio system so first real sound plays instantly
-const warmUpPipeline = () => {
-  if (!audioContext || audioContext.state !== 'running') return;
-  
-  // Create a short silent buffer and play it
-  const buffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
-  const source = audioContext.createBufferSource();
-  source.buffer = buffer;
-  source.connect(audioContext.destination);
-  source.start(0);
-  
-  // Also play a silent oscillator to warm up that path
-  const osc = audioContext.createOscillator();
-  const gain = audioContext.createGain();
-  gain.gain.value = 0;
-  osc.connect(gain);
-  gain.connect(audioContext.destination);
-  osc.start();
-  osc.stop(audioContext.currentTime + 0.001);
-};
-
-// Keep pipeline warm with periodic silent ticks
-const keepWarm = () => {
-  if (!audioContext || audioContext.state !== 'running') return;
-  
-  const now = Date.now();
-  if (now - lastWarmTime < 3000) return;
-  lastWarmTime = now;
-  
-  const osc = audioContext.createOscillator();
-  const gain = audioContext.createGain();
-  gain.gain.value = 0;
-  osc.connect(gain);
-  gain.connect(audioContext.destination);
-  osc.start();
-  osc.stop(audioContext.currentTime + 0.001);
-};
-
-// Resume and warm up context on first valid user gesture
-if (typeof window !== 'undefined' && audioContext) {
-  const resumeAndWarm = () => {
-    if (isResumed || !audioContext) return;
-    
-    if (audioContext.state === 'suspended') {
-      audioContext.resume().then(() => {
-        isResumed = true;
-        warmUpPipeline(); // Prime the audio pipeline
-      });
-    } else {
-      isResumed = true;
-      warmUpPipeline();
-    }
-  };
-  
-  // Valid user gestures for Web Audio
-  document.addEventListener('click', resumeAndWarm, { capture: true, once: true });
-  document.addEventListener('touchstart', resumeAndWarm, { capture: true, once: true });
-  document.addEventListener('keydown', resumeAndWarm, { capture: true, once: true });
-  
-  // Keep warm on mousemove (only works after resume)
-  document.addEventListener('mousemove', keepWarm, { passive: true });
-}
-
-const ensureAudioContext = async (): Promise<AudioContext | null> => {
-  const ctx = getAudioContext();
-  if (ctx && ctx.state === 'suspended') {
-    await ctx.resume();
-    isResumed = true;
-  }
-  return ctx;
 };
 
 /**
