@@ -1,6 +1,5 @@
-
-import { GooglePlace, HungerVibe, GeminiRecommendation, PricePoint, DietaryRestriction } from "../types";
-import Logger from "../utils/logger";
+import { GooglePlace, HungerVibe, GeminiRecommendation, PricePoint, DietaryRestriction } from '../types';
+import Logger from '../utils/logger';
 
 // Replicating Type definition locally to avoid importing the full SDK on client
 export enum Type {
@@ -15,9 +14,9 @@ export enum Type {
 }
 
 // Internal helper to call the backend proxy
-const callGeminiProxy = async (model: string, contents: any, config: any) => {
+const callGeminiProxy = async (model: string, contents: string, config: Record<string, unknown>): Promise<string> => {
   const startTime = performance.now();
-  Logger.aiRequest(model, JSON.stringify(contents));
+  Logger.aiRequest(model, contents);
 
   try {
     const response = await fetch('/api/gemini/generate', {
@@ -41,7 +40,7 @@ const callGeminiProxy = async (model: string, contents: any, config: any) => {
     const duration = Math.round(performance.now() - startTime);
     
     // Rough estimation of output tokens based on char count
-    const estimatedTokens = data.text ? data.text.length / 4 : 0;
+    const estimatedTokens = data.text ? Math.ceil(data.text.length / 4) : 0;
     Logger.aiResponse(model, duration, true, estimatedTokens);
 
     return data.text;
@@ -53,45 +52,45 @@ const callGeminiProxy = async (model: string, contents: any, config: any) => {
 };
 
 export const generateLoadingLogs = async (vibe: HungerVibe | null, address: string): Promise<string[]> => {
-    const vibeText = vibe || "Custom/User Defined";
-    Logger.info('AI', 'Generating Loading Logs', { vibe: vibeText, address });
+  const vibeText = vibe || 'Custom/User Defined';
+  Logger.info('AI', 'Generating Loading Logs', { vibe: vibeText, address });
 
-    const prompt = `
-      You are a system AI for a culinary logistics engine. Your task is to generate 4 short, concrete, technical-sounding log messages that narrate the process of finding lunch. The messages should feel specific to the user's request.
+  const prompt = `
+    You are a system AI for a culinary logistics engine. Your task is to generate 4 short, concrete, technical-sounding log messages that narrate the process of finding lunch. The messages should feel specific to the user's request.
 
-      User's Location Context: "${address}"
-      User's Desired Vibe: "${vibeText}"
+    User's Location Context: "${address}"
+    User's Desired Vibe: "${vibeText}"
 
-      Generate logs that reflect a logical search sequence. Use the location and vibe to make them specific. Do not use generic "hacking" tropes. Be cool, efficient, and technical.
+    Generate logs that reflect a logical search sequence. Use the location and vibe to make them specific. Do not use generic "hacking" tropes. Be cool, efficient, and technical.
 
-      Example for Vibe 'Grab & Go' and Address 'Kreuzberg, Berlin, Germany':
-      1. "PARSING KREUZBERG SECTOR GRID..."
-      2. "ISOLATING HIGH-THROUGHPUT VENDORS..."
-      3. "CROSS-REFERENCING DÖNER & CURRYWURST DATASTREAMS..."
-      4. "PLOTTING OPTIMAL FOOT-TRAFFIC VECTORS..."
+    Example for Vibe 'Grab & Go' and Address 'Kreuzberg, Berlin, Germany':
+    1. "PARSING KREUZBERG SECTOR GRID..."
+    2. "ISOLATING HIGH-THROUGHPUT VENDORS..."
+    3. "CROSS-REFERENCING DÖNER & CURRYWURST DATASTREAMS..."
+    4. "PLOTTING OPTIMAL FOOT-TRAFFIC VECTORS..."
 
-      Return ONLY a valid JSON string array, with exactly 4 strings.
-    `;
+    Return ONLY a valid JSON string array, with exactly 4 strings.
+  `;
 
-    try {
-        const text = await callGeminiProxy(
-          "gemini-3-pro-preview",
-          prompt,
-          {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
-            }
-          }
-        );
-        
-        if (!text) return ["PROCESSING..."];
-        return JSON.parse(text) as string[];
-    } catch (e) {
-        Logger.warn('AI', "Log generation failed, using fallbacks.", e);
-        return ["OPTIMIZING SEARCH...", "READING MENUS...", "CALCULATING ROUTES..."];
-    }
+  try {
+    const text = await callGeminiProxy(
+      'gemini-2.0-flash',
+      prompt,
+      {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
+      }
+    );
+    
+    if (!text) return ['PROCESSING...'];
+    return JSON.parse(text) as string[];
+  } catch (e) {
+    Logger.warn('AI', 'Log generation failed, using fallbacks.', { error: e });
+    return ['OPTIMIZING SEARCH...', 'READING MENUS...', 'CALCULATING ROUTES...'];
+  }
 };
 
 export const decideLunch = async (
@@ -119,8 +118,8 @@ export const decideLunch = async (
     rating: p.rating,
     user_ratings_total: p.user_ratings_total,
     price_level: p.price_level,
-    virtual_menu_source: p.editorial_summary?.overview || "No official menu summary available.",
-    website_ref: p.website || "N/A",
+    virtual_menu_source: p.editorial_summary?.overview || 'No official menu summary available.',
+    website_ref: p.website || 'N/A',
     attributes: {
       is_vegetarian: p.serves_vegetarian_food,
       has_takeout: p.takeout,
@@ -160,7 +159,7 @@ export const decideLunch = async (
 
   const systemInstruction = `
     ROLE: You are a high-precision Culinary Data Scientist & Logistics Officer, operating under the codename "LUNCHBOX".
-    MODEL: gemini-3-pro-preview
+    MODEL: gemini-2.0-flash
 
     CONTEXT:
     You are analyzing lunch options for a user located at: "${address}". This geographic context (city, country) is CRITICAL. You MUST adapt your language analysis to the local language. For example, if the user is in Berlin, Germany, you must search reviews for German terms (e.g., "glutenfrei" for gluten-free, "barzahlung" for cash only) in addition to English terms.
@@ -197,17 +196,15 @@ export const decideLunch = async (
        - \`recommended_dish\` MUST be a specific item mentioned in the \`virtual_menu_source\` or frequently praised in reviews.
          - BAD: "Pasta"
          - GOOD: "Cacio e Pepe"
-       - **GENERIC RECOMMENDATIONS ARE STRICTLY FORBIDDEN.** The \`recommended_dish\` field must not contain generic instructions like "Consult menu for popular dishes." or "Any sandwich." This is a critical failure condition. You must analyze the available data (\`virtual_menu_source\`, \`reviews_sample\`) to suggest a concrete item. **IF, AND ONLY IF, after thorough analysis, no specific dish can be reliably identified from the provided data, you are authorized to suggest a CATEGORY of dish the restaurant is known for (e.g., 'Artisanal Pizza', 'Fresh Seafood Platter', 'Handmade Pasta'). This is a last resort to be used only when data is sparse.**
+       - **GENERIC RECOMMENDATIONS ARE STRICTLY FORBIDDEN.** The \`recommended_dish\` field must not contain generic instructions like "Consult menu for popular dishes." or "Any sandwich." This is a critical failure condition.
 
     5. PAYMENT PROTOCOL (STRICT & LOCALIZED):
        - IF 'noCash' is TRUE:
          - You MUST DISCARD any place with strong signals of being CASH ONLY.
-       - Scan \`payment_options\` and \`reviews_sample\` for both English and LOCAL LANGUAGE phrases indicating payment methods. Your analysis must be thorough.
-       - EXAMPLES (ENGLISH): "cash only", "no card", "no visa".
-       - EXAMPLES (GERMAN CONTEXT): "nur bargeld", "barzahlung", "keine karte".
+       - Scan \`payment_options\` and \`reviews_sample\` for both English and LOCAL LANGUAGE phrases indicating payment methods.
        - A place with \`payment_options.accepts_credit_cards: false\` is an immediate discard if noCash is true.
        - IF a selected place is likely CASH ONLY (and user allows it):
-         - Set 'is_cash_only' to true. Your analysis MUST be based on review contents, not just structured data.
+         - Set 'is_cash_only' to true.
 
     ${budgetProtocol}
 
@@ -215,63 +212,13 @@ export const decideLunch = async (
        - Give a massive advantage to "Fresh Drops".
        - DEFINITION: A place with high ratings but very low review count (e.g., < 50), or reviews that explicitly mention "just opened", "new spot", "grand opening".
        - If you identify such a candidate that matches the vibe, include it and set \`is_new_opening\` to true.
-       - The \`ai_reason\` should highlight this newness (e.g., "Recently opened spot showing high potential with early positive reviews...").
     
     8. FREESTYLE PROMPT PROTOCOL (HIGHEST PRIORITY):
        - If "SPECIFIC REQUEST" is provided, it OVERRIDES generic vibe constraints where they conflict.
-       - The specific request is the user's direct voice. If they ask for "Ramen" but selected "Light & Clean", you must find Ramen places, prioritizing those that seem lighter or cleaner if possible, but DO NOT ignore the specific craving.
-       - If the user asks for "Quiet place to read", you must aggressively scan reviews for "quiet", "cozy", "work friendly", and penalize "loud", "crowded", "party vibe".
-       - This prompt allows the user to break the standard rules. Satisfy it above all else.
+       - The specific request is the user's direct voice.
 
     ${dietaryRestrictions.length > 0 ? dietaryProtocol : ''}
     
-    ---
-    CANDIDATE SCORING & DEEP ANALYSIS DIRECTIVES (PER MENTAL STATE):
-    For each candidate, you will assess its viability against the user's selected Mental State using the following detailed matrices.
-    ${ dietaryRestrictions.length > 0 ? `The user's dietary needs [${dietaryRestrictions.join(', ')}] should be a primary consideration in all of the following vibe analyses.` : '' }
-
-    ['Grab & Go']
-    - PHILOSOPHY: Maximize quality per unit of time. Efficiency is paramount.
-    - GEOGRAPHIC CONTEXTUALIZATION: Adapt your definition to the search area. In Berlin, this could be a world-class Currywurst stand. In Tokyo, a high-speed ramen counter. In New York, a classic pizza slice shop. Do not default to just "sandwiches".
-    - IDEAL CANDIDATE PROFILE: Counter service, high throughput, limited seating, menu optimized for speed. Often food trucks, market stalls, bakeries, or specialized single-item shops.
-    - TARGET DATA SIGNALS: \`types\` contains "takeout_restaurant", "food_truck", "fast_food". Reviews mention "quick," "fast service," "in and out," "line moves quickly," "great for a quick bite." \`virtual_menu_source\` implies simple, portable items.
-    - DEAL-BREAKERS (IMMEDIATE DISQUALIFICATION): Multiple reviews mention "long wait for food", "reservations required", "table service only", "leisurely".
-
-    ['Light & Clean']
-    - PHILOSOPHY: Energizing, not incapacitating. Freshness and quality of ingredients are primary.
-    - GEOGRAPHIC CONTEXTUALIZATION: Consider local definitions of "healthy." In California, this is likely a salad or grain bowl spot. In a Mediterranean city, it could be a grilled fish vendor.
-    - IDEAL CANDIDATE PROFILE: Focuses on fresh produce, lean proteins, and simple preparations. Salad bars, poke bowl counters, Vietnamese restaurants (pho, summer rolls), juice bars, modern cafes.
-    - TARGET DATA SIGNALS: \`serves_vegetarian_food: true\`. \`types\` includes "health_food_restaurant", "vegetarian_restaurant". Reviews contain "fresh," "light," "healthy," "clean," "not greasy," "refreshing," "wholesome." Menu items are grilled, steamed, or raw.
-    - DEAL-BREAKERS (IMMEDIATE DISQUALIFICATION): Menu is dominated by fried items or heavy cream sauces. Multiple reviews use terms like "greasy," "oily," or "heavy."
-
-    ['Hearty & Rich']
-    - PHILOSOPHY: Caloric restoration and psychological comfort. The goal is deep satisfaction.
-    - GEOGRAPHIC CONTEXTUALIZATION: This is highly regional. In Germany, it's Schnitzel or Schweinshaxe. In the American South, it's barbecue or mac & cheese. In Italy, a rich pasta or pizza.
-    - IDEAL CANDIDATE PROFILE: Serves food that is calorically dense and emotionally satisfying. Classic Italian, German, American BBQ, Ramen shops, quality burger joints.
-    - TARGET DATA SIGNALS: Reviews use words like "hearty," "huge portions," "comfort food," "satisfying," "rich," "filling," "worth the calories." Menu items often involve cheese, carbs, slow-cooked meats, or rich sauces.
-    - DEAL-BREAKERS (IMMEDIATE DISQUALIFICATION): Multiple reviews mention "tiny portions," "small plates," or "left hungry."
-
-    ['Spicy & Bold']
-    - PHILOSOPHY: Sensory intensity. The experience should be memorable and push flavor boundaries.
-    - GEOGRAPHIC CONTEXTUALIZATION: Seek out cuisines known for heat: Thai, Sichuan, Southern Indian, Mexican, Korean. Be aware that "spicy" in a Scandinavian city might be different from "spicy" in Bangkok. Calibrate based on review language.
-    - IDEAL CANDIDATE PROFILE: A restaurant that specializes in a cuisine known for its complex and intense spice profiles. Not just "hot," but flavorful.
-    - TARGET DATA SIGNALS: REQUIRES multiple, unambiguous mentions of "spicy," "hot," "chili," "real heat," "flavorful kick," "authentic spice" in reviews. \`types\` include "thai_restaurant", "indian_restaurant", "sichuan_restaurant", "mexican_restaurant", "korean_restaurant".
-    - DEAL-BREAKERS (IMMEDIATE DISQUALIFICATION): No credible mentions of "spicy" or "hot" in reviews. Reviews stating "bland," "mild," or "not spicy at all."
-
-    ['View & Vibe']
-    - PHILOSOPHY: The environment is a key ingredient. The setting should elevate the meal.
-    - GEOGRAPHIC CONTEXTUALIZATION: A "view" in a dense city could be a rooftop overlooking the skyline. In a coastal town, it's the seaside. "Vibe" could be a hyper-modernist interior, a cozy historic building, or a bustling, trendy hotspot.
-    - IDEAL CANDIDATE PROFILE: A restaurant where significant effort has been put into the physical environment. Rooftops, waterside locations, places with exceptional interior design, or a unique, memorable setting.
-    - TARGET DATA SIGNALS: Reviews MUST contain keywords like "view," "vibe," "beautiful interior," "terrace," "ambiance," "atmosphere," "decor," "design." A high price_level (3-4) often correlates with investment in ambiance.
-    - DEAL-BREAKERS (IMMEDIATE DISQUALIFICATION): Reviews do not mention the atmosphere/view, or actively describe it as "plain," "cramped," "no-frills," or "divey" (unless that is the specific, intended vibe).
-
-    ['Authentic & Classic']
-    - PHILOSOPHY: Reliability through tradition. A rejection of fleeting trends in favor of perfected classics.
-    - GEOGRAPHIC CONTEXTUALIZATION: Look for local institutions. In Paris, a classic bistro. In Naples, a certified Neapolitan pizzeria. In New York, a century-old Jewish deli.
-    - IDEAL CANDIDATE PROFILE: Long-standing institutions, often family-run, specializing in a specific regional or national cuisine, executed traditionally.
-    - TARGET DATA SIGNALS: Reviews mention "institution," "classic," "traditional," "authentic," "been around forever," "like my grandma's cooking," "no frills, just great food." Often has a lower rating count but a very loyal following.
-    - DEAL-BREAKERS (IMMEDIATE DISQUALIFICATION): Reviews describe it as a "modern take," "fusion," or "trendy." The \`types\` includes "fusion_restaurant".
-
     ---
     FINAL OUTPUT:
     Return strictly valid JSON matching the provided schema. Your analysis must be evident in the high quality and logic of your selections.
@@ -279,9 +226,9 @@ export const decideLunch = async (
 
   const prompt = `
     USER LOCATION CONTEXT: ${address}
-    CURRENT MENTAL STATE: ${vibe || "CUSTOM / USER DEFINED"}
-    SPECIFIC REQUEST (FREESTYLE): ${freestylePrompt ? `"${freestylePrompt}"` : "None"}
-    BUDGET TIER: ${price || "ANY / UNCONSTRAINED"}
+    CURRENT MENTAL STATE: ${vibe || 'CUSTOM / USER DEFINED'}
+    SPECIFIC REQUEST (FREESTYLE): ${freestylePrompt ? `"${freestylePrompt}"` : 'None'}
+    BUDGET TIER: ${price || 'ANY / UNCONSTRAINED'}
     USER REQUIRES CASHLESS: ${noCash}
     DIETARY NEEDS: [${dietaryRestrictions.join(', ')}]
     
@@ -291,12 +238,12 @@ export const decideLunch = async (
 
   try {
     const text = await callGeminiProxy(
-      "gemini-3-pro-preview",
+      'gemini-2.0-flash',
       prompt,
       {
         systemInstruction: systemInstruction,
         temperature: 0.7, 
-        responseMimeType: "application/json",
+        responseMimeType: 'application/json',
         responseSchema: {
           type: Type.ARRAY,
           items: {
@@ -308,15 +255,15 @@ export const decideLunch = async (
               is_cash_only: { type: Type.BOOLEAN },
               is_new_opening: { type: Type.BOOLEAN },
             },
-            required: ["place_id", "ai_reason", "recommended_dish", "is_cash_only"],
+            required: ['place_id', 'ai_reason', 'recommended_dish', 'is_cash_only'],
           },
         },
       }
     );
 
     if (!text) {
-        Logger.error('AI', 'Empty response from Gemini Proxy');
-        throw new Error("Empty response from Gemini Proxy");
+      Logger.error('AI', 'Empty response from Gemini Proxy');
+      throw new Error('Empty response from Gemini Proxy');
     }
 
     const recommendations = JSON.parse(text) as Omit<GeminiRecommendation, 'cash_warning_msg'>[];
@@ -324,12 +271,11 @@ export const decideLunch = async (
     
     return recommendations.map(rec => ({
       ...rec,
-      cash_warning_msg: rec.is_cash_only ? "Note: This location may be cash-only." : null,
+      cash_warning_msg: rec.is_cash_only ? 'Note: This location may be cash-only.' : null,
     }));
 
   } catch (error) {
     Logger.error('AI', 'Gemini Decision Failed', error);
-    // Return an empty array on failure to allow the client-side fallback to trigger
     return [];
   }
 };

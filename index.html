@@ -7,106 +7,20 @@
     <title>Lunch.sys // TE-Edition</title>
     
     <!-- Google Maps API (Modern Inline Bootstrap Loader) -->
+    <!-- API Key is injected at build time via VITE_GOOGLE_MAPS_API_KEY -->
     <script>(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t.toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
-      key: "AIzaSyCbxY43AwkRCYKTcelLU45UuNZ91uMWpZw",
+      key: "%VITE_GOOGLE_MAPS_API_KEY%",
       v: "weekly",
     });</script>
 
-    <!-- Tailwind CSS JIT -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              'braun-bg': '#EFEFE8',
-              'braun-surface': '#F9F9F7',
-              'braun-border': '#D4D4D0',
-              'braun-dark': '#3D3D3D',
-              'braun-text': '#5A5A5A',
-              'braun-text-muted': '#8A8A8A',
-              'braun-orange': '#FF4400',
-              'dark-bg': '#0A0A0A',
-              'dark-surface': '#141414',
-              'dark-border': '#2A2A2A',
-              'dark-text': '#E0E0E0',
-              'dark-text-muted': '#707070',
-            },
-            boxShadow: {
-              'braun-deep': '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-              'dark-deep': '0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3)',
-              'braun-raised': '0 3px 0 #D4D4D0',
-              'dark-raised': '0 3px 0 #2A2A2A',
-            },
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              mono: ['Roboto Mono', 'monospace'],
-            },
-            keyframes: {
-              'scroll-up': {
-                '0%': { opacity: '0', transform: 'translateY(10px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
-              },
-              blink: {
-                '0%, 100%': { opacity: '1' },
-                '50%': { opacity: '0' },
-              }
-            },
-            animation: {
-              'scroll-up': 'scroll-up 0.5s ease-out forwards',
-              'blink': 'blink 1s step-end infinite',
-            }
-          }
-        }
-      }
-    </script>
+    <!-- Tailwind CSS is imported via index.tsx -->
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     
-    <style>
-      /* Base reset styles */
-      *, *::before, *::after {
-        box-sizing: border-box;
-      }
-      
-      body {
-        margin: 0;
-        padding: 0;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-      }
-      
-      /* Scrollbar styling */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      
-      ::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 4px;
-      }
-      
-      ::-webkit-scrollbar-thumb:hover {
-        background: #666;
-      }
-      
-      .dark ::-webkit-scrollbar-thumb {
-        background: #444;
-      }
-      
-      .dark ::-webkit-scrollbar-thumb:hover {
-        background: #555;
-      }
-    </style>
+    <!-- Styles are imported via Tailwind CSS in index.tsx -->
   </head>
   <body>
     <div id="root"></div>

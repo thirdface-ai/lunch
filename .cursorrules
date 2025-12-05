@@ -1,0 +1,173 @@
+# Frontend Design Skill
+
+> Create distinctive, production-grade frontend interfaces with high design quality. Use this skill when building web components, pages, artifacts, or applications. Generates creative, polished code and UI design that avoids generic AI aesthetics.
+
+---
+
+## Core Design Philosophy: Dieter Rams Inspired
+
+All designs in this project follow **Dieter Rams' 10 Principles of Good Design**:
+
+1. **Good design is innovative** - Push boundaries while solving real problems
+2. **Good design makes a product useful** - Form follows function
+3. **Good design is aesthetic** - Visual quality is integral to usefulness
+4. **Good design makes a product understandable** - Self-explanatory interfaces
+5. **Good design is unobtrusive** - Products should be neutral and restrained
+6. **Good design is honest** - No manipulation or false promises
+7. **Good design is long-lasting** - Avoid trends, aim for timelessness
+8. **Good design is thorough down to the last detail** - Nothing is arbitrary
+9. **Good design is environmentally friendly** - Minimal, efficient code
+10. **Good design is as little design as possible** - Less, but better
+
+---
+
+## Spacing & Padding System (CRITICAL)
+
+**Use a consistent 4px/8px base unit system throughout:**
+
+```css
+/* Spacing Scale - Use ONLY these values */
+--space-0: 0;
+--space-1: 4px;    /* 0.25rem - Tight spacing */
+--space-2: 8px;    /* 0.5rem  - Default small */
+--space-3: 12px;   /* 0.75rem - Medium-small */
+--space-4: 16px;   /* 1rem    - Default medium */
+--space-5: 20px;   /* 1.25rem - Medium */
+--space-6: 24px;   /* 1.5rem  - Large */
+--space-8: 32px;   /* 2rem    - XL */
+--space-10: 40px;  /* 2.5rem  - XXL */
+--space-12: 48px;  /* 3rem    - Section spacing */
+--space-16: 64px;  /* 4rem    - Major sections */
+--space-20: 80px;  /* 5rem    - Page sections */
+--space-24: 96px;  /* 6rem    - Hero spacing */
+```
+
+**Padding Consistency Rules:**
+- Container padding: Always `--space-6` (24px) on mobile, `--space-8` (32px) on desktop
+- Card/Panel padding: Always `--space-4` (16px) or `--space-6` (24px)
+- Button padding: Horizontal `--space-4`, Vertical `--space-2` or `--space-3`
+- Input padding: Horizontal `--space-3`, Vertical `--space-2`
+- List item spacing: `--space-2` or `--space-3` between items
+- Section margins: `--space-12` or `--space-16` between major sections
+
+---
+
+## Design Thinking Process
+
+Before coding, understand the context and commit to a BOLD aesthetic direction:
+
+- **Purpose**: What problem does this interface solve? Who uses it?
+- **Tone**: For this project, we use **industrial/utilitarian** with **Braun-inspired** warmth
+- **Constraints**: Technical requirements (framework, performance, accessibility)
+- **Differentiation**: What makes this UNFORGETTABLE?
+
+**CRITICAL**: Choose a clear conceptual direction and execute it with precision. The key is intentionality, not intensity.
+
+---
+
+## This Project's Design Language
+
+### Color Palette (Braun-Inspired)
+
+```css
+/* Light Theme */
+--braun-bg: #F5F5F0;           /* Warm off-white */
+--braun-dark: #1A1A1A;         /* Near-black */
+--braun-border: #C4C4B8;       /* Warm gray */
+--braun-text-muted: #707070;   /* Muted text */
+--braun-orange: #FF4400;       /* Accent - Warm orange */
+
+/* Dark Theme */
+--dark-bg: #0F0F0F;            /* Deep black */
+--dark-text: #E8E8E8;          /* Off-white text */
+--dark-border: #2A2A2A;        /* Subtle border */
+--dark-text-muted: #6B6B6B;    /* Muted text */
+```
+
+### Typography
+
+- **Display/Headers**: `'Inter', sans-serif` - Bold, tight tracking
+- **Monospace/Data**: `'Roboto Mono', monospace` - Technical readability
+- **Body**: System fonts for performance
+
+### Component Patterns
+
+- **Buttons**: Minimal, uppercase labels, subtle hover states
+- **Cards**: Sharp corners or very subtle radius (2-4px), clear hierarchy
+- **Inputs**: Understated borders, focus states with accent color
+- **Icons**: Functional, not decorative - use sparingly
+
+---
+
+## Frontend Aesthetics Guidelines
+
+### Typography
+- Choose fonts that are beautiful, unique, and interesting
+- Avoid generic fonts like Arial; opt for distinctive choices
+- Pair a distinctive display font with a refined body font
+
+### Color & Theme
+- Commit to a cohesive aesthetic
+- Use CSS variables for consistency
+- Dominant colors with sharp accents outperform timid palettes
+
+### Motion
+- Use animations for effects and micro-interactions
+- Prioritize CSS-only solutions
+- Focus on high-impact moments: staggered reveals create more delight than scattered micro-interactions
+- Use scroll-triggering and hover states that surprise
+
+### Spatial Composition
+- Unexpected layouts where appropriate
+- Generous negative space OR controlled density
+- Grid-breaking elements used sparingly
+
+### Backgrounds & Visual Details
+- Create atmosphere and depth
+- Add contextual effects that match the overall aesthetic
+- Apply creative forms: subtle textures, geometric patterns, layered transparencies
+
+---
+
+## Anti-Patterns (NEVER DO)
+
+- ❌ Overused font families (Arial, system fonts only)
+- ❌ Clichéd color schemes (purple gradients on white)
+- ❌ Predictable layouts and component patterns
+- ❌ Cookie-cutter design lacking context-specific character
+- ❌ Inconsistent padding/spacing values
+- ❌ Decorative elements without purpose
+- ❌ Skeuomorphic details that don't add function
+
+---
+
+## Implementation Checklist
+
+When building any UI component:
+
+1. [ ] Uses spacing scale values (no arbitrary pixel values)
+2. [ ] Follows color palette from CSS variables
+3. [ ] Maintains consistent padding across similar elements
+4. [ ] Includes appropriate hover/focus states
+5. [ ] Works in both light and dark themes
+6. [ ] Accessible (proper contrast, focus indicators)
+7. [ ] Responsive (mobile-first approach)
+8. [ ] Production-grade and functional
+
+---
+
+## Code Quality Standards
+
+```typescript
+// Component structure should be clean and organized
+// Props should be typed
+// Use semantic HTML elements
+// Separate concerns (logic vs presentation)
+// Use CSS variables for theming
+// Keep animations subtle and purposeful
+```
+
+---
+
+**Remember**: Good design is as little design as possible. Every element should earn its place. If it doesn't serve the user, remove it.
+

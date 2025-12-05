@@ -15,8 +15,9 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "types": ["@types/google.maps"]
+    "types": ["@types/google.maps", "@types/node"],
+    "esModuleInterop": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "index.tsx"],
-  "exclude": ["node_modules"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "index.tsx", "api/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

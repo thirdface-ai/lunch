@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { AppState, FinalResult, ThemeMode } from '../types';
 import MapComponent from './MapComponent';
-import SupabaseService from '../services/supabaseService';
+import { useFavorites } from '../hooks/useFavorites';
 import Logger from '../utils/logger';
 
 interface ResultsViewProps {
@@ -22,47 +22,33 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   theme
 }) => {
   const isDark = theme === ThemeMode.DARK;
-  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
-  const [savingFavorite, setSavingFavorite] = useState<string | null>(null);
-
-  // Load favorites on mount
-  useEffect(() => {
-    const loadFavorites = async () => {
-      const ids = await SupabaseService.getFavoriteIds();
-      setFavoriteIds(ids);
-    };
-    loadFavorites();
-  }, []);
+  
+  // Use TanStack Query-powered favorites hook
+  const {
+    isFavorite,
+    toggleFavorite,
+    isAddingFavorite,
+    isRemovingFavorite,
+  } = useFavorites();
 
   const handleToggleFavorite = async (result: FinalResult) => {
-    setSavingFavorite(result.place_id);
-    
     try {
-      if (favoriteIds.has(result.place_id)) {
-        const success = await SupabaseService.removeFavorite(result.place_id);
-        if (success) {
-          setFavoriteIds(prev => {
-            const next = new Set(prev);
-            next.delete(result.place_id);
-            return next;
-          });
-          Logger.userAction('Removed Favorite', { placeId: result.place_id, placeName: result.name });
-        }
+      const isNowFavorite = await toggleFavorite(result);
+      
+      if (isNowFavorite) {
+        Logger.userAction('Added Favorite', { placeId: result.place_id, placeName: result.name });
       } else {
-        const success = await SupabaseService.addFavorite(result);
-        if (success) {
-          setFavoriteIds(prev => new Set(prev).add(result.place_id));
-          Logger.userAction('Added Favorite', { placeId: result.place_id, placeName: result.name });
-        }
+        Logger.userAction('Removed Favorite', { placeId: result.place_id, placeName: result.name });
       }
     } catch (error) {
       Logger.error('USER', 'Failed to toggle favorite', error);
-    } finally {
-      setSavingFavorite(null);
     }
   };
 
   if (appState !== AppState.RESULTS) return null;
+
+  // Check if any mutation is pending
+  const isSavingAny = isAddingFavorite || isRemovingFavorite;
 
   return (
     <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
@@ -88,11 +74,15 @@ const ResultsView: React.FC<ResultsViewProps> = ({
           {/* List Column */}
           <div className="flex-1 overflow-y-auto max-h-[80vh]">
             {results.map((place, idx) => {
-              const dayOfWeek = (new Date().getDay() + 6) % 7;
-              const todaysHoursRaw = place.opening_hours?.weekday_text?.[dayOfWeek];
+              // Find today's hours by matching the day name in the weekday_text strings
+              // Use the browser's locale to match Google Places API's weekdayDescriptions language
+              const browserLocale = typeof navigator !== 'undefined' ? navigator.language : 'en-US';
+              const todayName = new Date().toLocaleDateString(browserLocale, { weekday: 'long' });
+              const todaysHoursRaw = place.opening_hours?.weekday_text?.find(
+                text => text.toLowerCase().startsWith(todayName.toLowerCase())
+              );
               const todaysHours = todaysHoursRaw ? todaysHoursRaw.substring(todaysHoursRaw.indexOf(':') + 2) : null;
-              const isFavorite = favoriteIds.has(place.place_id);
-              const isSaving = savingFavorite === place.place_id;
+              const isPlaceFavorite = isFavorite(place.place_id);
 
               return (
                 <article 
@@ -118,12 +108,12 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                           {/* Favorite Button */}
                           <button
                             onClick={() => handleToggleFavorite(place)}
-                            disabled={isSaving}
-                            aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                            disabled={isSavingAny}
+                            aria-label={isPlaceFavorite ? 'Remove from favorites' : 'Add to favorites'}
                             className={`p-1.5 rounded transition-all focus:outline-none focus:ring-2 focus:ring-braun-orange ${
-                              isSaving ? 'opacity-50 cursor-wait' : ''
+                              isSavingAny ? 'opacity-50 cursor-wait' : ''
                             } ${
-                              isFavorite 
+                              isPlaceFavorite 
                                 ? 'text-braun-orange' 
                                 : `${isDark ? 'text-dark-text-muted hover:text-braun-orange' : 'text-braun-text-muted hover:text-braun-orange'}`
                             }`}
@@ -132,7 +122,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                               width="16" 
                               height="16" 
                               viewBox="0 0 24 24" 
-                              fill={isFavorite ? 'currentColor' : 'none'} 
+                              fill={isPlaceFavorite ? 'currentColor' : 'none'} 
                               stroke="currentColor" 
                               strokeWidth="2"
                             >

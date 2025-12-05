@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -66,15 +66,14 @@ app.post('/api/gemini/generate', limiter, async (req, res) => {
       return res.status(400).json({ error: 'Missing required parameters: model, contents' });
     }
 
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const genModel = genAI.getGenerativeModel({ model: model });
     
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: contents,
-      config: config
-    });
+    const result = await genModel.generateContent(contents);
+    const response = await result.response;
+    const text = response.text();
 
-    res.json({ text: response.text });
+    res.json({ text });
 
   } catch (error) {
     console.error('Gemini API Proxy Error:', error);

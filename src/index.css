@@ -1,0 +1,209 @@
+/* Tailwind CSS Directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===========================================
+   CSS Variables - Dieter Rams Inspired
+   =========================================== */
+:root {
+  /* Spacing Scale (4px base unit) */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  
+  /* Light Theme Colors */
+  --color-bg: #EFEFE8;
+  --color-surface: #F9F9F7;
+  --color-border: #D4D4D0;
+  --color-text: #3D3D3D;
+  --color-text-secondary: #5A5A5A;
+  --color-text-muted: #8A8A8A;
+  --color-accent: #FF4400;
+  --color-accent-dark: #CC3300;
+  
+  /* Shadows */
+  --shadow-deep: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-raised: 0 3px 0 #D4D4D0;
+  
+  /* Typography */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'Roboto Mono', ui-monospace, monospace;
+  
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 300ms ease;
+  --transition-slow: 500ms ease;
+}
+
+/* Dark Theme Variables */
+.dark {
+  --color-bg: #0A0A0A;
+  --color-surface: #141414;
+  --color-border: #2A2A2A;
+  --color-text: #E0E0E0;
+  --color-text-secondary: #B0B0B0;
+  --color-text-muted: #707070;
+  
+  --shadow-deep: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  --shadow-raised: 0 3px 0 #2A2A2A;
+}
+
+/* ===========================================
+   Base Styles
+   =========================================== */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+  
+  html {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    transition: background-color var(--transition-normal), color var(--transition-normal);
+  }
+  
+  /* Focus styles for accessibility */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  
+  /* Selection styling */
+  ::selection {
+    background-color: var(--color-accent);
+    color: white;
+  }
+}
+
+/* ===========================================
+   Scrollbar Styling
+   =========================================== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #444;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* ===========================================
+   Component Layer
+   =========================================== */
+@layer components {
+  /* Button base styles */
+  .btn {
+    @apply px-4 py-2 font-mono text-xs uppercase tracking-widest;
+    @apply transition-all duration-150;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-braun-orange;
+  }
+  
+  .btn-primary {
+    @apply btn bg-braun-orange text-white;
+    @apply hover:bg-braun-orange/90;
+  }
+  
+  .btn-secondary {
+    @apply btn border border-braun-border bg-transparent;
+    @apply hover:border-braun-orange hover:text-braun-orange;
+    @apply dark:border-dark-border dark:hover:border-braun-orange;
+  }
+  
+  /* Card base styles */
+  .card {
+    @apply bg-braun-surface border border-braun-border p-6;
+    @apply dark:bg-dark-surface dark:border-dark-border;
+    @apply transition-colors duration-300;
+  }
+  
+  /* Input base styles */
+  .input {
+    @apply w-full px-3 py-2 bg-transparent;
+    @apply border border-braun-border rounded;
+    @apply text-braun-dark placeholder:text-braun-text-muted;
+    @apply focus:outline-none focus:border-braun-orange;
+    @apply dark:border-dark-border dark:text-dark-text dark:placeholder:text-dark-text-muted;
+    @apply transition-colors duration-150;
+  }
+  
+  /* Decorative screw element (Braun/industrial aesthetic) */
+  .screw {
+    @apply w-2 h-2 rounded-full border opacity-50 flex items-center justify-center;
+    @apply border-braun-text-muted dark:border-dark-text-muted;
+  }
+  
+  .screw::after {
+    content: '';
+    @apply w-1.5 h-px rotate-45;
+    @apply bg-braun-text-muted dark:bg-dark-text-muted;
+  }
+}
+
+/* ===========================================
+   Utility Layer
+   =========================================== */
+@layer utilities {
+  /* Text utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Animation utilities */
+  .animate-delay-100 {
+    animation-delay: 100ms;
+  }
+  
+  .animate-delay-200 {
+    animation-delay: 200ms;
+  }
+  
+  .animate-delay-300 {
+    animation-delay: 300ms;
+  }
+  
+  /* Container queries support */
+  .container-type-inline {
+    container-type: inline-size;
+  }
+}
+

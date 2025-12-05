@@ -1,9 +1,10 @@
-
 import { HungerVibe, PricePoint, GooglePlace } from '../types';
 
-// Helper to generate specific search queries based on the user's vibe
+/**
+ * Generate search queries based on the user's vibe
+ */
 export const getSearchQueriesForVibe = (vibe: HungerVibe | null): string[] => {
-  if (!vibe) return ['restaurant', 'lunch', 'food', 'new opening']; // Fallback for pure freestyle
+  if (!vibe) return ['restaurant', 'lunch', 'food', 'new opening'];
 
   let queries: string[];
   switch (vibe) {
@@ -31,64 +32,93 @@ export const getSearchQueriesForVibe = (vibe: HungerVibe | null): string[] => {
   return [...queries, 'restaurant'];
 };
 
-// Revised scoring function that prioritizes proximity within the allowed range
+/**
+ * Calculate candidate score for ranking
+ */
 export const calculateCandidateScore = (
   p: GooglePlace,
   price: PricePoint | null,
   durationSeconds: number | undefined,
   maxDurationSeconds: number
 ): number => {
-    let score = 0;
-    const MAX_PROXIMITY_SCORE = 15;
+  let score = 0;
+  const MAX_PROXIMITY_SCORE = 15;
 
-    // 1. Proximity Score (Weight: 15)
-    if (durationSeconds !== undefined) {
-        const proximityRatio = durationSeconds / maxDurationSeconds;
-        const proximityScore = MAX_PROXIMITY_SCORE * (1 - proximityRatio);
-        score += Math.max(0, proximityScore);
+  // 1. Proximity Score (Weight: 15)
+  if (durationSeconds !== undefined) {
+    const proximityRatio = durationSeconds / maxDurationSeconds;
+    const proximityScore = MAX_PROXIMITY_SCORE * (1 - proximityRatio);
+    score += Math.max(0, proximityScore);
+  }
+  
+  // 2. Price Match Score (Weight: 10)
+  const priceLevel = p.price_level;
+  let priceMatchScore = 0;
+  if (priceLevel !== undefined && price !== null) {
+    switch (price) {
+      case PricePoint.INTERN:
+        if (priceLevel <= 1) priceMatchScore = 10;
+        else if (priceLevel === 2) priceMatchScore = 5;
+        else priceMatchScore = -5;
+        break;
+      case PricePoint.SENIOR:
+        if (priceLevel >= 2 && priceLevel <= 3) priceMatchScore = 10;
+        else if (priceLevel === 1 || priceLevel === 4) priceMatchScore = 5;
+        break;
+      case PricePoint.COMPANY_CARD:
+        if (priceLevel >= 3) priceMatchScore = 10;
+        else if (priceLevel === 2) priceMatchScore = 5;
+        else priceMatchScore = -5;
+        break;
     }
-    
-    // 2. Price Match Score (Weight: 10)
-    const priceLevel = p.price_level;
-    let priceMatchScore = 0;
-    if (priceLevel !== undefined && price !== null) {
-        switch (price) {
-            case PricePoint.INTERN:
-                if (priceLevel <= 1) priceMatchScore = 10;
-                else if (priceLevel === 2) priceMatchScore = 5;
-                else priceMatchScore = -5;
-                break;
-            case PricePoint.SENIOR:
-                if (priceLevel >= 2 && priceLevel <= 3) priceMatchScore = 10;
-                else if (priceLevel === 1 || priceLevel === 4) priceMatchScore = 5;
-                break;
-            case PricePoint.COMPANY_CARD:
-                if (priceLevel >= 3) priceMatchScore = 10;
-                else if (priceLevel === 2) priceMatchScore = 5;
-                else priceMatchScore = -5;
-                break;
-        }
-    } else {
-        // Neutral/High score if no price preference or no data
-        priceMatchScore = 7; 
-    }
-    score += priceMatchScore;
+  } else {
+    // Neutral/High score if no price preference or no data
+    priceMatchScore = 7; 
+  }
+  score += priceMatchScore;
 
-    const rating = p.rating || 0;
-    const reviews = p.user_ratings_total || 0;
+  const rating = p.rating || 0;
+  const reviews = p.user_ratings_total || 0;
 
-    // 3. "Hidden Gem" Score (Weight: 5)
-    if (rating > 4.3 && reviews >= 50 && reviews < 750) {
-        score += 5;
-    }
+  // 3. "Hidden Gem" Score (Weight: 5)
+  if (rating > 4.3 && reviews >= 50 && reviews < 750) {
+    score += 5;
+  }
 
-    // 4. "Fresh Drop" Score (Weight: 8)
-    if (rating >= 4.0 && reviews < 50 && reviews > 0) {
-        score += 8;
-    }
+  // 4. "Fresh Drop" Score (Weight: 8)
+  if (rating >= 4.0 && reviews < 50 && reviews > 0) {
+    score += 8;
+  }
 
-    // 5. Raw Rating Score (Weight: 1 per star)
-    score += rating;
+  // 5. Raw Rating Score (Weight: 1 per star)
+  score += rating;
 
-    return score;
+  return score;
+};
+
+/**
+ * Shuffle array using Fisher-Yates algorithm
+ */
+export const shuffleArray = <T>(array: T[]): T[] => {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+};
+
+/**
+ * Get walk time configuration based on limit
+ */
+export const getWalkConfig = (walkLimit: string): { radius: number; maxDurationSeconds: number } => {
+  switch (walkLimit) {
+    case '5 min':
+      return { radius: 1000, maxDurationSeconds: 300 };
+    case '15 min':
+      return { radius: 2500, maxDurationSeconds: 900 };
+    case '30 min':
+    default:
+      return { radius: 5000, maxDurationSeconds: 2400 };
+  }
 };

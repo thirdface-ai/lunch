@@ -1,10 +1,13 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
-// Supabase configuration
-// In production, these should come from environment variables
-const SUPABASE_URL = 'https://tfnotszdttxrfeleltye.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmbm90c3pkdHR4cmZlbGVsdHllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MjY0MTEsImV4cCI6MjA4MDUwMjQxMX0.cRNAdShs6V0McpRJ0Sp0XOBTqj9cpAfQQ7z71IBnDUY';
+// Supabase configuration from environment variables
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.warn('Supabase credentials not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.');
+}
 
 // Create Supabase client with proper types
 export const supabase: SupabaseClient<Database> = createClient<Database>(
