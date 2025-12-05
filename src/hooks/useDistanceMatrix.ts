@@ -72,19 +72,21 @@ export const useDistanceMatrix = () => {
           resolve();
         }, MATRIX_TIMEOUT_MS);
 
+        // Extract destinations - batch already comes from validPlaces so all have geometry.location
+        const destinations = batch.map(p => p.geometry!.location!);
+
         try {
           service.getDistanceMatrix(
             {
               origins: [{ lat: origin.lat, lng: origin.lng }],
-              destinations: batch
-                .map(p => p.geometry?.location)
-                .filter(Boolean) as google.maps.LatLng[],
+              destinations,
               travelMode,
             },
             (response, status) => {
               clearTimeout(timeoutId);
 
               if (status === 'OK' && response?.rows[0]) {
+                // Iterate using same index as destinations array
                 batch.forEach((place, idx) => {
                   const element = response.rows[0].elements[idx];
                   if (element?.status === 'OK' && element.duration) {
@@ -152,4 +154,3 @@ export const useDistanceMatrix = () => {
 };
 
 export default useDistanceMatrix;
-

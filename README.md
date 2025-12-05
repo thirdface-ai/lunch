@@ -1,4 +1,4 @@
-# 🍜 Thirdface Lunch Decider
+# Thirdface Lunch Decider
 
 An AI-powered lunch recommendation engine that helps you discover the perfect spot for your next meal. Built with React, Google Maps, Gemini AI, and Supabase.
 
@@ -7,9 +7,9 @@ An AI-powered lunch recommendation engine that helps you discover the perfect sp
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue)
 ![Supabase](https://img.shields.io/badge/Supabase-2.39-green)
 
-## ✨ Features
+## Features
 
-- **🎯 Vibe-Based Search** - Choose from 6 distinct "mental states" to match your mood:
+- **Vibe-Based Search** - Choose from 6 distinct "mental states" to match your mood:
   - Grab & Go - Quick, efficient meals
   - Light & Clean - Fresh, healthy options
   - Hearty & Rich - Comfort food satisfaction
@@ -17,23 +17,23 @@ An AI-powered lunch recommendation engine that helps you discover the perfect sp
   - View & Vibe - Atmosphere-focused dining
   - Authentic & Classic - Traditional favorites
 
-- **🤖 AI-Powered Recommendations** - Gemini AI analyzes reviews, menus, and attributes to find hidden gems
+- **AI-Powered Recommendations** - Gemini AI analyzes reviews, menus, and attributes to find hidden gems
 
-- **📍 Location-Aware** - Uses Google Maps to find restaurants within your preferred walking distance
+- **Location-Aware** - Uses Google Maps to find restaurants within your preferred walking distance
 
-- **💰 Budget Filtering** - Filter by budget tier (Bootstrapped, Series A, Company Card)
+- **Budget Filtering** - Filter by budget tier (Bootstrapped, Series A, Company Card)
 
-- **🥗 Dietary Support** - Filter for Gluten-Free, Vegan, or Vegetarian options
+- **Dietary Support** - Filter for Gluten-Free, Vegan, or Vegetarian options
 
-- **💳 Payment Preferences** - Option to exclude cash-only establishments
+- **Payment Preferences** - Option to exclude cash-only establishments
 
-- **❤️ Favorites** - Save your favorite spots for quick access
+- **Favorites** - Save your favorite spots for quick access
 
-- **📊 Search History** - Track your searches with Supabase
+- **Search History** - Track your searches with Supabase
 
-- **🌙 Dark Mode** - Beautiful Braun-inspired design with light/dark themes
+- **Dark Mode** - Beautiful Braun-inspired design with light/dark themes
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -43,31 +43,31 @@ An AI-powered lunch recommendation engine that helps you discover the perfect sp
 │  │   (Input)   │  │ (Processing)│  │ (Results + Map)     │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
+                      │
+                      ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      Services Layer                          │
 │  ┌──────────────────┐  ┌──────────────────────────────────┐ │
 │  │  geminiService   │  │      supabaseService             │ │
-│  │  (AI Decisions)  │  │  (History, Favorites, Logs)      │ │
+│  │  (AI via proxy)  │  │  (History, Favorites, Logs)      │ │
 │  └──────────────────┘  └──────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
-                              │
-          ┌───────────────────┼───────────────────┐
-          ▼                   ▼                   ▼
+                      │
+          ┌───────────┼───────────┐
+          ▼           ▼           ▼
 ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│  Google Maps    │ │   Gemini AI     │ │    Supabase     │
-│  Places API     │ │   (via proxy)   │ │   PostgreSQL    │
+│  Google Maps    │ │ Gemini AI       │ │    Supabase     │
+│  (client-side)  │ │ (Edge Function) │ │   PostgreSQL    │
 └─────────────────┘ └─────────────────┘ └─────────────────┘
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+ 
 - npm or yarn
-- Google Maps API Key (with Places API enabled)
+- Google Maps API Key (with Places API and Distance Matrix API enabled)
 - Gemini API Key
 - Supabase Project
 
@@ -86,75 +86,116 @@ An AI-powered lunch recommendation engine that helps you discover the perfect sp
 
 3. **Set up environment variables**
    
-   Create a `.env` file in the root directory:
+   Create a `.env.local` file:
    ```env
-   # Gemini AI (for the server proxy)
-   API_KEY=your_gemini_api_key
+   # Supabase Configuration
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-key
    
-   # Port for production server
-   PORT=8080
+   # Google Maps API Key (client-side, restricted by HTTP referrer)
+   VITE_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
    ```
 
-4. **Start development server**
+4. **Deploy Supabase Edge Function for Gemini**
+   ```bash
+   # Link to your Supabase project
+   supabase link --project-ref your-project-ref
+   
+   # Set Gemini API key secret
+   supabase secrets set GEMINI_API_KEY=your-gemini-key
+   
+   # Deploy the Gemini proxy function
+   supabase functions deploy gemini-proxy
+   ```
+
+5. **Start development server**
    ```bash
    npm run dev
    ```
 
-5. **Open in browser**
+6. **Open in browser**
    ```
    http://localhost:5173
    ```
 
-## 🌐 Deployment on Vercel
+## API Key Security
 
-### One-Click Deploy
+| Key | Storage Location | Security |
+|-----|-----------------|----------|
+| `GOOGLE_MAPS_API_KEY` | Client (env var) | Protected by HTTP referrer restrictions |
+| `GEMINI_API_KEY` | Edge Function Secret | Server-side only, never exposed |
+| `SUPABASE_ANON_KEY` | Client (env var) | Safe - RLS protected |
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/lunch-decider)
+### Google Maps API Key Restrictions
 
-### Manual Deployment
+In Google Cloud Console, restrict your client-side Google Maps key:
 
-1. **Install Vercel CLI**
-   ```bash
-   npm i -g vercel
-   ```
+1. **Application restrictions**: HTTP referrers
+   - `localhost:*` (for development)
+   - `your-production-domain.com/*`
 
-2. **Login to Vercel**
-   ```bash
-   vercel login
-   ```
+2. **API restrictions**: Only enable:
+   - Maps JavaScript API
+   - Places API (New)
+   - Distance Matrix API
+   - Geocoding API
 
-3. **Deploy**
-   ```bash
-   vercel
-   ```
+### Setting Gemini Secret
 
-4. **Set Environment Variables**
-   
-   In your Vercel project settings, add:
-   - `API_KEY` - Your Gemini API key
+```bash
+# Set the Gemini API key as an Edge Function secret
+supabase secrets set GEMINI_API_KEY=your-key-here
 
-### Vercel Configuration
+# List current secrets
+supabase secrets list
+```
 
-The project includes a `vercel.json` configuration file that:
-- Builds the frontend with Vite
-- Sets up serverless functions for the Gemini API proxy
-- Configures proper routing
+## User API Keys (Optional)
 
-## 📁 Project Structure
+The app supports user-provided API keys stored securely in Supabase Vault:
+
+```sql
+-- User API keys are stored in the user_api_keys table
+-- Keys are encrypted client-side before storage
+-- RLS ensures users can only access their own keys
+```
+
+## Deployment
+
+### Vercel (Frontend)
+
+```bash
+# Deploy frontend to Vercel
+vercel
+
+# Set environment variables in Vercel dashboard:
+# - VITE_SUPABASE_URL
+# - VITE_SUPABASE_ANON_KEY
+# - VITE_GOOGLE_MAPS_API_KEY
+```
+
+### Supabase (Backend)
+
+```bash
+# Deploy Edge Function
+supabase functions deploy gemini-proxy
+
+# Apply database migrations
+supabase db push
+```
+
+## Project Structure
 
 ```
 lunch-decider/
 ├── index.html              # HTML entry point
-├── index.tsx               # React entry point
 ├── package.json            # Dependencies & scripts
-├── tsconfig.json           # TypeScript configuration
-├── vite.config.ts          # Vite bundler configuration
 ├── vercel.json             # Vercel deployment config
-├── server.js               # Express server (production)
 │
-├── api/                    # Vercel Serverless Functions
-│   └── gemini/
-│       └── generate.ts     # Gemini API proxy endpoint
+├── supabase/
+│   └── functions/
+│       └── gemini-proxy/   # AI proxy Edge Function
+│           └── index.ts
 │
 └── src/
     ├── App.tsx             # Main application component
@@ -171,6 +212,11 @@ lunch-decider/
     │   ├── geminiService.ts    # AI recommendation logic
     │   └── supabaseService.ts  # Database operations
     │
+    ├── hooks/
+    │   ├── useGooglePlaces.ts  # Places API (client-side)
+    │   ├── useDistanceMatrix.ts # Distance Matrix (client-side)
+    │   └── ...
+    │
     ├── lib/
     │   ├── supabase.ts         # Supabase client setup
     │   └── database.types.ts   # Auto-generated DB types
@@ -180,7 +226,7 @@ lunch-decider/
         └── lunchAlgorithm.ts   # Scoring & filtering logic
 ```
 
-## 🗃️ Database Schema
+## Database Schema
 
 ### Tables
 
@@ -212,6 +258,17 @@ Stores user's favorite restaurants.
 | ai_reason | TEXT | AI recommendation reason |
 | recommended_dish | TEXT | Suggested dish |
 
+#### `user_api_keys`
+Encrypted storage for user-provided API keys.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID | Primary key |
+| session_id | TEXT | Browser session identifier |
+| service | TEXT | Service name (gemini, openai, etc.) |
+| encrypted_key | TEXT | Encrypted API key |
+| key_hint | TEXT | Last 4 chars for display |
+
 #### `app_logs`
 Application logging for debugging and analytics.
 
@@ -223,37 +280,7 @@ Application logging for debugging and analytics.
 | message | TEXT | Log message |
 | metadata | JSONB | Additional context |
 
-## 🔧 Configuration
-
-### Google Maps API
-
-The app requires a Google Maps API key with the following APIs enabled:
-- Maps JavaScript API
-- Places API (New)
-- Distance Matrix API
-- Geocoding API
-
-Update the API key in `index.html`:
-```javascript
-key: "YOUR_GOOGLE_MAPS_API_KEY",
-```
-
-### Supabase
-
-Update the Supabase configuration in `src/lib/supabase.ts`:
-```typescript
-const SUPABASE_URL = 'https://your-project.supabase.co';
-const SUPABASE_ANON_KEY = 'your-anon-key';
-```
-
-### Gemini AI
-
-The Gemini API key is passed via environment variable to the server:
-```env
-API_KEY=your_gemini_api_key
-```
-
-## 🎨 Design System
+## Design System
 
 The app uses a Braun-inspired design language:
 
@@ -275,7 +302,7 @@ The app uses a Braun-inspired design language:
 - Sans: Inter
 - Mono: Roboto Mono
 
-## 📜 Scripts
+## Scripts
 
 | Script | Description |
 |--------|-------------|
@@ -284,14 +311,16 @@ The app uses a Braun-inspired design language:
 | `npm run preview` | Preview production build |
 | `npm start` | Start production server |
 
-## 🔒 Security
+## Security
 
 - Row Level Security (RLS) enabled on all Supabase tables
-- API keys are server-side only (proxied through serverless functions)
+- Gemini API key stored as Edge Function secret (never exposed to client)
+- Google Maps API key protected by HTTP referrer restrictions
+- User API keys encrypted with pgsodium before storage
 - Session-based identification (no user auth required)
 - Input sanitization on all user inputs
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
@@ -299,11 +328,11 @@ The app uses a Braun-inspired design language:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [Google Maps Platform](https://developers.google.com/maps) for location services
 - [Google Gemini](https://ai.google.dev/) for AI recommendations
@@ -313,4 +342,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Built with ❤️ by [Thirdface](https://thirdface.com)
+Built with care by [Thirdface](https://thirdface.com)

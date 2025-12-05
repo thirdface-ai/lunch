@@ -1,5 +1,6 @@
 import { GooglePlace, HungerVibe, GeminiRecommendation, PricePoint, DietaryRestriction } from '../types';
 import Logger from '../utils/logger';
+import { supabase } from '../lib/supabase';
 
 // Replicating Type definition locally to avoid importing the full SDK on client
 export enum Type {
@@ -13,30 +14,24 @@ export enum Type {
   NULL = 'NULL',
 }
 
-// Internal helper to call the backend proxy
+// Internal helper to call the Supabase Edge Function
 const callGeminiProxy = async (model: string, contents: string, config: Record<string, unknown>): Promise<string> => {
   const startTime = performance.now();
   Logger.aiRequest(model, contents);
 
   try {
-    const response = await fetch('/api/gemini/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        contents,
-        config
-      }),
+    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+      body: { model, contents, config },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Server responded with ${response.status}`);
+    if (error) {
+      throw new Error(error.message || 'Edge Function invocation failed');
     }
 
-    const data = await response.json();
+    if (!data?.text) {
+      throw new Error('Invalid response from Gemini proxy');
+    }
+
     const duration = Math.round(performance.now() - startTime);
     
     // Rough estimation of output tokens based on char count

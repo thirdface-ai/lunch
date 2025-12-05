@@ -153,4 +153,3 @@ export const useGooglePlaces = () => {
 };
 
 export default useGooglePlaces;
-
