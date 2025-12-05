@@ -207,86 +207,95 @@ const ResultsView: React.FC<ResultsViewProps> = ({
               return (
                 <article 
                   key={place.place_id} 
-                  className={`p-4 sm:p-8 border-b last:border-b-0 transition-colors group ${isDark ? 'border-dark-border hover:bg-dark-surface' : 'border-braun-border hover:bg-white'}`}
+                  className={`p-4 sm:p-6 lg:p-8 border-b last:border-b-0 transition-colors group ${isDark ? 'border-dark-border hover:bg-dark-surface' : 'border-braun-border hover:bg-white'}`}
                 >
-                  {/* Header: Number + Name inline - using <a> for iOS compatibility */}
-                  <div className="mb-3 sm:mb-4">
-                    <span className="font-mono text-braun-orange text-xs sm:text-sm font-bold tabular-nums mr-3">
-                      {(idx + 1).toString().padStart(2, '0')}
-                    </span>
-                    <a 
-                      href={getPlaceUrl(place.place_id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`font-sans font-bold text-base sm:text-xl leading-snug group-hover:text-braun-orange transition-colors ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}
-                    >
-                      {place.name}
-                    </a>
-                    
-                    {/* NEW OPENING BADGE */}
-                    {place.is_new_opening && (
-                      <span className={`inline-flex align-middle ml-2 font-mono text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-[1px] animate-pulse border ${isDark ? 'text-blue-400 border-blue-400/50 bg-blue-400/10' : 'text-blue-600 border-blue-600/50 bg-blue-50'}`}>
-                        FRESH DROP
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Content area - indented to align with name (after the 01 number) */}
-                  <div className="pl-7 sm:pl-9 space-y-3 sm:space-y-4">
-                    {/* Metadata - single line with wrapping */}
-                    <div className={`flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-1 font-mono text-[9px] sm:text-[10px] uppercase tracking-wider ${isDark ? 'text-[#999]' : 'text-braun-text-muted'}`}>
-                      <span>
-                        <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>RATING:</span>{' '}
-                        {(place.rating || 0).toFixed(1)}
-                      </span>
-                      <span>
-                        <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>COST:</span>{' '}
-                        {place.price_level && place.price_level > 0 
-                          ? '$'.repeat(place.price_level) 
-                          : (place.price_level === 0 ? 'Free' : '$$')}
-                      </span>
-                      <span>
-                        <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>WALK:</span>{' '}
-                        {place.walking_time_text || 'N/A'}
-                      </span>
-                      <span>
-                        <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>HOURS:</span>{' '}
-                        {place.opening_hours ? (
-                          (() => {
-                            const openStatus = isCurrentlyOpen(todaysHours);
-                            if (openStatus === true) {
-                              return <span className="text-green-500 font-bold">OPEN</span>;
-                            } else if (openStatus === false) {
-                              return <span className="text-red-500 font-bold">CLOSED</span>;
-                            }
-                            return place.opening_hours?.open_now 
-                              ? <span className="text-green-500 font-bold">OPEN</span>
-                              : <span className="text-red-500 font-bold">CLOSED</span>;
-                          })()
-                        ) : 'N/A'}
+                  {/* Grid Layout: Fixed number column + content */}
+                  <div className="flex gap-4 lg:gap-6">
+                    {/* Fixed-width number column */}
+                    <div className="flex-shrink-0 w-6 lg:w-8">
+                      <span className="font-mono text-braun-orange text-xs lg:text-sm font-bold tabular-nums">
+                        {(idx + 1).toString().padStart(2, '0')}
                       </span>
                     </div>
-
-                    {/* Description */}
-                    <p className={`font-sans text-xs sm:text-sm leading-relaxed max-w-2xl ${isDark ? 'text-[#BBB]' : 'text-[#333]'}`}>
-                      {place.ai_reason}
-                    </p>
-
-                    {/* TRY section */}
-                    <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 pt-1">
-                      <div className="flex items-baseline gap-2">
-                        <span className={`font-mono text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-[#999]' : 'text-braun-text-muted'}`}>TRY:</span>
-                        <span className={`font-sans text-xs sm:text-sm font-medium border-b pb-0.5 ${isDark ? 'text-dark-text border-dark-border' : 'text-braun-dark border-braun-border/50'}`}>
-                          {place.recommended_dish}
-                        </span>
+                    
+                    {/* Content column */}
+                    <div className="flex-1 min-w-0 space-y-3 lg:space-y-4">
+                      {/* Name row */}
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <a 
+                          href={getPlaceUrl(place.place_id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`font-sans font-bold text-lg lg:text-xl leading-tight group-hover:text-braun-orange transition-colors ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}
+                        >
+                          {place.name}
+                        </a>
+                        
+                        {/* NEW OPENING BADGE */}
+                        {place.is_new_opening && (
+                          <span className={`font-mono text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-[1px] animate-pulse border ${isDark ? 'text-blue-400 border-blue-400/50 bg-blue-400/10' : 'text-blue-600 border-blue-600/50 bg-blue-50'}`}>
+                            FRESH DROP
+                          </span>
+                        )}
                       </div>
 
-                      {place.is_cash_only && (
-                        <span className="font-mono text-[9px] sm:text-[10px] font-bold text-braun-orange uppercase tracking-widest border border-braun-orange/30 px-2 py-0.5 rounded-[1px]">
-                          <span className="hidden sm:inline">LEGACY PAYMENT METHOD DETECTED</span>
-                          <span className="sm:hidden">CASH ONLY</span>
-                        </span>
-                      )}
+                      {/* Metadata row - clean grid alignment */}
+                      <div className={`font-mono text-[10px] lg:text-[11px] uppercase tracking-wider ${isDark ? 'text-[#888]' : 'text-braun-text-muted'}`}>
+                        <div className="flex flex-wrap gap-x-6 lg:gap-x-8 gap-y-1">
+                          <span className="inline-flex items-center gap-2">
+                            <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>RATING:</span>
+                            <span>{(place.rating || 0).toFixed(1)}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-2">
+                            <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>COST:</span>
+                            <span>{place.price_level && place.price_level > 0 
+                              ? '$'.repeat(place.price_level) 
+                              : (place.price_level === 0 ? 'Free' : '$$')}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-2">
+                            <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>WALK:</span>
+                            <span>{place.walking_time_text || 'N/A'}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-2">
+                            <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>HOURS:</span>
+                            {place.opening_hours ? (
+                              (() => {
+                                const openStatus = isCurrentlyOpen(todaysHours);
+                                if (openStatus === true) {
+                                  return <span className="text-green-500 font-bold">OPEN</span>;
+                                } else if (openStatus === false) {
+                                  return <span className="text-red-500 font-bold">CLOSED</span>;
+                                }
+                                return place.opening_hours?.open_now 
+                                  ? <span className="text-green-500 font-bold">OPEN</span>
+                                  : <span className="text-red-500 font-bold">CLOSED</span>;
+                              })()
+                            ) : <span>N/A</span>}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Description - constrained width for readability */}
+                      <p className={`font-sans text-[13px] lg:text-sm leading-relaxed max-w-xl ${isDark ? 'text-[#AAA]' : 'text-[#444]'}`}>
+                        {place.ai_reason}
+                      </p>
+
+                      {/* TRY section */}
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-mono text-[10px] lg:text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-[#666]' : 'text-braun-text-muted'}`}>TRY:</span>
+                          <span className={`font-sans text-[13px] lg:text-sm font-medium border-b ${isDark ? 'text-dark-text border-dark-border' : 'text-braun-dark border-braun-dark/20'}`}>
+                            {place.recommended_dish}
+                          </span>
+                        </div>
+
+                        {place.is_cash_only && (
+                          <span className="font-mono text-[9px] lg:text-[10px] font-bold text-braun-orange uppercase tracking-widest border border-braun-orange/30 px-2 py-0.5 rounded-[1px]">
+                            <span className="hidden sm:inline">LEGACY PAYMENT METHOD DETECTED</span>
+                            <span className="sm:hidden">CASH ONLY</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -295,7 +304,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
           </div>
 
           {/* Map Column - hidden on mobile, shown on lg+ screens */}
-          <div className={`hidden lg:block lg:w-[500px] lg:border-l lg:min-h-[600px] relative flex-shrink-0 ${isDark ? 'border-dark-border bg-[#181818]' : 'border-braun-border bg-[#E5E5E0]'}`}>
+          <div className={`hidden lg:block lg:w-[420px] lg:border-l lg:min-h-[600px] relative flex-shrink-0 ${isDark ? 'border-dark-border bg-[#181818]' : 'border-braun-border bg-[#E5E5E0]'}`}>
             <MapComponent
               userLat={userLat}
               userLng={userLng}
