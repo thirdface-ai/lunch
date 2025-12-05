@@ -1,0 +1,7 @@
+{
+  "name": "lunch decider",
+  "description": "A Dieter Rams inspired decision engine for lunch options using Google Places and Gemini 2.5 Flash.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
