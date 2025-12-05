@@ -106,6 +106,7 @@ export const decideLunch = async (
   });
 
   // Pre-process candidates to give the AI a very clean JSON object to work with
+  // Include rich review data for deep semantic analysis
   const analysisPayload = candidates.map(p => ({
     id: p.place_id,
     name: p.name,
@@ -122,9 +123,14 @@ export const decideLunch = async (
       has_alcohol: p.serves_beer || p.serves_wine,
       payment_options: p.payment_options 
     },
-    reviews_sample: p.reviews?.slice(0, 15)
-      .map(r => r?.text?.substring(0, 300))
-      .filter((text): text is string => !!text) || [],
+    // Deep review analysis: 20 reviews with full context for AI analysis
+    reviews_deep: p.reviews?.slice(0, 20).map(r => ({
+      text: r.text?.substring(0, 500) || '',
+      rating: r.rating,
+      author: r.author_name,
+      time_ago: r.relative_time_description,
+    })).filter(r => r.text.length > 0) || [],
+    review_count: p.reviews?.length || 0,
   }));
 
   const dietaryProtocol = `
@@ -176,47 +182,76 @@ export const decideLunch = async (
        - EXAMPLE (SUCCESS): A pool containing a Ramen Shop, a French Bistro, and a Salad Bar.
        - This protocol is absolute. If you cannot find a diverse pool of options that match the vibe, you must still provide the best candidates and note the lack of diversity in an \`ai_reason\` field.
 
-    3. DEEP SEMANTIC REVIEW ANALYSIS (REQUIRED FOR ALL CANDIDATES):
-       - You MUST perform a deep semantic analysis of the \`reviews_sample\` for every single candidate before making a decision. Do not just keyword match.
-       - Identify recurring dish names to validate the \`recommended_dish\`.
-       - Extract operational data: mentions of "wait times," "noise level," "service speed," "good for groups," etc.
-       - Synthesize sentiment to confirm the vibe (e.g., do reviews for a "View & Vibe" candidate actually mention the view?).
-       - You must extract negative signals as strongly as positive ones. A single deal-breaker mentioned in multiple reviews (e.g., 'dirty', 'rude service') should disqualify a candidate.
+    3. DEEP SEMANTIC REVIEW ANALYSIS (CRITICAL - SPEND TIME HERE):
+       - You have access to \`reviews_deep\` containing up to 20 reviews per candidate with full text, ratings, and timestamps.
+       - You MUST perform DEEP semantic analysis of ALL reviews for every candidate. This is the core of your analysis.
+       - EXTRACT SPECIFIC DISH NAMES: Scan every review for mentions of specific dishes, ingredients, or menu items.
+       - IDENTIFY PATTERNS: Look for dishes mentioned by MULTIPLE reviewers - these are validated recommendations.
+       - EXTRACT QUOTES: Pull 2-3 short, impactful quotes from reviews that capture the essence of the place.
+       - OPERATIONAL DATA: Extract mentions of "wait times," "noise level," "service speed," "good for groups," "great for lunch," etc.
+       - SENTIMENT ANALYSIS: Synthesize overall sentiment. Look for recurring praise or complaints.
+       - NEGATIVE SIGNALS: A single deal-breaker mentioned in multiple reviews (e.g., 'dirty', 'rude service', 'long wait') should disqualify a candidate.
+       - VIBE VALIDATION: Do reviews for a "View & Vibe" candidate actually mention the view? Do "Grab & Go" candidates have reviews mentioning fast service?
 
-    4. FUNCTIONAL REASONING & DISH SPECIFICITY:
-       - \`ai_reason\` MUST be purely functional, data-driven, and devoid of marketing fluff.
-         - BAD: "This place has delicious and mouth-watering tacos that you'll love!"
-         - GOOD: "High rating density (4.7/500 reviews) points to consistent quality. Reviews frequently cite the 'al pastor' tacos, noting quick service, making it an ideal 'Grab & Go' candidate."
-       - **Comparative Analysis is Mandatory.** Your \`ai_reason\` should briefly state *why* this option was chosen over another strong-but-rejected candidate. Example: "Chosen over 'Burger Palace' because reviews confirm faster service, aligning better with the 'Grab & Go' directive."
-       - \`recommended_dish\` MUST be a specific item mentioned in the \`virtual_menu_source\` or frequently praised in reviews.
-         - BAD: "Pasta"
-         - GOOD: "Cacio e Pepe"
-       - **GENERIC RECOMMENDATIONS ARE STRICTLY FORBIDDEN.** The \`recommended_dish\` field must not contain generic instructions like "Consult menu for popular dishes." or "Any sandwich." This is a critical failure condition.
+    4. PERSONALIZED FIT ANALYSIS (REQUIRED FOR EACH SELECTION):
+       - The \`personalized_fit\` field MUST explain specifically WHY this restaurant matches THIS user's preferences.
+       - Reference the user's stated vibe, budget, and dietary needs explicitly.
+       - EXAMPLE (BAD): "Great restaurant with good food."
+       - EXAMPLE (GOOD): "Perfect for your 'Light & Clean' vibe: reviews mention 'fresh salads,' 'healthy options,' and 'light portions.' Multiple reviewers note it's ideal for a quick lunch. Within your 'Series A' budget at price level 2."
+       - If the user has dietary restrictions, explain how the restaurant accommodates them based on review evidence.
 
-    5. PAYMENT PROTOCOL (STRICT & LOCALIZED):
-       - IF 'noCash' is TRUE:
-         - You MUST DISCARD any place with strong signals of being CASH ONLY.
-       - Scan \`payment_options\` and \`reviews_sample\` for both English and LOCAL LANGUAGE phrases indicating payment methods.
-       - A place with \`payment_options.accepts_credit_cards: false\` is an immediate discard if noCash is true.
-       - IF a selected place is likely CASH ONLY (and user allows it):
-         - Set 'is_cash_only' to true.
+    5. REVIEW-EXTRACTED DISH RECOMMENDATIONS (STRICT):
+       - \`recommended_dish\` MUST be a specific dish name extracted DIRECTLY from \`reviews_deep\`.
+       - Prioritize dishes mentioned by MULTIPLE reviewers.
+       - Include the specific name as reviewers wrote it (e.g., "Spicy Miso Ramen" not just "ramen").
+       - GENERIC RECOMMENDATIONS ARE A CRITICAL FAILURE. Never output:
+         - "Signature dishes or daily specials"
+         - "Ask the staff"
+         - "Any of the pasta dishes"
+         - Generic category names like "Pizza" or "Burger"
+       - If no specific dish is mentioned in reviews, use the \`virtual_menu_source\` OR output "Chef's recommendation (verify with staff)" as LAST RESORT ONLY.
+
+    6. REVIEW HIGHLIGHTS (REQUIRED):
+       - \`review_highlights\` MUST contain 2-3 short, impactful direct quotes from the reviews.
+       - Choose quotes that reveal: food quality, atmosphere, service, or unique selling points.
+       - Keep quotes under 100 characters each. Truncate with "..." if needed.
+       - Include the reviewer's rating if available (e.g., "[5★] 'Best ramen in the city!'").
+
+    7. FUNCTIONAL REASONING & AI_REASON:
+       - \`ai_reason\` should be a comprehensive analysis including:
+         - Rating analysis (e.g., "4.7/5 from 342 reviews indicates consistent quality")
+         - Review sentiment summary
+         - Why this beats other candidates
+         - Any caveats or things to be aware of
+       - **Comparative Analysis is Mandatory.** State *why* this option was chosen over a strong-but-rejected candidate.
+
+    8. PAYMENT PROTOCOL (STRICT & LOCALIZED):
+       - IF 'noCash' is TRUE: DISCARD any place with signals of being CASH ONLY.
+       - Scan \`payment_options\` and \`reviews_deep\` for payment method mentions.
+       - Set 'is_cash_only' to true if evidence suggests cash-only.
 
     ${budgetProtocol}
 
-    7. FRESH DROP / NEW OPENING PROTOCOL:
-       - Give a massive advantage to "Fresh Drops".
-       - DEFINITION: A place with high ratings but very low review count (e.g., < 50), or reviews that explicitly mention "just opened", "new spot", "grand opening".
-       - If you identify such a candidate that matches the vibe, include it and set \`is_new_opening\` to true.
+    9. FRESH DROP / NEW OPENING PROTOCOL:
+       - Give advantage to "Fresh Drops": high ratings but < 50 reviews, or reviews mentioning "just opened", "new spot".
+       - Set \`is_new_opening\` to true for qualifying candidates.
     
-    8. FREESTYLE PROMPT PROTOCOL (HIGHEST PRIORITY):
-       - If "SPECIFIC REQUEST" is provided, it OVERRIDES generic vibe constraints where they conflict.
-       - The specific request is the user's direct voice.
+    10. FREESTYLE PROMPT PROTOCOL (HIGHEST PRIORITY):
+        - If "SPECIFIC REQUEST" is provided, it OVERRIDES generic vibe constraints.
+        - The specific request is the user's direct voice.
 
     ${dietaryRestrictions.length > 0 ? dietaryProtocol : ''}
     
     ---
+    ANALYSIS DEPTH REQUIREMENT:
+    Take your time analyzing the reviews. The quality of your dish recommendations and personalized fit explanations depends on thorough review analysis. A shallow analysis that misses specific dish names or returns generic recommendations is a failure.
+    
     FINAL OUTPUT:
-    Return strictly valid JSON matching the provided schema. Your analysis must be evident in the high quality and logic of your selections.
+    Return strictly valid JSON matching the provided schema. Your deep analysis must be evident in:
+    - Specific dish names from reviews
+    - Personalized fit explanations referencing user preferences
+    - Direct quotes from reviewers
+    - Data-driven reasoning
   `;
 
   const prompt = `
@@ -249,8 +284,13 @@ export const decideLunch = async (
               recommended_dish: { type: Type.STRING },
               is_cash_only: { type: Type.BOOLEAN },
               is_new_opening: { type: Type.BOOLEAN },
+              personalized_fit: { type: Type.STRING },
+              review_highlights: { 
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
             },
-            required: ['place_id', 'ai_reason', 'recommended_dish', 'is_cash_only'],
+            required: ['place_id', 'ai_reason', 'recommended_dish', 'is_cash_only', 'personalized_fit', 'review_highlights'],
           },
         },
       }
@@ -267,6 +307,10 @@ export const decideLunch = async (
     return recommendations.map(rec => ({
       ...rec,
       cash_warning_msg: rec.is_cash_only ? 'Note: This location may be cash-only.' : null,
+      // Ensure review_highlights is always an array
+      review_highlights: rec.review_highlights || [],
+      // Ensure personalized_fit has a fallback
+      personalized_fit: rec.personalized_fit || rec.ai_reason,
     }));
 
   } catch (error) {

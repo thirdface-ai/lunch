@@ -64,6 +64,14 @@ export interface UserPreferences {
   freestylePrompt?: string;
 }
 
+// Place Review (our own type for AI analysis)
+export interface PlaceReview {
+  text: string;
+  rating?: number;
+  author_name?: string;
+  relative_time_description?: string;
+}
+
 // Google Place
 export interface GooglePlace {
   place_id: string;
@@ -76,7 +84,7 @@ export interface GooglePlace {
   };
   types?: string[];
   price_level?: number;
-  reviews?: google.maps.places.PlaceReview[];
+  reviews?: PlaceReview[];
   editorial_summary?: { overview: string };
   website?: string;
   formatted_phone_number?: string;
@@ -106,6 +114,9 @@ export interface GeminiRecommendation {
   is_cash_only: boolean;
   cash_warning_msg: string | null;
   is_new_opening?: boolean;
+  // New fields for deep analysis
+  personalized_fit: string;
+  review_highlights: string[];
 }
 
 // Final Result

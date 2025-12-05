@@ -2,9 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateLoadingLogs, decideLunch, Type } from './geminiService';
 import { HungerVibe, PricePoint, DietaryRestriction, GooglePlace } from '../types';
 
-// Mock fetch
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
+// Mock the supabase client
+const mockInvoke = vi.fn();
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    functions: {
+      invoke: (...args: unknown[]) => mockInvoke(...args),
+    },
+  },
+}));
 
 // Mock Logger to avoid side effects
 vi.mock('../utils/logger', () => ({
@@ -29,7 +35,7 @@ describe('Type enum', () => {
 
 describe('generateLoadingLogs', () => {
   beforeEach(() => {
-    mockFetch.mockReset();
+    mockInvoke.mockReset();
   });
 
   it('returns parsed logs on successful API call', async () => {
@@ -40,19 +46,19 @@ describe('generateLoadingLogs', () => {
       'FINALIZING SELECTION...'
     ];
 
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ text: JSON.stringify(mockLogs) }),
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify(mockLogs) },
+      error: null,
     });
 
     const result = await generateLoadingLogs(HungerVibe.GRAB_AND_GO, 'Berlin, Germany');
     
     expect(result).toEqual(mockLogs);
-    expect(mockFetch).toHaveBeenCalledWith('/api/gemini/generate', expect.any(Object));
+    expect(mockInvoke).toHaveBeenCalledWith('gemini-proxy', expect.any(Object));
   });
 
   it('returns fallback logs when API fails', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+    mockInvoke.mockRejectedValueOnce(new Error('Network error'));
 
     const result = await generateLoadingLogs(HungerVibe.LIGHT_AND_CLEAN, 'Test Address');
     
@@ -62,20 +68,25 @@ describe('generateLoadingLogs', () => {
   });
 
   it('returns fallback logs when API returns empty text', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ text: '' }),
+    // When API returns empty text, the proxy throws an error due to !data?.text check
+    // This triggers the catch block which returns fallback logs
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: '' },
+      error: null,
     });
 
     const result = await generateLoadingLogs(null, 'Address');
     
-    expect(result).toEqual(['PROCESSING...']);
+    // Empty text triggers error fallback, not the ['PROCESSING...'] return
+    expect(result).toContain('OPTIMIZING SEARCH...');
+    expect(result).toContain('READING MENUS...');
+    expect(result).toContain('CALCULATING ROUTES...');
   });
 
   it('handles null vibe gracefully', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ text: JSON.stringify(['LOG 1', 'LOG 2', 'LOG 3', 'LOG 4']) }),
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify(['LOG 1', 'LOG 2', 'LOG 3', 'LOG 4']) },
+      error: null,
     });
 
     const result = await generateLoadingLogs(null, 'Test Address');
@@ -84,14 +95,14 @@ describe('generateLoadingLogs', () => {
   });
 
   it('passes correct model to API', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ text: JSON.stringify(['LOG']) }),
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify(['LOG']) },
+      error: null,
     });
 
     await generateLoadingLogs(HungerVibe.HEARTY_AND_RICH, 'Address');
 
-    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const callBody = mockInvoke.mock.calls[0][1].body;
     expect(callBody.model).toBe('gemini-2.0-flash');
   });
 });
@@ -116,7 +127,7 @@ describe('decideLunch', () => {
   ];
 
   beforeEach(() => {
-    mockFetch.mockReset();
+    mockInvoke.mockReset();
   });
 
   it('returns parsed recommendations on success', async () => {
@@ -127,12 +138,14 @@ describe('decideLunch', () => {
         recommended_dish: 'Margherita Pizza',
         is_cash_only: false,
         is_new_opening: false,
+        personalized_fit: 'Perfect for your Hearty & Rich vibe',
+        review_highlights: ['[5★] "Best pizza in town!"'],
       },
     ];
 
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ text: JSON.stringify(mockRecommendations) }),
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify(mockRecommendations) },
+      error: null,
     });
 
     const result = await decideLunch(
@@ -148,6 +161,8 @@ describe('decideLunch', () => {
     expect(result).toHaveLength(1);
     expect(result[0].place_id).toBe('place-1');
     expect(result[0].cash_warning_msg).toBeNull();
+    expect(result[0].personalized_fit).toBe('Perfect for your Hearty & Rich vibe');
+    expect(result[0].review_highlights).toHaveLength(1);
   });
 
   it('adds cash warning message when is_cash_only is true', async () => {
@@ -158,12 +173,14 @@ describe('decideLunch', () => {
         recommended_dish: 'Currywurst',
         is_cash_only: true,
         is_new_opening: false,
+        personalized_fit: 'Matches your Grab & Go vibe',
+        review_highlights: ['[4★] "Quick and tasty!"'],
       },
     ];
 
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ text: JSON.stringify(mockRecommendations) }),
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify(mockRecommendations) },
+      error: null,
     });
 
     const result = await decideLunch(
@@ -181,7 +198,7 @@ describe('decideLunch', () => {
   });
 
   it('returns empty array on API error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('API Error'));
+    mockInvoke.mockRejectedValueOnce(new Error('API Error'));
 
     const result = await decideLunch(
       mockCandidates,
@@ -197,9 +214,9 @@ describe('decideLunch', () => {
   });
 
   it('returns empty array when API returns empty text', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ text: '' }),
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: '' },
+      error: null,
     });
 
     const result = await decideLunch(
@@ -216,9 +233,9 @@ describe('decideLunch', () => {
   });
 
   it('includes dietary restrictions in request when provided', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ text: JSON.stringify([]) }),
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify([]) },
+      error: null,
     });
 
     await decideLunch(
@@ -231,16 +248,16 @@ describe('decideLunch', () => {
       undefined
     );
 
-    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const callBody = mockInvoke.mock.calls[0][1].body;
     expect(callBody.contents).toContain('DIETARY NEEDS');
     expect(callBody.contents).toContain('Vegan');
     expect(callBody.contents).toContain('Gluten-Free');
   });
 
   it('includes freestyle prompt in request when provided', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ text: JSON.stringify([]) }),
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify([]) },
+      error: null,
     });
 
     await decideLunch(
@@ -253,14 +270,14 @@ describe('decideLunch', () => {
       'I want the best ramen in town'
     );
 
-    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const callBody = mockInvoke.mock.calls[0][1].body;
     expect(callBody.contents).toContain('I want the best ramen in town');
   });
 
   it('passes noCash constraint to API', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ text: JSON.stringify([]) }),
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify([]) },
+      error: null,
     });
 
     await decideLunch(
@@ -273,7 +290,7 @@ describe('decideLunch', () => {
       undefined
     );
 
-    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const callBody = mockInvoke.mock.calls[0][1].body;
     expect(callBody.contents).toContain('USER REQUIRES CASHLESS: true');
   });
 
@@ -299,15 +316,15 @@ describe('decideLunch', () => {
           accepts_nfc: true,
         },
         reviews: [
-          { text: 'Amazing pasta!' },
-          { text: 'Great wine selection' },
-        ] as google.maps.places.PlaceReview[],
+          { text: 'Amazing pasta!', rating: 5 },
+          { text: 'Great wine selection', rating: 4 },
+        ],
       },
     ];
 
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ text: JSON.stringify([]) }),
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify([]) },
+      error: null,
     });
 
     await decideLunch(
@@ -320,7 +337,7 @@ describe('decideLunch', () => {
       undefined
     );
 
-    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const callBody = mockInvoke.mock.calls[0][1].body;
     expect(callBody.contents).toContain('Detailed Restaurant');
     expect(callBody.contents).toContain('Fine Italian dining');
   });
@@ -333,9 +350,9 @@ describe('decideLunch', () => {
       },
     ];
 
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ text: JSON.stringify([]) }),
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify([]) },
+      error: null,
     });
 
     // Should not throw

@@ -167,9 +167,41 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                         </span>
                       </div>
 
+                      {/* Personalized Fit - Why this matches YOUR preferences */}
+                      {place.personalized_fit && (
+                        <div className={`p-4 border-l-2 border-braun-orange ${isDark ? 'bg-dark-surface/50' : 'bg-braun-orange/5'}`}>
+                          <span className={`font-mono text-[10px] font-bold uppercase tracking-wider block mb-2 ${isDark ? 'text-braun-orange' : 'text-braun-orange'}`}>
+                            WHY THIS FITS YOU
+                          </span>
+                          <p className={`font-sans text-sm leading-relaxed ${isDark ? 'text-[#CCC]' : 'text-[#444]'}`}>
+                            {place.personalized_fit}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* AI Analysis Reason */}
                       <p className={`font-sans text-sm leading-relaxed max-w-2xl ${isDark ? 'text-[#BBB]' : 'text-[#333]'}`}>
                         {place.ai_reason}
                       </p>
+
+                      {/* Review Highlights - Direct quotes from reviewers */}
+                      {place.review_highlights && place.review_highlights.length > 0 && (
+                        <div className="space-y-2">
+                          <span className={`font-mono text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-[#777]' : 'text-braun-text-muted'}`}>
+                            FROM THE REVIEWS
+                          </span>
+                          <div className="flex flex-col gap-2">
+                            {place.review_highlights.slice(0, 3).map((highlight, hIdx) => (
+                              <blockquote 
+                                key={hIdx}
+                                className={`font-sans text-xs italic pl-3 border-l ${isDark ? 'text-[#999] border-dark-border' : 'text-[#666] border-braun-border/50'}`}
+                              >
+                                {highlight}
+                              </blockquote>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 pt-2">
                         <div className="flex items-baseline gap-2">

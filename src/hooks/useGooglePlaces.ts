@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { GooglePlace, HungerVibe } from '../types';
+import { GooglePlace, HungerVibe, PlaceReview } from '../types';
 import { getSearchQueriesForVibe } from '../utils/lunchAlgorithm';
 
 // Price level mapping from Google Places API enum to numeric value
@@ -10,6 +10,17 @@ const PRICE_LEVEL_MAP: Record<string, number> = {
   'EXPENSIVE': 4,
   'VERY_EXPENSIVE': 5,
 };
+
+/**
+ * Map Google Places API review to our PlaceReview type
+ * The new Places API uses a different structure than the legacy API
+ */
+const mapReview = (review: google.maps.places.Review): PlaceReview => ({
+  text: review.text || '',
+  rating: review.rating ?? undefined,
+  author_name: review.authorAttribution?.displayName ?? undefined,
+  relative_time_description: review.relativePublishTimeDescription ?? undefined,
+});
 
 // Fields to request from Places API
 const PLACE_FIELDS = [
@@ -49,7 +60,7 @@ const mapPlace = (p: google.maps.places.Place): GooglePlace => ({
     open_now: (p.regularOpeningHours as unknown as { openNow?: boolean }).openNow ?? false,
     weekday_text: p.regularOpeningHours.weekdayDescriptions,
   } : undefined,
-  // Skip reviews mapping - incompatible types between new API and legacy
+  reviews: p.reviews?.map(mapReview).filter(r => r.text.length > 0) ?? undefined,
   serves_vegetarian_food: p.servesVegetarianFood ?? undefined,
   serves_beer: p.servesBeer ?? undefined,
   serves_wine: p.servesWine ?? undefined,

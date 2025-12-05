@@ -150,8 +150,11 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('SYSTEM UNABLE TO LOCATE VIABLE TARGETS.');
       }
 
-      // Get AI recommendations
+      // Get AI recommendations with deep review analysis
       addLog('ENGAGING NEURAL CORE (GEMINI-2.0-FLASH)...');
+      addLog('ANALYZING UP TO 20 REVIEWS PER CANDIDATE...');
+      addLog('EXTRACTING DISH FREQUENCY DATA FROM REVIEWS...');
+      addLog('CROSS-REFERENCING USER PREFERENCES...');
 
       const recommendations = await decideLunch(
         candidatesForGemini,
@@ -165,7 +168,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
 
       let finalRecommendations: GeminiRecommendation[] = recommendations;
 
-      // Backfill if needed
+      // Backfill if needed - but with meaningful data, not generic fallbacks
       if (!recommendations || recommendations.length < 3) {
         addLog('SUPPLEMENTING RESULTS WITH ALGORITHMIC BACKFILL...');
         const needed = 3 - (recommendations?.length || 0);
@@ -174,17 +177,32 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
           .filter(p => !recommendedPlaceIds.has(p.place_id))
           .sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
-        const fallbackRecs: GeminiRecommendation[] = fallbackPool.slice(0, needed).map(p => ({
-          place_id: p.place_id,
-          ai_reason: p.editorial_summary?.overview ||
-            `A highly-rated alternative (${p.rating || 'N/A'}/5 from ${p.user_ratings_total || 0} reviews).`,
-          recommended_dish: 'Signature dishes or daily specials.',
-          is_cash_only: p.payment_options?.accepts_cash_only || false,
-          cash_warning_msg: p.payment_options?.accepts_cash_only
-            ? 'Note: This location may be cash-only.'
-            : null,
-          is_new_opening: (p.user_ratings_total || 0) < 50
-        }));
+        const fallbackRecs: GeminiRecommendation[] = fallbackPool.slice(0, needed).map(p => {
+          // Try to extract a dish from reviews if available
+          const reviewDish = p.reviews?.find(r => r.text && r.text.length > 50)?.text?.match(/(?:the |their |try the |recommend the |loved the |best )([A-Z][a-z]+(?:\s+[A-Z]?[a-z]+){0,3})/)?.[1];
+          
+          // Build a meaningful reason from available data
+          const vibeMatch = preferences.vibe ? `Selected as a potential ${preferences.vibe} option. ` : '';
+          const ratingInfo = p.rating ? `Rated ${p.rating}/5 from ${p.user_ratings_total || 0} reviews. ` : '';
+          const summaryInfo = p.editorial_summary?.overview ? p.editorial_summary.overview : '';
+          
+          return {
+            place_id: p.place_id,
+            ai_reason: `${vibeMatch}${ratingInfo}${summaryInfo || 'Limited data available - verify details with restaurant.'}`,
+            recommended_dish: reviewDish || 'Chef\'s recommendation (ask staff for today\'s best)',
+            is_cash_only: p.payment_options?.accepts_cash_only || false,
+            cash_warning_msg: p.payment_options?.accepts_cash_only
+              ? 'Note: This location may be cash-only.'
+              : null,
+            is_new_opening: (p.user_ratings_total || 0) < 50,
+            personalized_fit: preferences.vibe 
+              ? `Included as a backup option for your "${preferences.vibe}" request. Limited AI analysis available.`
+              : 'Included as a high-rated backup option. Limited AI analysis available.',
+            review_highlights: p.reviews?.slice(0, 2).map(r => 
+              r.rating ? `[${r.rating}★] "${r.text?.substring(0, 80)}..."` : `"${r.text?.substring(0, 80)}..."`
+            ).filter(Boolean) || [],
+          };
+        });
 
         finalRecommendations = [...finalRecommendations, ...fallbackRecs];
       }
