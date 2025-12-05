@@ -224,7 +224,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
         <div className={`flex flex-col lg:flex-row transition-colors duration-300 ${isDark ? 'bg-[#151515]' : 'bg-[#F9F9F7]'}`}>
           
           {/* List Column */}
-          <div className="flex-1 overflow-y-auto max-h-[50vh] sm:max-h-[80vh]">
+          <div className="flex-1 overflow-y-auto max-h-[75vh] sm:max-h-[80vh]">
             {results.map((place, idx) => {
               // Find today's hours by matching the day name in the weekday_text strings
               // Use the browser's locale to match Google Places API's weekdayDescriptions language

@@ -83,7 +83,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0,
         <div className={`flex-1 p-4 sm:p-8 flex flex-col justify-center transition-colors duration-300 ${isDark ? 'bg-[#111]' : 'bg-[#F0F0EC]'}`}>
           
           {/* The "Screen" */}
-          <div className={`p-3 sm:p-4 rounded-sm shadow-inner border-b-2 relative overflow-hidden flex flex-col h-[55vh] sm:h-[400px] transition-colors duration-300 ${isDark ? 'bg-[#000] border-[#222]' : 'bg-[#222] border-[#444]'}`}>
+          <div className={`p-3 sm:p-4 rounded-sm shadow-inner border-b-2 relative overflow-hidden flex flex-col h-[70vh] sm:h-[400px] transition-colors duration-300 ${isDark ? 'bg-[#000] border-[#222]' : 'bg-[#222] border-[#444]'}`}>
             
             {/* Screen Bezel Branding */}
             <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[8px] font-sans font-bold text-[#444] tracking-widest uppercase pointer-events-none">

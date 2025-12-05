@@ -118,7 +118,7 @@ interface FooterProps {
 
 const Footer: React.FC<FooterProps> = ({ isDark }) => {
   return (
-    <div className={`w-full py-3 flex justify-center sm:fixed sm:bottom-4 sm:left-auto sm:right-4 sm:w-auto sm:py-0 sm:justify-end font-mono text-[8px] sm:text-[9px] tracking-wider items-center gap-2 sm:gap-3 z-50 whitespace-nowrap ${isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'}`}>
+    <div className={`fixed bottom-2 left-0 right-0 flex justify-center sm:bottom-4 sm:left-auto sm:right-4 font-mono text-[8px] sm:text-[9px] tracking-wider items-center gap-1.5 sm:gap-3 z-50 ${isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'}`}>
       {/* Mobile: simplified text, Desktop: scramble effect */}
       <span className="sm:hidden">
         <a 
@@ -137,7 +137,7 @@ const Footer: React.FC<FooterProps> = ({ isDark }) => {
           className={isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'} 
         />
       </span>
-      <span className={`${isDark ? 'text-dark-text-muted/20' : 'text-braun-text-muted/20'}`}>|</span>
+      <span className={`${isDark ? 'text-dark-text-muted/20' : 'text-braun-text-muted/20'}`}>·</span>
       <a 
         href="https://thirdface.com/imprint" 
         target="_blank" 
