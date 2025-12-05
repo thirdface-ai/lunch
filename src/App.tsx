@@ -3,6 +3,7 @@ import ControlPanel from './components/ControlPanel';
 import TerminalLog from './components/TerminalLog';
 import ResultsView from './components/ResultsView';
 import ErrorBoundary from './components/ErrorBoundary';
+import Footer from './components/Footer';
 import { usePreferences } from './hooks/usePreferences';
 import { useLunchDecision } from './hooks/useLunchDecision';
 import { ThemeMode } from './types';
@@ -62,6 +63,9 @@ const AppContent: React.FC = () => {
         onReset={reset}
         theme={effectiveTheme === 'dark' ? ThemeMode.DARK : ThemeMode.LIGHT}
       />
+
+      {/* Global Footer - visible on all screens */}
+      <Footer isDark={isDark} />
     </div>
   );
 };
