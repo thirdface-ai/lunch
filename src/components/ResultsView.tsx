@@ -241,110 +241,113 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                   key={place.place_id} 
                   className={`p-4 sm:p-8 border-b last:border-b-0 transition-colors group ${isDark ? 'border-dark-border hover:bg-dark-surface' : 'border-braun-border hover:bg-white'}`}
                 >
-                  <div className="flex gap-3 sm:gap-6">
-                    <div className="font-mono text-braun-orange text-xs sm:text-sm font-bold pt-1">
+                  {/* Header row: Number + Name aligned on same baseline */}
+                  <div className="flex items-baseline gap-3 sm:gap-4 mb-3 sm:mb-4">
+                    <span className="font-mono text-braun-orange text-xs sm:text-sm font-bold tabular-nums shrink-0">
                       {(idx + 1).toString().padStart(2, '0')}
-                    </div>
+                    </span>
+                    
+                    <h2 
+                      className={`font-sans font-bold text-base sm:text-xl leading-tight group-hover:text-braun-orange transition-colors cursor-pointer ${isDark ? 'text-dark-text' : 'text-braun-dark'}`} 
+                      onClick={() => handlePlaceClick(place.place_id)}
+                    >
+                      {place.name}
+                    </h2>
+                    
+                    {/* Favorite Button */}
+                    <button
+                      onClick={() => handleToggleFavorite(place)}
+                      disabled={isSavingAny}
+                      aria-label={isPlaceFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                      className={`p-1 shrink-0 transition-all focus:outline-none focus:ring-2 focus:ring-white/30 ${
+                        isSavingAny ? 'opacity-50 cursor-wait' : ''
+                      } ${
+                        isPlaceFavorite 
+                          ? 'text-braun-orange' 
+                          : `${isDark ? 'text-dark-text-muted hover:text-braun-orange' : 'text-braun-text-muted hover:text-braun-orange'}`
+                      }`}
+                    >
+                      <svg 
+                        width="16" 
+                        height="16" 
+                        viewBox="0 0 24 24" 
+                        fill={isPlaceFavorite ? 'currentColor' : 'none'} 
+                        stroke="currentColor" 
+                        strokeWidth="2"
+                      >
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                      </svg>
+                    </button>
+                    
+                    {/* NEW OPENING BADGE */}
+                    {place.is_new_opening && (
+                      <span className={`font-mono text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-[1px] animate-pulse border shrink-0 ${isDark ? 'text-blue-400 border-blue-400/50 bg-blue-400/10' : 'text-blue-600 border-blue-600/50 bg-blue-50'}`}>
+                        FRESH DROP
+                      </span>
+                    )}
+                  </div>
 
-                    <div className="flex-1 space-y-3 sm:space-y-4">
-                      
-                      <div>
-                        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                          <h2 
-                            className={`font-sans font-bold text-base sm:text-xl leading-tight sm:leading-none group-hover:text-braun-orange transition-colors cursor-pointer ${isDark ? 'text-dark-text' : 'text-braun-dark'}`} 
-                            onClick={() => handlePlaceClick(place.place_id)}
-                          >
-                            {place.name}
-                          </h2>
-                          
-                          {/* Favorite Button */}
-                          <button
-                            onClick={() => handleToggleFavorite(place)}
-                            disabled={isSavingAny}
-                            aria-label={isPlaceFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                            className={`p-1.5 rounded transition-all focus:outline-none focus:ring-2 focus:ring-white/30 ${
-                              isSavingAny ? 'opacity-50 cursor-wait' : ''
-                            } ${
-                              isPlaceFavorite 
-                                ? 'text-braun-orange' 
-                                : `${isDark ? 'text-dark-text-muted hover:text-braun-orange' : 'text-braun-text-muted hover:text-braun-orange'}`
-                            }`}
-                          >
-                            <svg 
-                              width="16" 
-                              height="16" 
-                              viewBox="0 0 24 24" 
-                              fill={isPlaceFavorite ? 'currentColor' : 'none'} 
-                              stroke="currentColor" 
-                              strokeWidth="2"
-                            >
-                              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                            </svg>
-                          </button>
-                          
-                          {/* NEW OPENING BADGE */}
-                          {place.is_new_opening && (
-                            <span className={`font-mono text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-[1px] animate-pulse border ${isDark ? 'text-blue-400 border-blue-400/50 bg-blue-400/10' : 'text-blue-600 border-blue-600/50 bg-blue-50'}`}>
-                              FRESH DROP
-                            </span>
-                          )}
-                        </div>
+                  {/* Content area - indented to align with name */}
+                  <div className="pl-[calc(theme(spacing.3)+1.5rem)] sm:pl-[calc(theme(spacing.4)+1.75rem)] space-y-3 sm:space-y-4">
+                    {/* Metadata grid */}
+                    <div className={`grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-[10px] uppercase tracking-wider ${isDark ? 'text-[#999]' : 'text-braun-text-muted'}`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>RATING:</span>
+                        <span>{(place.rating || 0).toFixed(1)}</span>
                       </div>
-
-                      <div className={`grid grid-cols-2 sm:flex sm:flex-wrap gap-x-4 sm:gap-x-6 gap-y-1.5 sm:gap-y-2 font-mono text-[10px] sm:text-[10px] uppercase tracking-wider ${isDark ? 'text-[#999]' : 'text-braun-text-muted'}`}>
-                        <span className="flex items-center gap-1">
-                          <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>RATING:</span> {(place.rating || 0).toFixed(1)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>COST:</span> 
+                      <div className="flex items-center gap-1.5">
+                        <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>COST:</span>
+                        <span>
                           {place.price_level && place.price_level > 0 
                             ? '$'.repeat(place.price_level) 
                             : (place.price_level === 0 ? 'Free' : '$$')}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>WALK:</span> {place.walking_time_text || 'N/A'}
-                        </span>
-                        <span className="flex items-center gap-1 col-span-2 sm:col-span-1">
-                          <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>HOURS:</span>
-                          {place.opening_hours ? (
-                            <>
-                              {(() => {
-                                const openStatus = isCurrentlyOpen(todaysHours);
-                                if (openStatus === true) {
-                                  return <span className="text-green-500 font-bold">Open</span>;
-                                } else if (openStatus === false) {
-                                  return <span className="text-red-500 font-bold">Closed</span>;
-                                }
-                                // Fallback to API data if we can't parse
-                                return place.opening_hours?.open_now 
-                                  ? <span className="text-green-500 font-bold">Open</span>
-                                  : <span className="text-red-500 font-bold">Closed</span>;
-                              })()}
-                              <span className="hidden sm:inline ml-1 normal-case">{todaysHours && `(${todaysHours})`}</span>
-                            </>
-                          ) : 'N/A'}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>WALK:</span>
+                        <span>{place.walking_time_text || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>HOURS:</span>
+                        {place.opening_hours ? (
+                          <>
+                            {(() => {
+                              const openStatus = isCurrentlyOpen(todaysHours);
+                              if (openStatus === true) {
+                                return <span className="text-green-500 font-bold">OPEN</span>;
+                              } else if (openStatus === false) {
+                                return <span className="text-red-500 font-bold">CLOSED</span>;
+                              }
+                              // Fallback to API data if we can't parse
+                              return place.opening_hours?.open_now 
+                                ? <span className="text-green-500 font-bold">OPEN</span>
+                                : <span className="text-red-500 font-bold">CLOSED</span>;
+                            })()}
+                          </>
+                        ) : <span>N/A</span>}
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <p className={`font-sans text-xs sm:text-sm leading-relaxed max-w-2xl ${isDark ? 'text-[#BBB]' : 'text-[#333]'}`}>
+                      {place.ai_reason}
+                    </p>
+
+                    {/* TRY section */}
+                    <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 pt-1">
+                      <div className="flex items-baseline gap-2">
+                        <span className={`font-mono text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-[#999]' : 'text-braun-text-muted'}`}>TRY:</span>
+                        <span className={`font-sans text-xs sm:text-sm font-medium border-b pb-0.5 ${isDark ? 'text-dark-text border-dark-border' : 'text-braun-dark border-braun-border/50'}`}>
+                          {place.recommended_dish}
                         </span>
                       </div>
 
-                      <p className={`font-sans text-xs sm:text-sm leading-relaxed max-w-2xl ${isDark ? 'text-[#BBB]' : 'text-[#333]'}`}>
-                        {place.ai_reason}
-                      </p>
-
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-8 pt-1 sm:pt-2">
-                        <div className="flex items-baseline gap-2">
-                          <span className={`font-mono text-[10px] font-bold uppercase ${isDark ? 'text-[#999]' : 'text-braun-text-muted'}`}>TRY:</span>
-                          <span className={`font-sans text-xs sm:text-sm font-medium border-b pb-0.5 ${isDark ? 'text-dark-text border-dark-border' : 'text-braun-dark border-braun-border/50'}`}>
-                            {place.recommended_dish}
-                          </span>
-                        </div>
-
-                        {place.is_cash_only && (
-                          <span className="font-mono text-[9px] sm:text-[10px] font-bold text-braun-orange uppercase tracking-widest border border-braun-orange/30 px-2 py-0.5 rounded-[1px]">
-                            <span className="hidden sm:inline">LEGACY PAYMENT METHOD DETECTED</span>
-                            <span className="sm:hidden">CASH ONLY</span>
-                          </span>
-                        )}
-                      </div>
+                      {place.is_cash_only && (
+                        <span className="font-mono text-[9px] sm:text-[10px] font-bold text-braun-orange uppercase tracking-widest border border-braun-orange/30 px-2 py-0.5 rounded-[1px]">
+                          <span className="hidden sm:inline">LEGACY PAYMENT METHOD DETECTED</span>
+                          <span className="sm:hidden">CASH ONLY</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </article>

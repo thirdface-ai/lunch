@@ -118,35 +118,47 @@ interface FooterProps {
 
 const Footer: React.FC<FooterProps> = ({ isDark }) => {
   return (
-    <div className={`fixed bottom-2 left-0 right-0 flex justify-center sm:bottom-4 sm:left-auto sm:right-4 font-mono text-[8px] sm:text-[9px] tracking-wider items-center gap-1.5 sm:gap-3 z-50 ${isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'}`}>
-      {/* Mobile: simplified text, Desktop: scramble effect */}
-      <span className="sm:hidden">
+    <footer 
+      className={`
+        fixed z-50 font-mono uppercase tracking-wider
+        bottom-3 left-1/2 -translate-x-1/2
+        sm:bottom-4 sm:left-auto sm:right-4 sm:translate-x-0
+        ${isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'}
+      `}
+    >
+      <div className="flex items-center gap-2 text-[9px] sm:text-[10px]">
+        {/* Mobile: Inline row */}
         <a 
           href="https://www.linkedin.com/in/noahnawara/"
           target="_blank"
           rel="noopener noreferrer"
-          className={`transition-all duration-200 ${isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'}`}
+          className="sm:hidden hover:text-braun-orange transition-colors"
         >
           NOAH NAWARA
         </a>
-      </span>
-      <span className="hidden sm:inline">
-        Built by <ScrambleText 
-          text="NOAH NAWARA" 
-          href="https://www.linkedin.com/in/noahnawara/"
-          className={isDark ? 'text-dark-text-muted/40' : 'text-braun-text-muted/40'} 
-        />
-      </span>
-      <span className={`${isDark ? 'text-dark-text-muted/20' : 'text-braun-text-muted/20'}`}>·</span>
-      <a 
-        href="https://thirdface.com/imprint" 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className={`transition-all duration-200 hover:text-braun-orange ${isDark ? 'text-dark-text-muted/40 hover:text-braun-orange' : 'text-braun-text-muted/40 hover:text-braun-orange'}`}
-      >
-        Imprint
-      </a>
-    </div>
+        
+        {/* Desktop: Scramble effect */}
+        <span className="hidden sm:inline">
+          Built by{' '}
+          <ScrambleText 
+            text="NOAH NAWARA" 
+            href="https://www.linkedin.com/in/noahnawara/"
+            className={isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'} 
+          />
+        </span>
+        
+        <span className={`${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
+        
+        <a 
+          href="https://thirdface.com/imprint" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="hover:text-braun-orange transition-colors"
+        >
+          Imprint
+        </a>
+      </div>
+    </footer>
   );
 };
 

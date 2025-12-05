@@ -6,38 +6,44 @@
  * Deep, warm, minimal sounds. Only when necessary.
  */
 
-// Audio context - created on page load with low-latency hint
+// Audio context - lazy initialized on first user interaction
 let audioContext: AudioContext | null = null;
+let isInitialized = false;
 
-// Create context immediately with interactive latency hint
-if (typeof window !== 'undefined') {
+/**
+ * Initialize AudioContext on first user gesture.
+ * Called automatically by sound functions or can be triggered manually.
+ */
+const initAudioContext = (): AudioContext | null => {
+  if (isInitialized) return audioContext;
+  
+  if (typeof window === 'undefined') return null;
+  
   try {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     audioContext = new AudioContextClass({ latencyHint: 'interactive' });
+    isInitialized = true;
   } catch (e) {
     console.warn('Web Audio API not supported');
+    isInitialized = true; // Don't retry
   }
-}
-
-// Resume on first user interaction (browser autoplay policy)
-if (typeof window !== 'undefined' && audioContext) {
-  const resume = () => { audioContext?.resume(); };
-  document.addEventListener('click', resume, { once: true });
-  document.addEventListener('touchstart', resume, { once: true });
-  document.addEventListener('keydown', resume, { once: true });
-}
+  
+  return audioContext;
+};
 
 /**
  * Get audio context only if ready to play immediately.
  * If suspended, triggers resume and returns null (skip this sound).
  */
 const getReadyContext = (): AudioContext | null => {
-  if (!audioContext) return null;
-  if (audioContext.state === 'suspended') {
-    audioContext.resume();
-    return null;
+  const ctx = initAudioContext();
+  if (!ctx) return null;
+  
+  if (ctx.state === 'suspended') {
+    ctx.resume();
+    return null; // Skip this sound, context will be ready next time
   }
-  return audioContext;
+  return ctx;
 };
 
 /**
