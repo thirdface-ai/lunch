@@ -55,18 +55,24 @@ export const generateLoadingLogs = async (vibe: HungerVibe | null, address: stri
   Logger.info('AI', 'Generating Loading Logs', { vibe: vibeText, address });
 
   const prompt = `
-    You are a system AI for a culinary logistics engine. Generate 4 short, technical-sounding log messages for finding lunch.
+    Generate 8 short, funny loading messages for a lunch finder app. Keep each under 8 words. Be witty and playful.
 
     Location: "${address}"
-    Vibe: "${vibeText}"
+    Mood: "${vibeText}"
 
-    Example for 'Grab & Go' in 'Kreuzberg, Berlin':
-    1. "SCANNING KREUZBERG FOOD MATRIX..."
-    2. "ANALYZING 15 CANDIDATE ESTABLISHMENTS..."
-    3. "EXTRACTING DISH INTELLIGENCE FROM REVIEWS..."
-    4. "CALCULATING OPTIMAL MATCHES..."
+    Structure:
+    - Messages 1-4: Fun searching/analyzing messages
+    - Messages 5-6: Slightly apologetic but still funny ("worth the wait" vibes)
+    - Messages 7-8: Reassuring that results are coming, stay hungry
 
-    Return ONLY a valid JSON string array with exactly 4 strings.
+    Examples:
+    - "SNIFFING OUT GOOD PASTA..."
+    - "BRIBING FOOD CRITICS..."
+    - "STILL HERE, STILL COOKING..."
+    - "TRUST ME, THIS IS WORTH IT..."
+    - "ALMOST DONE, DON'T ORDER PIZZA..."
+
+    Return ONLY a valid JSON string array with exactly 8 strings. ALL CAPS.
   `;
 
   try {
@@ -82,15 +88,19 @@ export const generateLoadingLogs = async (vibe: HungerVibe | null, address: stri
       }
     );
     
-    if (!text) return ['PROCESSING...'];
+    if (!text) return ['THINKING ABOUT FOOD...'];
     return JSON.parse(text) as string[];
   } catch (e) {
     Logger.warn('AI', 'Log generation failed, using fallbacks.', { error: e });
     return [
-      'SCANNING NEARBY RESTAURANTS...',
-      'ANALYZING REVIEWS...',
-      'EXTRACTING RECOMMENDATIONS...',
-      'FINALIZING TOP PICKS...'
+      'SNIFFING OUT OPTIONS...',
+      'JUDGING MENU FONTS...',
+      'BRIBING FOOD CRITICS...',
+      'READING SUSPICIOUS REVIEWS...',
+      'STILL HERE, STILL HUNGRY...',
+      'GOOD THINGS TAKE TIME OK...',
+      'ALMOST THERE, STAY STRONG...',
+      'WORTH THE WAIT, PROMISE...'
     ];
   }
 };

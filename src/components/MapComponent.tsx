@@ -1,6 +1,28 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FinalResult, ThemeMode } from '../types';
 
+// Dark mode styles for Google Maps
+const DARK_MAP_STYLES: google.maps.MapTypeStyle[] = [
+  { elementType: 'geometry', stylers: [{ color: '#1a1a1a' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a1a' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8a8a8a' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#2a2a2a' }] },
+  { featureType: 'administrative.country', elementType: 'labels.text.fill', stylers: [{ color: '#9e9e9e' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#bdbdbd' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#252525' }] },
+  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
+  { featureType: 'road', elementType: 'geometry.fill', stylers: [{ color: '#2c2c2c' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#8a8a8a' }] },
+  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#373737' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3c3c3c' }] },
+  { featureType: 'road.highway.controlled_access', elementType: 'geometry', stylers: [{ color: '#4e4e4e' }] },
+  { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#616161' }] },
+  { featureType: 'transit', elementType: 'labels.text.fill', stylers: [{ color: '#757575' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e0e0e' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#4e4e4e' }] },
+];
+
 interface MapComponentProps {
   userLat: number | null;
   userLng: number | null;
@@ -12,7 +34,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [apiStatus, setApiStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
-  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  const markersRef = useRef<google.maps.Marker[]>([]);
 
   const isDark = theme === ThemeMode.DARK;
 
@@ -28,8 +50,8 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
           const mapInstance = new Map(mapRef.current, {
             center: { lat: userLat || 0, lng: userLng || 0 },
             zoom: 14,
-            mapId: 'DEMO_MAP_ID',
             disableDefaultUI: true,
+            styles: isDark ? DARK_MAP_STYLES : undefined,
           });
           setMap(mapInstance);
           setApiStatus('loaded');
@@ -44,7 +66,13 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
     initMap();
 
     return () => { isMounted = false; };
-  }, [map, userLat, userLng]);
+  }, [map, userLat, userLng, isDark]);
+
+  // Update map styles when theme changes
+  useEffect(() => {
+    if (!map) return;
+    map.setOptions({ styles: isDark ? DARK_MAP_STYLES : [] });
+  }, [map, isDark]);
 
   // Update markers and viewport when map is ready or data changes
   useEffect(() => {
@@ -52,52 +80,51 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
 
     const updateMap = async () => {
       // Clear any existing markers
-      markersRef.current.forEach(marker => { marker.map = null; });
+      markersRef.current.forEach(marker => marker.setMap(null));
       markersRef.current = [];
 
-      const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary('marker') as google.maps.MarkerLibrary;
-      
-      // Create and add user marker
-      const userPin = new PinElement({
-        background: isDark ? '#FFFFFF' : '#111111',
-        borderColor: isDark ? '#FFFFFF' : '#111111',
-        glyphColor: isDark ? '#111111' : '#FFFFFF',
-        scale: 1.0,
-      });
-      
-      const userMarker = new AdvancedMarkerElement({
+      // Create user location marker (black/white dot)
+      const userMarker = new google.maps.Marker({
         map,
         position: { lat: userLat, lng: userLng },
         title: 'Your Location',
-        content: userPin.element,
         zIndex: 1,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: isDark ? '#FFFFFF' : '#111111',
+          fillOpacity: 1,
+          strokeColor: isDark ? '#FFFFFF' : '#111111',
+          strokeWeight: 2,
+        },
       });
       markersRef.current.push(userMarker);
 
-      // Create and add result markers
+      // Create result markers with numbered labels
       results.forEach((res, idx) => {
         if (!res.geometry?.location) return;
-        
-        // Create a custom glyph element for better text rendering
-        const glyphLabel = document.createElement('span');
-        glyphLabel.textContent = (idx + 1).toString();
-        glyphLabel.style.fontWeight = 'bold';
-        glyphLabel.style.fontSize = '14px';
-        
-        const resultPin = new PinElement({
-          background: '#FF4400',
-          borderColor: '#CC3300',
-          glyph: glyphLabel,
-          glyphColor: '#FFFFFF',
-          scale: 1.2,
-        });
 
-        const marker = new AdvancedMarkerElement({
+        const marker = new google.maps.Marker({
           map,
           position: res.geometry.location,
           title: `${idx + 1}. ${res.name}`,
-          content: resultPin.element,
-          zIndex: 10 + idx
+          zIndex: 10 + idx,
+          label: {
+            text: (idx + 1).toString(),
+            color: '#FFFFFF',
+            fontWeight: 'bold',
+            fontSize: '12px',
+          },
+          icon: {
+            path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
+            fillColor: '#FF4400',
+            fillOpacity: 1,
+            strokeColor: '#CC3300',
+            strokeWeight: 1,
+            scale: 1.8,
+            anchor: new google.maps.Point(12, 22),
+            labelOrigin: new google.maps.Point(12, 9),
+          },
         });
         
         marker.addListener('click', () => {

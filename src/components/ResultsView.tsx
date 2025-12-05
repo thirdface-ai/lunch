@@ -4,6 +4,67 @@ import MapComponent from './MapComponent';
 import { useFavorites } from '../hooks/useFavorites';
 import Logger from '../utils/logger';
 
+/**
+ * Parse time string like "11:00 am", "2:30 pm", "14:00" into minutes since midnight
+ */
+const parseTimeToMinutes = (timeStr: string): number | null => {
+  const cleaned = timeStr.trim().toLowerCase();
+  
+  // Handle 24-hour format (e.g., "14:00")
+  const match24 = cleaned.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    const hours = parseInt(match24[1], 10);
+    const minutes = parseInt(match24[2], 10);
+    return hours * 60 + minutes;
+  }
+  
+  // Handle 12-hour format (e.g., "2:30 pm", "11:00 am")
+  const match12 = cleaned.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = parseInt(match12[2], 10);
+    const period = match12[3];
+    
+    if (period === 'pm' && hours !== 12) hours += 12;
+    if (period === 'am' && hours === 12) hours = 0;
+    
+    return hours * 60 + minutes;
+  }
+  
+  return null;
+};
+
+/**
+ * Check if a place is currently open based on today's hours string
+ * Handles formats like "11:00 am – 10:00 pm", "12:00 – 11:30 pm", "Closed"
+ */
+const isCurrentlyOpen = (todaysHours: string | null | undefined): boolean | null => {
+  if (!todaysHours) return null;
+  
+  const cleaned = todaysHours.trim().toLowerCase();
+  if (cleaned === 'closed') return false;
+  if (cleaned === 'open 24 hours') return true;
+  
+  // Split by common separators: "–", "-", "to"
+  const parts = todaysHours.split(/\s*[–\-]\s*|\s+to\s+/i);
+  if (parts.length !== 2) return null;
+  
+  const openTime = parseTimeToMinutes(parts[0]);
+  const closeTime = parseTimeToMinutes(parts[1]);
+  
+  if (openTime === null || closeTime === null) return null;
+  
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  
+  // Handle overnight hours (e.g., 6pm - 2am)
+  if (closeTime < openTime) {
+    return currentMinutes >= openTime || currentMinutes < closeTime;
+  }
+  
+  return currentMinutes >= openTime && currentMinutes < closeTime;
+};
+
 interface ResultsViewProps {
   appState: AppState;
   results: FinalResult[];
@@ -156,11 +217,18 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                           <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>HOURS:</span>
                           {place.opening_hours ? (
                             <>
-                              {place.opening_hours.open_now ? (
-                                <span className="text-green-500 font-bold">Open</span>
-                              ) : (
-                                <span className="text-red-500 font-bold">Closed</span>
-                              )}
+                              {(() => {
+                                const openStatus = isCurrentlyOpen(todaysHours);
+                                if (openStatus === true) {
+                                  return <span className="text-green-500 font-bold">Open</span>;
+                                } else if (openStatus === false) {
+                                  return <span className="text-red-500 font-bold">Closed</span>;
+                                }
+                                // Fallback to API data if we can't parse
+                                return place.opening_hours?.open_now 
+                                  ? <span className="text-green-500 font-bold">Open</span>
+                                  : <span className="text-red-500 font-bold">Closed</span>;
+                              })()}
                               {todaysHours && <span className="ml-1 normal-case">({todaysHours})</span>}
                             </>
                           ) : 'N/A'}
