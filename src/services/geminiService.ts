@@ -21,17 +21,6 @@ const GEMINI_MODEL = 'gemini-3-pro-preview';
 export type AnalysisLogCallback = (message: string) => void;
 
 // Types for deep analysis pipeline
-interface MenuData {
-  dishes: Array<{
-    name: string;
-    description?: string;
-    price?: string;
-    category?: string;
-  }>;
-  cuisineType?: string;
-  specialties?: string[];
-}
-
 interface TriageResult {
   place_id: string;
   relevance_score: number;
@@ -89,27 +78,7 @@ const callGeminiProxy = async (model: string, contents: string, config: Record<s
   }
 };
 
-// Fetch menu data from restaurant website
-const fetchMenuData = async (websiteUrl: string, restaurantName: string): Promise<MenuData | null> => {
-  if (!websiteUrl || websiteUrl === 'N/A') return null;
-  
-  try {
-    Logger.info('AI', `Fetching menu from ${websiteUrl}`);
-    const { data, error } = await supabase.functions.invoke('website-scraper', {
-      body: { websiteUrl, restaurantName },
-    });
-
-    if (error || !data?.success) {
-      Logger.warn('AI', `Menu fetch failed for ${restaurantName}`, { error });
-      return null;
-    }
-
-    return data.data as MenuData;
-  } catch (e) {
-    Logger.warn('AI', `Menu scraping error for ${restaurantName}`, { error: e });
-    return null;
-  }
-};
+// Note: Website scraping removed for performance - reviews contain sufficient dish data
 
 export const generateLoadingLogs = async (vibe: HungerVibe | null, address: string): Promise<string[]> => {
   const vibeText = vibe || 'Custom/User Defined';
@@ -121,22 +90,22 @@ export const generateLoadingLogs = async (vibe: HungerVibe | null, address: stri
     User's Location Context: "${address}"
     User's Desired Vibe: "${vibeText}"
 
-    Generate logs that reflect a COMPREHENSIVE search with multiple AI analysis stages:
+    Generate logs that reflect a quick but thorough AI analysis:
     1. Initial scan
     2. Data gathering
-    3. Deep review analysis
-    4. Menu extraction
-    5. Cross-referencing
+    3. Review analysis
+    4. Dish extraction from reviews
+    5. Sentiment analysis
     6. Final ranking
 
     Use the location and vibe to make them specific. Be cool, efficient, and technical.
 
     Example for Vibe 'Grab & Go' and Address 'Kreuzberg, Berlin, Germany':
     1. "PARSING KREUZBERG SECTOR GRID..."
-    2. "INITIATING DEEP REVIEW MINING PROTOCOL..."
-    3. "EXTRACTING MENU DATA FROM 15 CANDIDATES..."
-    4. "CROSS-REFERENCING DÖNER SENTIMENT PATTERNS..."
-    5. "ANALYZING DISH FREQUENCY MATRICES..."
+    2. "SCANNING 25 CANDIDATE ESTABLISHMENTS..."
+    3. "MINING REVIEW DATA FOR DISH MENTIONS..."
+    4. "ANALYZING DÖNER SENTIMENT PATTERNS..."
+    5. "CROSS-REFERENCING QUALITY SIGNALS..."
     6. "CALCULATING OPTIMAL LUNCH VECTORS..."
 
     Return ONLY a valid JSON string array, with exactly 6 strings.
@@ -160,11 +129,11 @@ export const generateLoadingLogs = async (vibe: HungerVibe | null, address: stri
   } catch (e) {
     Logger.warn('AI', 'Log generation failed, using fallbacks.', { error: e });
     return [
-      'INITIATING DEEP ANALYSIS...',
+      'INITIATING ANALYSIS...',
       'MINING REVIEW DATA...',
-      'EXTRACTING MENU INTELLIGENCE...',
-      'CROSS-REFERENCING SOURCES...',
-      'CALCULATING DISH RANKINGS...',
+      'EXTRACTING DISH MENTIONS...',
+      'ANALYZING SENTIMENT...',
+      'RANKING CANDIDATES...',
       'FINALIZING RECOMMENDATIONS...'
     ];
   }
@@ -280,7 +249,7 @@ Return JSON array with assessments for ALL candidates.
 
 /**
  * STAGE 2: DEEP ANALYSIS
- * Detailed analysis of each promising candidate with review mining and menu extraction
+ * Detailed analysis of each promising candidate using review mining
  */
 const deepAnalyzeCandidates = async (
   candidates: GooglePlace[],
@@ -295,41 +264,17 @@ const deepAnalyzeCandidates = async (
   
   // Log which restaurants we're deeply analyzing
   const topCandidates = candidates.slice(0, 5).map(c => c.name);
-  onLog?.(`INITIATING DEEP REVIEW MINING FOR ${candidates.length} CANDIDATES...`);
+  onLog?.(`INITIATING REVIEW ANALYSIS FOR ${candidates.length} CANDIDATES...`);
   onLog?.(`PRIORITY TARGETS: ${topCandidates.join(', ').toUpperCase()}`);
   
-  // Fetch menu data in parallel for candidates with websites
-  const candidatesWithWebsites = candidates.filter(c => c.website);
-  if (candidatesWithWebsites.length > 0) {
-    onLog?.(`SCRAPING MENUS FROM ${candidatesWithWebsites.length} RESTAURANT WEBSITES...`);
-  }
-  
-  const menuPromises = candidates.map(async (c) => {
-    if (c.website) {
-      const menu = await fetchMenuData(c.website, c.name);
-      return { place_id: c.place_id, menu };
-    }
-    return { place_id: c.place_id, menu: null };
-  });
-
-  const menuResults = await Promise.all(menuPromises);
-  
-  // Log menu extraction results
-  const menusFound = menuResults.filter(m => m.menu && m.menu.dishes && m.menu.dishes.length > 0);
-  if (menusFound.length > 0) {
-    const totalDishes = menusFound.reduce((sum, m) => sum + (m.menu?.dishes?.length || 0), 0);
-    onLog?.(`EXTRACTED ${totalDishes} MENU ITEMS FROM ${menusFound.length} WEBSITES`);
-  }
-  const menuMap = new Map(menuResults.map(m => [m.place_id, m.menu]));
 
   // Log review analysis
   const totalReviews = candidates.reduce((sum, c) => sum + (c.reviews?.length || 0), 0);
   onLog?.(`PARSING ${totalReviews} CUSTOMER REVIEWS FOR DISH MENTIONS...`);
   
-  // Build comprehensive analysis payload
+  // Build analysis payload from reviews (no website scraping)
   const analysisPayload = candidates.map(p => {
     const triage = triageMap.get(p.place_id);
-    const menu = menuMap.get(p.place_id);
     
     // Include ALL reviews with full text for deep analysis
     const fullReviews = p.reviews?.map(r => ({
@@ -348,16 +293,9 @@ const deepAnalyzeCandidates = async (
       price_level: p.price_level,
       cuisine_category: triage?.cuisine_category || 'unknown',
       editorial_summary: p.editorial_summary?.overview || '',
-      website: p.website || 'N/A',
       // Full reviews for deep semantic analysis
       reviews: fullReviews,
       review_count: fullReviews.length,
-      // Menu data from website scraping
-      menu_data: menu ? {
-        dishes: menu.dishes?.slice(0, 20) || [],
-        specialties: menu.specialties || [],
-        cuisine_type: menu.cuisineType,
-      } : null,
       // Payment info
       payment_options: p.payment_options,
       // Service attributes
@@ -387,7 +325,6 @@ DISH EXTRACTION PROTOCOL (CRITICAL)
 2. Count how many times each dish is mentioned
 3. Note the sentiment for each mention (positive/negative)
 4. Extract a sample quote for the top dish
-5. Cross-reference with menu_data if available
 
 EXAMPLES of what to extract:
 - "Tonkotsu Ramen" NOT "ramen"
@@ -484,18 +421,16 @@ Return comprehensive analysis for EACH candidate. Be thorough - this data drives
     const results = JSON.parse(text) as DeepAnalysisResult[];
     Logger.info('AI', `[STAGE 2] Deep analysis complete for ${results.length} candidates`);
     
-    // Log dish extraction results
-    const candidatesWithDishes = results.filter(r => r.dish_mentions && r.dish_mentions.length > 0);
+    // Log dish extraction results from reviews
     const totalDishMentions = results.reduce((sum, r) => sum + (r.dish_mentions?.length || 0), 0);
     if (totalDishMentions > 0) {
-      onLog?.(`DISH EXTRACTION COMPLETE: ${totalDishMentions} SPECIFIC DISHES IDENTIFIED`);
-      // Log some example dishes
+      onLog?.(`REVIEW ANALYSIS COMPLETE: ${totalDishMentions} DISH MENTIONS EXTRACTED`);
       const sampleDishes = results
         .filter(r => r.top_dish)
         .slice(0, 3)
         .map(r => r.top_dish);
       if (sampleDishes.length > 0) {
-        onLog?.(`TOP DISHES FOUND: ${sampleDishes.join(', ').toUpperCase()}`);
+        onLog?.(`TOP DISHES: ${sampleDishes.join(', ').toUpperCase()}`);
       }
     }
     
