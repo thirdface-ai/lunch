@@ -10,6 +10,7 @@ interface TerminalLogProps {
 }
 
 const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0, theme }) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const prevLogsLengthRef = useRef(0);
   const hasPlayedInitRef = useRef(false);
@@ -43,8 +44,11 @@ const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0,
     }
   }, [progress]);
 
+  // Scroll within the terminal container, not the whole page
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (scrollContainerRef.current && endRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
   }, [logs]);
 
   if (appState !== AppState.PROCESSING) return null;
@@ -91,7 +95,7 @@ const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0,
             </div>
 
             {/* Terminal Content */}
-            <div className="flex-1 overflow-y-auto scrollbar-hide font-mono text-[11px] sm:text-xs md:text-sm space-y-1.5 sm:space-y-2 p-2 pt-5 sm:pt-6 relative z-10" role="log" aria-live="polite">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto scrollbar-hide font-mono text-[11px] sm:text-xs md:text-sm space-y-1.5 sm:space-y-2 p-2 pt-5 sm:pt-6 relative z-10" role="log" aria-live="polite">
               {logs.map((log) => (
                 <div key={log.id} className="flex gap-2 sm:gap-4 text-braun-orange/90 animate-scroll-up">
                   <span className="opacity-50 text-[9px] sm:text-[10px] w-8 sm:w-10 text-right shrink-0 mt-0.5">
