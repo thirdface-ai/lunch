@@ -22,8 +22,9 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
     const originalText = text;
     const charCount = originalText.replace(/\s/g, '').length; // Count non-space chars
     
-    // Calculate exact animation duration: charCount * 3 iterations * 30ms per iteration
-    const animationDuration = charCount * 3 * 30;
+    // Animation timing - 36ms interval (20% slower than 30ms for better sound sync)
+    const intervalMs = 36;
+    const animationDuration = charCount * 3 * intervalMs;
     
     // Play sound for exact animation duration - immediate, no async
     playSplitFlapForDuration(animationDuration);
@@ -51,7 +52,7 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
         setDisplayText(originalText);
         setIsAnimating(false);
       }
-    }, 30);
+    }, intervalMs);
   }, [text, isAnimating]);
 
   const handleMouseEnter = () => {

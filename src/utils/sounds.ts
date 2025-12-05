@@ -8,6 +8,7 @@
 
 // Audio context singleton
 let audioContext: AudioContext | null = null;
+let isWarmedUp = false;
 
 const getAudioContext = (): AudioContext | null => {
   if (typeof window === 'undefined') return null;
@@ -23,10 +24,45 @@ const getAudioContext = (): AudioContext | null => {
   return audioContext;
 };
 
+/**
+ * Pre-warm the audio context on first user interaction
+ * This eliminates the delay on first sound playback
+ */
+const warmUpAudioContext = (): void => {
+  if (isWarmedUp) return;
+  
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().then(() => {
+      isWarmedUp = true;
+    });
+  } else if (ctx) {
+    isWarmedUp = true;
+  }
+};
+
+// Auto-warm on first user interaction (click, touch, keydown)
+if (typeof window !== 'undefined') {
+  const warmUpOnce = () => {
+    warmUpAudioContext();
+    // Remove listeners after first interaction
+    window.removeEventListener('click', warmUpOnce);
+    window.removeEventListener('touchstart', warmUpOnce);
+    window.removeEventListener('keydown', warmUpOnce);
+    window.removeEventListener('mousedown', warmUpOnce);
+  };
+  
+  window.addEventListener('click', warmUpOnce, { passive: true });
+  window.addEventListener('touchstart', warmUpOnce, { passive: true });
+  window.addEventListener('keydown', warmUpOnce, { passive: true });
+  window.addEventListener('mousedown', warmUpOnce, { passive: true });
+}
+
 const ensureAudioContext = async (): Promise<AudioContext | null> => {
   const ctx = getAudioContext();
   if (ctx && ctx.state === 'suspended') {
     await ctx.resume();
+    isWarmedUp = true;
   }
   return ctx;
 };
@@ -445,11 +481,19 @@ export const playSplitFlapForDuration = (durationMs: number): void => {
   const ctx = getAudioContext();
   if (!ctx) return;
   
-  // Resume context synchronously if needed (fire and forget)
+  // If context is suspended, resume and schedule with slight delay
   if (ctx.state === 'suspended') {
-    ctx.resume();
+    ctx.resume().then(() => {
+      scheduleSplitFlapSounds(ctx, durationMs);
+    });
+    return;
   }
   
+  scheduleSplitFlapSounds(ctx, durationMs);
+};
+
+// Internal function to schedule the actual sounds
+const scheduleSplitFlapSounds = (ctx: AudioContext, durationMs: number): void => {
   const now = ctx.currentTime;
   const durationSec = durationMs / 1000;
   const clickInterval = 0.035; // 35ms between clicks
