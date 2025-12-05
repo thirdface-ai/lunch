@@ -209,7 +209,7 @@ export const useGooglePlaces = () => {
     // Only keep places that have at least one food-related type
     const foodPlaces = allPlaces.filter(place => isFoodEstablishment(place.types));
     
-    Logger.info('PLACES', 'Food establishment filter applied', {
+    Logger.info('SYSTEM', 'Food establishment filter applied', {
       total: allPlaces.length,
       passed: foodPlaces.length,
       filtered: allPlaces.length - foodPlaces.length
