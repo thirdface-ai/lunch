@@ -92,10 +92,10 @@ export const useTerminalLogs = (
       }, interval);
     };
 
-    // Start after a short initial delay (let system messages show first)
+    // Start quickly - show first AI message early for engagement
     messageIntervalRef.current = setTimeout(() => {
       scheduleNextMessage();
-    }, 1500);
+    }, 600);
 
     return () => {
       if (messageIntervalRef.current) {

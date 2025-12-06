@@ -229,12 +229,12 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   if (appState !== AppState.RESULTS) return null;
 
   return (
-    <div className={`min-h-screen p-3 sm:p-4 sm:pt-8 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
-      {/* Main Chassis */}
-      <div className={`w-full max-w-7xl mx-auto border shadow-braun-deep flex flex-col transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
+    <div className={`h-screen sm:p-4 flex items-center justify-center transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
+      {/* Main Chassis - fixed height on desktop */}
+      <div className={`w-full h-full sm:h-[calc(100vh-2rem)] sm:max-h-[800px] max-w-7xl mx-auto border shadow-braun-deep flex flex-col transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
         
         {/* Header */}
-        <div className={`px-4 py-3 sm:p-8 flex justify-between items-center sm:items-end border-b transition-colors duration-300 ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
+        <div className={`px-4 py-3 sm:p-6 flex justify-between items-center sm:items-end border-b flex-shrink-0 transition-colors duration-300 ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
           <div>
             <h1 className={`font-sans font-bold text-base sm:text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>{funnyTitle}</h1>
           </div>
@@ -247,11 +247,11 @@ const ResultsView: React.FC<ResultsViewProps> = ({
           </button>
         </div>
 
-        {/* Split View */}
-        <div className={`flex flex-col lg:flex-row transition-colors duration-300 ${isDark ? 'bg-[#151515]' : 'bg-[#F9F9F7]'}`}>
+        {/* Split View - takes remaining height */}
+        <div className={`flex-1 min-h-0 flex flex-col lg:flex-row transition-colors duration-300 ${isDark ? 'bg-[#151515]' : 'bg-[#F9F9F7]'}`}>
           
-          {/* List Column */}
-          <div className="flex-1 overflow-y-auto">
+          {/* List Column - scrollable */}
+          <div className="flex-1 overflow-y-auto min-h-0">
             {results.map((place, idx) => {
               // Find today's hours by matching the day name in the weekday_text strings
               // Use the browser's locale to match Google Places API's weekdayDescriptions language
@@ -367,7 +367,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
           </div>
 
           {/* Map Column - hidden on mobile, shown on lg+ screens */}
-          <div className={`hidden lg:block lg:w-[420px] lg:border-l lg:min-h-[600px] relative flex-shrink-0 ${isDark ? 'border-dark-border bg-[#181818]' : 'border-braun-border bg-[#E5E5E0]'}`}>
+          <div className={`hidden lg:block lg:w-[420px] lg:border-l relative flex-shrink-0 ${isDark ? 'border-dark-border bg-[#181818]' : 'border-braun-border bg-[#E5E5E0]'}`}>
             <MapComponent
               userLat={userLat}
               userLng={userLng}
