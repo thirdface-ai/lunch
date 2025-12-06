@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { TerminalLog, AppState, HungerVibe } from '../types';
-import { generateLoadingLogs } from '../services/geminiService';
+import { generateLoadingLogs } from '../services/gatewayService';
 
 // Get random interval between 8-12 seconds
 const getRandomInterval = () => Math.floor(Math.random() * 4000) + 8000;
