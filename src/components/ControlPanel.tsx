@@ -255,10 +255,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             onChange={handleInputChange}
                                             onBlur={() => { Sounds.inputBlur(); setTimeout(() => setShowPredictions(false), 200); }}
                                             onFocus={() => { Sounds.inputFocus(); inputValue && predictions.length > 0 && setShowPredictions(true); }}
-                            placeholder="ENTER ADDRESS..."
+                            placeholder="Enter address..."
                             aria-expanded={showPredictions}
                             aria-haspopup="listbox"
-                            className="w-full bg-transparent text-braun-orange font-mono text-lg md:text-2xl p-0 focus:outline-none placeholder:text-[#555] tracking-wider z-20"
+                            className="w-full bg-transparent text-braun-orange font-mono text-base p-0 focus:outline-none placeholder:text-[#555] tracking-wider z-20"
                             style={{ textShadow: inputValue ? "0 0 5px rgba(255, 68, 0, 0.5)" : "none" }}
                         />
                          <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] z-30"></div>
@@ -351,17 +351,17 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                         <div className={`h-[1px] flex-grow ${isDark ? 'bg-dark-border' : 'bg-braun-border'}`}></div>
                      </div>
 
-                    <div className={`p-3 pb-1 pt-1 rounded-sm shadow-inner border-b-2 relative transition-colors duration-300 group ${isDark ? 'bg-[#000] border-[#222]' : 'bg-[#222] border-[#444]'}`}>
-                        <div className={`relative h-12 flex items-center px-4 ${isDark ? 'bg-[#050505]' : 'bg-[#2A2A2A]'}`}>
+                    <div className={`p-3 sm:p-4 pb-2 pt-2 rounded-sm shadow-inner border-b-2 relative transition-colors duration-300 group ${isDark ? 'bg-[#000] border-[#222]' : 'bg-[#222] border-[#444]'}`}>
+                        <div className={`relative h-14 sm:h-14 flex items-center px-3 sm:px-4 ${isDark ? 'bg-[#050505]' : 'bg-[#2A2A2A]'}`}>
                             <input
                                 type="text"
                                 aria-label="Custom Prompt"
                                 value={preferences.freestylePrompt || ''}
                                 onChange={(e) => handleFreestyleChange(e.target.value)}
                                 onFocus={handleFreestyleFocus}
-                                placeholder="DESCRIBE YOUR SPECIFIC CRAVING..."
-                                className={`w-full bg-transparent font-mono text-sm md:text-base p-0 focus:outline-none tracking-wider z-20 text-braun-orange placeholder:text-[#555]`}
-                                style={{ textShadow: preferences.freestylePrompt ? "0 0 5px rgba(255, 68, 0, 0.3)" : "none" }}
+                                placeholder="Describe your specific craving..."
+                                className={`w-full bg-transparent font-mono text-base p-0 focus:outline-none tracking-wider z-20 text-braun-orange placeholder:text-[#555]`}
+                                style={{ textShadow: preferences.freestylePrompt ? "0 0 5px rgba(255, 68, 0, 0.5)" : "none" }}
                             />
                             {/* Scanline overlay */}
                             <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] z-30 opacity-70"></div>
