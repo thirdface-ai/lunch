@@ -9,7 +9,7 @@ import {
   calculateCandidateScore,
   shuffleArray,
   getWalkConfig,
-  filterByOpenOnArrival,
+  getOpenStatusScore,
 } from '../utils/lunchAlgorithm';
 import {
   AppState,
@@ -104,38 +104,37 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
 
       addLog(`APPLYING STRICT PROXIMITY FILTER: <= ${preferences.walkLimit} WALK...`);
 
-      // Adaptive filtering logic
+      // Adaptive filtering logic - filter by distance only, not by open status
       let candidatesWithinRange = filterByDuration(allMeasuredCandidates, durations, maxDurationSeconds);
       
-      // Filter to only places that will be open when user arrives
-      addLog('VERIFYING OPERATIONAL STATUS ON ARRIVAL...');
-      const openOnArrival = filterByOpenOnArrival(candidatesWithinRange, durations);
-      const closedCount = candidatesWithinRange.length - openOnArrival.length;
-      if (closedCount > 0) {
-        addLog(`FILTERED ${closedCount} ESTABLISHMENTS: CLOSED OR NOT OPEN ON ARRIVAL.`);
-      }
-      candidatesWithinRange = openOnArrival;
+      // Analyze open status for logging (but don't filter)
+      addLog('ANALYZING OPERATIONAL STATUS...');
+      let openCount = 0;
+      let closedCount = 0;
+      let unknownCount = 0;
+      candidatesWithinRange.forEach(place => {
+        const duration = durations.get(place.place_id);
+        const status = getOpenStatusScore(place, duration?.value).status;
+        if (status === 'open' || status === 'opens_soon') openCount++;
+        else if (status === 'closed') closedCount++;
+        else unknownCount++;
+      });
+      
+      const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+      addLog(`STATUS CHECK (${dayName.toUpperCase()}): ${openCount} OPEN, ${closedCount} CLOSED, ${unknownCount} UNKNOWN`);
+      addLog('NOTE: CLOSED ESTABLISHMENTS DEPRIORITIZED BUT INCLUDED.');
 
       if (candidatesWithinRange.length === 0) {
         addLog('WARNING: STRICT FILTER YIELDED 0 RESULTS. EXPANDING HORIZON...');
         Logger.warn('SYSTEM', 'Expanding Proximity Search', { originalLimit: maxDurationSeconds });
-        let expanded = filterByDuration(allMeasuredCandidates, durations, maxDurationSeconds * 1.5);
-        candidatesWithinRange = filterByOpenOnArrival(expanded, durations);
+        candidatesWithinRange = filterByDuration(allMeasuredCandidates, durations, maxDurationSeconds * 1.5);
       }
 
       if (candidatesWithinRange.length === 0) {
-        addLog('WARNING: NO OPEN RESULTS IN RANGE. RETRIEVING CLOSEST OPEN ENTITIES...');
+        addLog('WARNING: NO RESULTS IN RANGE. RETRIEVING CLOSEST ENTITIES...');
         Logger.warn('SYSTEM', 'Emergency Fallback Triggered', { count: 5 });
-        // Get closest places that will be open on arrival
         const sortedByDistance = sortByDuration(allMeasuredCandidates, durations);
-        const openPlaces = filterByOpenOnArrival(sortedByDistance, durations);
-        candidatesWithinRange = openPlaces.slice(0, 5);
-        
-        // If still nothing open, fall back to closest regardless (with warning)
-        if (candidatesWithinRange.length === 0) {
-          addLog('WARNING: NO OPEN ESTABLISHMENTS DETECTED. SHOWING CLOSEST REGARDLESS.');
-          candidatesWithinRange = sortedByDistance.slice(0, 5);
-        }
+        candidatesWithinRange = sortedByDistance.slice(0, 5);
       }
 
       addLog(`PROXIMITY FILTER COMPLETE. ${candidatesWithinRange.length} CANDIDATES SELECTED.`);

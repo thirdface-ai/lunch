@@ -234,6 +234,71 @@ export const getSearchQueriesForVibe = (vibe: HungerVibe | null): string[] => {
 };
 
 /**
+ * Get the open status score for a place
+ * Returns a score based on whether the place is open/will be open on arrival
+ * This is used for prioritization, not filtering
+ */
+export const getOpenStatusScore = (
+  place: GooglePlace,
+  walkingTimeSeconds: number | undefined
+): { score: number; status: 'open' | 'opens_soon' | 'closed' | 'unknown' } => {
+  const OPEN_BONUS = 25; // Heavy bonus for being open
+  const OPENS_SOON_BONUS = 15; // Moderate bonus for opening soon
+  const CLOSED_PENALTY = -10; // Penalty for being closed
+  const UNKNOWN_BONUS = 5; // Small bonus if we don't know (benefit of doubt)
+
+  // If no opening hours data, give benefit of the doubt
+  if (!place.opening_hours) {
+    return { score: UNKNOWN_BONUS, status: 'unknown' };
+  }
+
+  // If currently open, great!
+  if (place.opening_hours.open_now) {
+    return { score: OPEN_BONUS, status: 'open' };
+  }
+
+  // Check today's specific hours to see if it will be open on arrival
+  const todaysHoursStr = getTodaysHoursString(place.opening_hours.weekday_text);
+  if (!todaysHoursStr) {
+    // No weekday_text data but has opening_hours - assume closed today
+    return { score: CLOSED_PENALTY, status: 'closed' };
+  }
+
+  const hours = parseTodaysHours(todaysHoursStr);
+  if (!hours) {
+    // Explicitly closed today (e.g., "Closed")
+    return { score: CLOSED_PENALTY, status: 'closed' };
+  }
+
+  // Calculate arrival time
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const walkingMinutes = walkingTimeSeconds ? Math.ceil(walkingTimeSeconds / 60) : 0;
+  const arrivalMinutes = currentMinutes + walkingMinutes;
+
+  // Handle overnight hours (e.g., 6pm - 2am)
+  if (hours.closeMinutes < hours.openMinutes) {
+    // Place closes after midnight
+    if (arrivalMinutes >= hours.openMinutes || arrivalMinutes < hours.closeMinutes) {
+      return { score: OPEN_BONUS, status: 'open' };
+    }
+  } else {
+    // Normal hours: check if arrival time falls within open hours
+    if (arrivalMinutes >= hours.openMinutes && arrivalMinutes < hours.closeMinutes) {
+      return { score: OPEN_BONUS, status: 'open' };
+    }
+    
+    // Check if it opens soon (within 60 minutes of arrival)
+    if (arrivalMinutes < hours.openMinutes && (hours.openMinutes - arrivalMinutes) <= 60) {
+      return { score: OPENS_SOON_BONUS, status: 'opens_soon' };
+    }
+  }
+
+  // Closed for the rest of today
+  return { score: CLOSED_PENALTY, status: 'closed' };
+};
+
+/**
  * Calculate candidate score for ranking
  */
 export const calculateCandidateScore = (
@@ -245,14 +310,18 @@ export const calculateCandidateScore = (
   let score = 0;
   const MAX_PROXIMITY_SCORE = 15;
 
-  // 1. Proximity Score (Weight: 15)
+  // 1. Open Status Score (Weight: 25 for open, -10 for closed) - HIGHEST PRIORITY
+  const openStatus = getOpenStatusScore(p, durationSeconds);
+  score += openStatus.score;
+
+  // 2. Proximity Score (Weight: 15)
   if (durationSeconds !== undefined) {
     const proximityRatio = durationSeconds / maxDurationSeconds;
     const proximityScore = MAX_PROXIMITY_SCORE * (1 - proximityRatio);
     score += Math.max(0, proximityScore);
   }
   
-  // 2. Price Match Score (Weight: 10)
+  // 3. Price Match Score (Weight: 10)
   const priceLevel = p.price_level;
   let priceMatchScore = 0;
   if (priceLevel !== undefined && price !== null) {
@@ -279,17 +348,17 @@ export const calculateCandidateScore = (
   const rating = p.rating || 0;
   const reviews = p.user_ratings_total || 0;
 
-  // 3. "Hidden Gem" Score (Weight: 5)
+  // 4. "Hidden Gem" Score (Weight: 5)
   if (rating > 4.3 && reviews >= 50 && reviews < 750) {
     score += 5;
   }
 
-  // 4. "Fresh Drop" Score (Weight: 8)
+  // 5. "Fresh Drop" Score (Weight: 8)
   if (rating >= 4.0 && reviews < 50 && reviews > 0) {
     score += 8;
   }
 
-  // 5. Raw Rating Score (Weight: 1 per star)
+  // 6. Raw Rating Score (Weight: 1 per star)
   score += rating;
 
   return score;
