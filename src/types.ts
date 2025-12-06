@@ -155,3 +155,39 @@ export interface AppLogRecord {
   metadata: Record<string, unknown> | null;
 }
 
+// Curated Review Data from Haiku pre-processor
+export interface CuratedReviewData {
+  place_id: string;
+  vibe_score: number;              // 0-10 match to user's vibe/freestyle
+  top_reviews: { 
+    text: string; 
+    rating?: number; 
+    signal: 'positive' | 'negative' | 'neutral';
+  }[];
+  extracted_dishes: string[];      // ["Tonkotsu Ramen", "Wiener Schnitzel"]
+  quality_signals: string[];       // ["hidden gem", "consistent quality"]
+  red_flags: string[];             // ["slow service on weekends"]
+}
+
+// AI Pipeline Timing Metrics
+export interface PipelineTimingRecord {
+  id?: string;
+  created_at?: string;
+  session_id: string;
+  total_duration_ms: number;
+  haiku_duration_ms: number | null;
+  main_model_duration_ms: number | null;
+  places_search_duration_ms: number | null;
+  distance_matrix_duration_ms: number | null;
+  haiku_model: string | null;
+  main_model: string | null;
+  candidate_count: number;
+  result_count: number;
+  haiku_success: boolean;
+  // Prompt tracking for debugging/analysis
+  haiku_prompt: string | null;
+  main_model_prompt: string | null;
+  user_vibe: string | null;
+  user_freestyle_prompt: string | null;
+}
+

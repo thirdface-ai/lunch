@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useGooglePlaces } from './useGooglePlaces';
 import { useDistanceMatrix } from './useDistanceMatrix';
 import { useTerminalLogs } from './useTerminalLogs';
-import { decideLunch } from '../services/aiService';
+import { decideLunch, curateAllCandidates, HaikuCurationResult } from '../services/aiService';
 import SupabaseService from '../services/supabaseService';
 import Logger from '../utils/logger';
 import {
@@ -15,6 +15,7 @@ import {
   AppState,
   UserPreferences,
   FinalResult,
+  CuratedReviewData,
 } from '../types';
 
 interface UseLunchDecisionReturn {
@@ -56,6 +57,9 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
 
     addLog(`ACQUIRING SATELLITE LOCK [${preferences.lat.toFixed(4)}, ${preferences.lng.toFixed(4)}]...`);
 
+    // Track total pipeline time
+    const pipelineStartTime = performance.now();
+    
     try {
       const { radius, maxDurationSeconds } = getWalkConfig(preferences.walkLimit);
       addLog(`CALIBRATING SCANNER RADIUS: ${radius}m...`);
@@ -85,13 +89,44 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('NO FOOD ESTABLISHMENTS FOUND. TRY A DIFFERENT LOCATION OR VIBE.');
       }
 
-      // Calculate walking distances
-      addLog('CALIBRATING WALKING VECTORS...');
+      // Prepare candidate pool
       const candidatePool = shuffleArray([...places]).slice(0, 50);
+      
+      // Track timing for analytics
+      const placesSearchDuration = Math.round(performance.now() - pipelineStartTime);
 
-      const { durations } = await calculateDistances({
-        origin: { lat: preferences.lat, lng: preferences.lng },
-        places: candidatePool,
+      // === PARALLEL EXECUTION: Haiku + Distance Matrix ===
+      addLog('INITIATING PARALLEL ANALYSIS...');
+      
+      const parallelStartTime = performance.now();
+      
+      // Run Haiku curation and distance matrix in parallel
+      const [haikuResult, distanceResult] = await Promise.all([
+        // Haiku pre-processes ALL candidates for vibe scoring and dish extraction
+        curateAllCandidates(
+          candidatePool,
+          preferences.vibe,
+          preferences.freestylePrompt,
+          addLog
+        ),
+        // Distance matrix calculates walking times
+        calculateDistances({
+          origin: { lat: preferences.lat, lng: preferences.lng },
+          places: candidatePool,
+        })
+      ]);
+
+      const { durations } = distanceResult;
+      const curatedData: Map<string, CuratedReviewData> = haikuResult.curatedData;
+      const haikuSuccess = haikuResult.success;
+      const haikuDuration = haikuResult.durationMs;
+      const distanceMatrixDuration = Math.round(performance.now() - parallelStartTime);
+
+      Logger.info('SYSTEM', 'Parallel analysis complete', {
+        haikuSuccess,
+        haikuDuration,
+        curatedCount: curatedData.size,
+        durationsCount: durations.size
       });
 
       setProgress(60);
@@ -143,14 +178,16 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         addLog('WARNING: LIMITED CANDIDATE POOL.');
       }
 
-      // Rank candidates
-      addLog('RANKING CANDIDATES...');
+      // Rank candidates using Haiku curation data
+      addLog(haikuSuccess ? 'RANKING WITH HAIKU INSIGHTS...' : 'RANKING CANDIDATES...');
 
       const sortedCandidates = candidatesWithinRange.sort((a, b) => {
         const durationA = durations.get(a.place_id)?.value;
         const durationB = durations.get(b.place_id)?.value;
-        const scoreA = calculateCandidateScore(a, preferences.price, durationA, maxDurationSeconds);
-        const scoreB = calculateCandidateScore(b, preferences.price, durationB, maxDurationSeconds);
+        const curationA = curatedData.get(a.place_id);
+        const curationB = curatedData.get(b.place_id);
+        const scoreA = calculateCandidateScore(a, preferences.price, durationA, maxDurationSeconds, curationA);
+        const scoreB = calculateCandidateScore(b, preferences.price, durationB, maxDurationSeconds, curationB);
         return scoreB - scoreA;
       });
 
@@ -185,29 +222,34 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('SYSTEM UNABLE TO LOCATE VIABLE TARGETS.');
       }
 
-      // Get AI recommendations via multi-stage deep analysis pipeline
+      // Get AI recommendations via enhanced pipeline with Haiku pre-curation
       addLog('ENGAGING NEURAL ANALYSIS CORE...');
 
-      const recommendations = await decideLunch(
+      const decisionResult = await decideLunch(
         candidatesForGemini,
         preferences.vibe,
         preferences.price,
         preferences.noCash,
         preferences.address,
         preferences.dietaryRestrictions,
+        durations,           // Pass walking times
+        curatedData,         // Pass Haiku curated data
         preferences.freestylePrompt,
-        addLog // Pass the log callback for real-time personalized updates
+        addLog
       );
 
+      const { recommendations, durationMs: mainModelDuration } = decisionResult;
+
       // NO GENERIC FALLBACKS - Quality over quantity
-      // The multi-stage pipeline handles all analysis including fallbacks internally
-      // We trust the AI to return quality results or nothing
       if (!recommendations || recommendations.length === 0) {
         throw new Error('DEEP ANALYSIS PIPELINE YIELDED NO VIABLE RECOMMENDATIONS.');
       }
 
       // Take up to 5 results (quality over quantity - no padding with generic fallbacks)
       const finalSelection = recommendations.slice(0, 5);
+      
+      // Calculate total pipeline time
+      const totalDuration = Math.round(performance.now() - pipelineStartTime);
 
       setProgress(100);
       addLog(`DEEP ANALYSIS COMPLETE. ${finalSelection.length} OPTIMAL SOLUTIONS CALCULATED.`);
@@ -236,6 +278,33 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
       
       // Save recommended places for variety tracking (non-blocking)
       SupabaseService.saveRecommendedPlaces(finalResults);
+      
+      // Log pipeline timing to Supabase (non-blocking)
+      SupabaseService.logPipelineTiming({
+        total_duration_ms: totalDuration,
+        haiku_duration_ms: haikuDuration,
+        main_model_duration_ms: mainModelDuration,
+        places_search_duration_ms: placesSearchDuration,
+        distance_matrix_duration_ms: distanceMatrixDuration,
+        haiku_model: 'anthropic/claude-haiku-4.5',
+        main_model: 'openrouter/auto',
+        candidate_count: candidatesForGemini.length,
+        result_count: finalResults.length,
+        haiku_success: haikuSuccess,
+        // User context for debugging
+        user_vibe: preferences.vibe || null,
+        user_freestyle_prompt: preferences.freestylePrompt || null,
+        // Note: Full prompts are generated in aiService - these track user inputs
+        haiku_prompt: null, // Could be added if needed for deeper debugging
+        main_model_prompt: null,
+      });
+      
+      Logger.info('SYSTEM', 'Pipeline Timing', {
+        totalMs: totalDuration,
+        haikuMs: haikuDuration,
+        mainModelMs: mainModelDuration,
+        haikuSuccess
+      });
 
       setTimeout(() => {
         setResults(finalResults);

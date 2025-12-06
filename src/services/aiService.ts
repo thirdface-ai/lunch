@@ -1,4 +1,4 @@
-import { GooglePlace, HungerVibe, GeminiRecommendation, PricePoint, DietaryRestriction } from '../types';
+import { GooglePlace, HungerVibe, GeminiRecommendation, PricePoint, DietaryRestriction, CuratedReviewData, PlaceReview } from '../types';
 import Logger from '../utils/logger';
 import { supabase } from '../lib/supabase';
 
@@ -16,6 +16,12 @@ export enum Type {
 
 // Using OpenRouter's auto model selection for optimal results
 const AI_MODEL = 'openrouter/auto';
+
+// Fast, cheap model for pre-processing (multilingual review curation)
+const HAIKU_MODEL = 'anthropic/claude-haiku-4.5';
+
+// Duration map type for walking times
+export type DurationMap = Map<string, { text: string; value: number }>;
 
 // Callback type for real-time logging during analysis
 export type AnalysisLogCallback = (message: string) => void;
@@ -129,10 +135,145 @@ const getDefaultLoadingMessages = (): string[] => [
 ];
 
 /**
- * STREAMLINED LUNCH DECISION - Single API Call
+ * Haiku pre-processor result with timing
+ */
+export interface HaikuCurationResult {
+  curatedData: Map<string, CuratedReviewData>;
+  durationMs: number;
+  success: boolean;
+}
+
+/**
+ * HAIKU PRE-PROCESSOR - Curates reviews for ALL candidates
+ * 
+ * Uses Claude Haiku 4.5 to:
+ * - Select the most informative reviews per restaurant
+ * - Extract dish mentions across any language (German, English, etc.)
+ * - Identify quality signals and red flags
+ * - Score vibe match for ranking
+ */
+export const curateAllCandidates = async (
+  candidates: GooglePlace[],
+  vibe: HungerVibe | null,
+  freestylePrompt?: string,
+  onLog?: AnalysisLogCallback
+): Promise<HaikuCurationResult> => {
+  const startTime = performance.now();
+  
+  Logger.info('AI', '=== HAIKU PRE-PROCESSING ===', { 
+    candidateCount: candidates.length,
+    vibe,
+    freestylePrompt
+  });
+
+  if (candidates.length === 0) {
+    return { curatedData: new Map(), durationMs: 0, success: true };
+  }
+
+  onLog?.(`HAIKU ANALYZING ${candidates.length} RESTAURANTS...`);
+
+  // Build compact payload for Haiku - all reviews from all candidates
+  const payload = candidates.map(p => ({
+    id: p.place_id,
+    name: p.name,
+    types: p.types?.slice(0, 5) || [],
+    rating: p.rating,
+    reviews: (p.reviews || []).map((r: PlaceReview) => ({
+      text: r.text,
+      rating: r.rating,
+    })).filter((r: { text: string }) => r.text && r.text.length > 0),
+  }));
+
+  const totalReviews = payload.reduce((sum, p) => sum + p.reviews.length, 0);
+  onLog?.(`SCANNING ${totalReviews} MULTILINGUAL REVIEWS...`);
+
+  const systemInstruction = `You are a fast, efficient review analyzer. Your task is to process restaurant data and extract key insights.
+
+USER REQUEST: ${freestylePrompt || vibe || 'Good lunch spot'}
+
+For EACH restaurant, analyze its reviews and output:
+1. vibe_score (0-10): How well does this restaurant match the user's request?
+2. top_reviews: Select up to 5 most informative reviews, classify each as positive/negative/neutral
+3. extracted_dishes: Specific dish names mentioned (in ANY language - German, English, etc.)
+4. quality_signals: Positive patterns like "hidden gem", "consistent", "locals love it"
+5. red_flags: Issues like "went downhill", "overpriced", "rude staff", "slow service"
+
+CRITICAL for vibe_score:
+- If user asked for specific food (e.g., "schnitzel", "ramen"), score HIGH only if reviews mention that food
+- If user asked for a vibe (e.g., "quick lunch"), score based on service speed mentions
+- Score 0 for restaurants that clearly don't match the request
+
+Return a JSON array with one object per restaurant, matching input order.`;
+
+  const prompt = `Analyze these ${payload.length} restaurants:
+
+${JSON.stringify(payload, null, 1)}
+
+Return JSON array with structure:
+[{ "place_id": "...", "vibe_score": 0-10, "top_reviews": [...], "extracted_dishes": [...], "quality_signals": [...], "red_flags": [...] }, ...]`;
+
+  try {
+    const text = await callOpenRouterProxy(
+      HAIKU_MODEL,
+      prompt,
+      {
+        systemInstruction,
+        temperature: 0.3, // Lower temp for consistent analysis
+        responseMimeType: 'application/json',
+      }
+    );
+
+    const durationMs = Math.round(performance.now() - startTime);
+
+    if (!text || text.trim() === '') {
+      throw new Error('Empty response from Haiku');
+    }
+
+    // Parse response
+    let jsonText = text.trim();
+    if (jsonText.startsWith('```json')) jsonText = jsonText.slice(7);
+    else if (jsonText.startsWith('```')) jsonText = jsonText.slice(3);
+    if (jsonText.endsWith('```')) jsonText = jsonText.slice(0, -3);
+    jsonText = jsonText.trim();
+
+    const results: CuratedReviewData[] = JSON.parse(jsonText);
+    
+    // Build map for easy lookup
+    const curatedMap = new Map<string, CuratedReviewData>();
+    results.forEach(r => {
+      curatedMap.set(r.place_id, r);
+    });
+
+    Logger.info('AI', `Haiku curation complete`, { 
+      durationMs, 
+      processedCount: results.length 
+    });
+    onLog?.(`HAIKU COMPLETE: ${results.length} RESTAURANTS CURATED (${(durationMs / 1000).toFixed(1)}s)`);
+
+    return { curatedData: curatedMap, durationMs, success: true };
+
+  } catch (error) {
+    const durationMs = Math.round(performance.now() - startTime);
+    Logger.error('AI', 'Haiku curation failed, falling back to uncurated', error);
+    onLog?.(`HAIKU FALLBACK: PROCEEDING WITHOUT PRE-CURATION`);
+    
+    return { curatedData: new Map(), durationMs, success: false };
+  }
+};
+
+/**
+ * Main model decision result with timing
+ */
+export interface DecisionResult {
+  recommendations: GeminiRecommendation[];
+  durationMs: number;
+}
+
+/**
+ * LUNCH DECISION - Enhanced with Haiku pre-curation
  * 
  * Analyzes candidates and returns exactly 3 recommendations.
- * Uses detailed system prompt for quality while keeping it to ONE fast API call.
+ * Now leverages pre-curated data from Haiku for better quality.
  */
 export const decideLunch = async (
   candidates: GooglePlace[],
@@ -141,19 +282,25 @@ export const decideLunch = async (
   noCash: boolean,
   address: string,
   dietaryRestrictions: DietaryRestriction[],
+  durations?: DurationMap,
+  curatedData?: Map<string, CuratedReviewData>,
   freestylePrompt?: string,
   onLog?: AnalysisLogCallback
-): Promise<GeminiRecommendation[]> => {
-  Logger.info('AI', '=== LUNCH DECISION (SINGLE CALL) ===', { 
+): Promise<DecisionResult> => {
+  const startTime = performance.now();
+  
+  Logger.info('AI', '=== LUNCH DECISION ===', { 
     candidateCount: candidates.length, 
     vibe, 
     price, 
-    freestylePrompt
+    freestylePrompt,
+    hasCuratedData: curatedData && curatedData.size > 0,
+    hasDurations: durations && durations.size > 0
   });
 
   if (candidates.length === 0) {
     Logger.warn('AI', 'No candidates provided');
-    return [];
+    return { recommendations: [], durationMs: 0 };
   }
 
   onLog?.(`ANALYZING ${candidates.length} RESTAURANTS...`);
@@ -161,12 +308,15 @@ export const decideLunch = async (
   // Take top 15 candidates
   const topCandidates = candidates.slice(0, 15);
   
-  // Build payload with up to 20 reviews per restaurant
+  // Build enriched payload with walking time, service flags, and curated data
   const payload = topCandidates.map(p => {
-    const reviews = (p.reviews || [])
-      .slice(0, 20)
-      .map(r => r.text)
-      .filter(t => t && t.length > 0);
+    const duration = durations?.get(p.place_id);
+    const curation = curatedData?.get(p.place_id);
+    
+    // Use curated reviews if available, otherwise fall back to raw reviews
+    const reviews = curation?.top_reviews 
+      ? curation.top_reviews.map(r => ({ text: r.text, rating: r.rating, signal: r.signal }))
+      : (p.reviews || []).slice(0, 10).map(r => ({ text: r.text, rating: r.rating }));
     
     return {
       id: p.place_id,
@@ -176,14 +326,28 @@ export const decideLunch = async (
       price_level: p.price_level,
       types: p.types?.slice(0, 5),
       summary: p.editorial_summary?.overview || '',
-      reviews: reviews,
+      // Enriched data
+      walking_minutes: duration ? Math.round(duration.value / 60) : null,
+      open_now: p.opening_hours?.open_now ?? null,
+      serves_beer: p.serves_beer ?? null,
+      serves_wine: p.serves_wine ?? null,
+      takeout: p.takeout ?? null,
+      dine_in: p.dine_in ?? null,
       cash_only: p.payment_options?.accepts_cash_only || false,
       vegetarian: p.serves_vegetarian_food,
+      // Curated data from Haiku (if available)
+      vibe_score: curation?.vibe_score ?? null,
+      extracted_dishes: curation?.extracted_dishes ?? [],
+      quality_signals: curation?.quality_signals ?? [],
+      red_flags: curation?.red_flags ?? [],
+      reviews: reviews,
     };
   });
 
-  const totalReviews = payload.reduce((sum, p) => sum + p.reviews.length, 0);
-  onLog?.(`MINING ${totalReviews} REVIEWS FOR DISH MENTIONS...`);
+  const hasCuration = curatedData && curatedData.size > 0;
+  onLog?.(hasCuration 
+    ? `LEVERAGING HAIKU PRE-CURATION FOR ${payload.length} CANDIDATES...`
+    : `ANALYZING ${payload.length} CANDIDATES...`);
 
   // Budget context
   const budgetText = price ? {
@@ -196,7 +360,10 @@ export const decideLunch = async (
     ? `DIETARY REQUIREMENTS: ${dietaryRestrictions.join(', ')}. Prioritize restaurants that accommodate these.`
     : '';
 
-  // Detailed system instruction for quality recommendations
+  // Whether we have Haiku pre-curation
+  const hasCurationData = curatedData && curatedData.size > 0;
+
+  // Enhanced system instruction leveraging curated data
   const systemInstruction = `You are an expert lunch recommendation AI. Your task is to analyze restaurant data and select EXACTLY 3 best matches.
 
 LOCATION: ${address}
@@ -206,40 +373,53 @@ ${budgetText}
 ${dietaryText}
 ${noCash ? 'USER REQUIRES CARD PAYMENT - exclude cash-only places' : ''}
 
+${hasCurationData ? `=== PRE-CURATED DATA AVAILABLE ===
+Each restaurant includes Haiku-analyzed data:
+- vibe_score: How well it matches user's request (0-10) - TRUST THIS for ranking
+- extracted_dishes: Dishes already identified from reviews - USE THESE as recommended_dish
+- quality_signals: Positive patterns detected ("hidden gem", "consistent")
+- red_flags: Issues to mention as caveats ("slow service", "went downhill")
+- walking_minutes: Time to walk there - factor into "Grab & Go" recommendations
+` : ''}
+
 === ANALYSIS INSTRUCTIONS ===
 
-1. DISH EXTRACTION (Critical)
-   - Scan ALL reviews for specific dish names
-   - Look for: "the [dish name] is amazing", "must try the [dish]", "best [dish] in town"
-   - Extract SPECIFIC names like "Tonkotsu Ramen", "Margherita Pizza", "Eggs Benedict"
-   - NOT generic terms like "ramen", "pizza", "breakfast"
+1. DISH SELECTION
+   ${hasCurationData 
+     ? '- USE extracted_dishes as your PRIMARY source for recommended_dish\n   - Validate with review context if needed'
+     : '- Scan reviews for specific dish names\n   - Look for: "the [dish name] is amazing", "must try the [dish]"'}
+   - Extract SPECIFIC names like "Tonkotsu Ramen", "Margherita Pizza"
+   - NOT generic terms like "ramen", "pizza"
 
-2. QUALITY SIGNALS
-   - High ratings (4.3+) with many reviews = reliable
-   - Phrases like "hidden gem", "locals' favorite", "always consistent"
-   - Recent positive reviews indicate current quality
+2. VIBE MATCHING
+   ${hasCurationData
+     ? '- Prioritize restaurants with HIGH vibe_score (7+)\n   - vibe_score already factors in user\'s specific request'
+     : '- Match restaurant style to user mood'}
+   - For "Grab & Go": favor places with walking_minutes < 5, takeout=true
+   - For "View & Vibe": favor places with serves_wine=true, higher ratings
 
-3. RED FLAGS
-   - "went downhill", "not what it used to be"
-   - "overpriced", "slow service", "rude staff"
-   - Skip places with multiple red flags
+3. QUALITY & RED FLAGS
+   ${hasCurationData
+     ? '- quality_signals are pre-identified - mention them in ai_reason\n   - red_flags are pre-identified - mention as honest caveats'
+     : '- Look for "hidden gem", "locals favorite", "consistent"'}
+   - Skip places with multiple red_flags
 
 4. CASH-ONLY DETECTION
    - Check cash_only field
-   - Scan reviews for "cash only", "no cards", "bring cash"
-   - German: "nur Barzahlung"
+   - If user requires card, exclude cash_only=true places
 
 === OUTPUT REQUIREMENTS ===
 
 Return EXACTLY 3 recommendations as a JSON array. For each:
 
 - place_id: The restaurant's ID from the data
-- recommended_dish: A SPECIFIC dish name found in reviews (never generic)
+- recommended_dish: A SPECIFIC dish name ${hasCurationData ? 'from extracted_dishes' : 'found in reviews'}
 - ai_reason: 2-3 sentences explaining:
-  * Why this matches the user's vibe
+  * Why this matches the user's vibe ${hasCurationData ? '(reference vibe_score)' : ''}
   * Evidence from reviews (quote specific praise)
-  * Any notable quality signals
-  * Honest caveat if relevant
+  * ${hasCurationData ? 'Mention quality_signals if present' : 'Notable quality signals'}
+  * ${hasCurationData ? 'Mention red_flags as honest caveats' : 'Honest caveat if relevant'}
+  * Walking time if relevant for the vibe
 - is_cash_only: Boolean
 - is_new_opening: True if <50 reviews and "just opened" mentions
 
@@ -247,33 +427,14 @@ Return EXACTLY 3 recommendations as a JSON array. For each:
 
 BAD: "Great restaurant with good food."
 
-GOOD: "Their Duck Confit is legendary - multiple reviewers call it 'perfectly crispy' and 'best in Mitte'. At 4.6 stars with 340 reviews, this French bistro delivers consistent quality. Quick service makes it ideal for a satisfying lunch."
+GOOD: "Their Duck Confit is legendary - reviewers call it 'perfectly crispy' and 'best in Mitte'. At 4.6 stars with 340 reviews, this French bistro delivers consistent quality. Just 4 minutes walk makes it perfect for your quick lunch."
 
-=== CRITICAL: NO DUPLICATES ===
+=== CRITICAL RULES ===
 - NEVER recommend the same restaurant twice
-- Each place_id in your response MUST be unique
-- If you can't find 3 different quality options, return fewer (1 or 2) rather than duplicating
-
-=== SELECTION STRATEGY ===
-Pick the 3 restaurants that BEST match the user's request.
-
-CRITICAL - SPECIFIC REQUEST PRIORITY:
-If the user asked for something specific (like "schnitzel", "ramen", "pizza", "tacos", "pho", etc.):
-- This is their PRIMARY requirement - ALL 3 recommendations should serve this item
-- Search reviews for mentions of the specific dish/cuisine they requested
-- Do NOT recommend restaurants that don't serve what the user asked for
-- Better to return fewer high-quality matches than dilute with unrelated options
-- If a restaurant doesn't have the specific item in reviews or menu hints, SKIP IT
-
-Example: If user asked for "schnitzel", ONLY recommend:
-- German restaurants known for schnitzel
-- Austrian restaurants with wiener schnitzel
-- European restaurants where reviews mention schnitzel
-- DO NOT recommend Italian pizzerias, ramen shops, etc.
-
-If the user gave a general vibe (like "quick lunch", "something filling"):
-- Offer variety - pick from different cuisine types when possible
-- Show them interesting options they might not have considered`;
+- Each place_id MUST be unique
+- ${hasCurationData ? 'Prioritize restaurants with vibe_score >= 7' : ''}
+- If user asked for specific food, ALL recommendations must serve it
+- Better to return fewer high-quality matches than dilute with unrelated options`;
 
   const prompt = `Analyze these ${payload.length} restaurants and select exactly 3 best matches:
 
@@ -342,14 +503,20 @@ Return a JSON array with exactly 3 recommendations.`;
     });
     onLog?.(`TOP 3 PICKS: ${pickNames.join(', ').toUpperCase()}`);
 
-    return finalResults.map(rec => ({
-      ...rec,
-      cash_warning_msg: rec.is_cash_only ? 'Note: This location may be cash-only.' : null,
-    }));
+    const durationMs = Math.round(performance.now() - startTime);
+    
+    return {
+      recommendations: finalResults.map(rec => ({
+        ...rec,
+        cash_warning_msg: rec.is_cash_only ? 'Note: This location may be cash-only.' : null,
+      })),
+      durationMs
+    };
 
   } catch (error) {
+    const durationMs = Math.round(performance.now() - startTime);
     Logger.error('AI', 'Lunch decision failed', error);
     onLog?.(`ERROR: Analysis failed. Please try again.`);
-    return [];
+    return { recommendations: [], durationMs };
   }
 };

@@ -83,6 +83,66 @@ export type Database = {
         }
         Relationships: []
       }
+      pipeline_timing: {
+        Row: {
+          candidate_count: number
+          created_at: string | null
+          distance_matrix_duration_ms: number | null
+          haiku_duration_ms: number | null
+          haiku_model: string | null
+          haiku_prompt: string | null
+          haiku_success: boolean | null
+          id: string
+          main_model: string | null
+          main_model_duration_ms: number | null
+          main_model_prompt: string | null
+          places_search_duration_ms: number | null
+          result_count: number
+          session_id: string
+          total_duration_ms: number
+          user_freestyle_prompt: string | null
+          user_vibe: string | null
+        }
+        Insert: {
+          candidate_count: number
+          created_at?: string | null
+          distance_matrix_duration_ms?: number | null
+          haiku_duration_ms?: number | null
+          haiku_model?: string | null
+          haiku_prompt?: string | null
+          haiku_success?: boolean | null
+          id?: string
+          main_model?: string | null
+          main_model_duration_ms?: number | null
+          main_model_prompt?: string | null
+          places_search_duration_ms?: number | null
+          result_count: number
+          session_id: string
+          total_duration_ms: number
+          user_freestyle_prompt?: string | null
+          user_vibe?: string | null
+        }
+        Update: {
+          candidate_count?: number
+          created_at?: string | null
+          distance_matrix_duration_ms?: number | null
+          haiku_duration_ms?: number | null
+          haiku_model?: string | null
+          haiku_prompt?: string | null
+          haiku_success?: boolean | null
+          id?: string
+          main_model?: string | null
+          main_model_duration_ms?: number | null
+          main_model_prompt?: string | null
+          places_search_duration_ms?: number | null
+          result_count?: number
+          session_id?: string
+          total_duration_ms?: number
+          user_freestyle_prompt?: string | null
+          user_vibe?: string | null
+        }
+        Relationships: []
+      }
       recommended_places: {
         Row: {
           created_at: string | null
