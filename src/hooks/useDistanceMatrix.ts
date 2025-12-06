@@ -146,10 +146,70 @@ export const useDistanceMatrix = () => {
     });
   }, []);
 
+  /**
+   * Verify walking times using Directions API (more accurate than Distance Matrix)
+   * Use this for final results to get precise route-based walking times
+   */
+  const verifyWalkingTimes = useCallback(async (
+    origin: { lat: number; lng: number },
+    places: Array<{ place_id: string; geometry?: { location?: google.maps.LatLng | google.maps.LatLngLiteral } }>
+  ): Promise<Map<string, PlaceDuration>> => {
+    if (!window.google) {
+      throw new Error('Google Maps API not loaded');
+    }
+
+    const directionsService = new google.maps.DirectionsService();
+    const verifiedDurations = new Map<string, PlaceDuration>();
+
+    // Process each place in parallel
+    const promises = places.map(async (place) => {
+      if (!place.geometry?.location) return;
+
+      try {
+        const result = await new Promise<google.maps.DirectionsResult | null>((resolve) => {
+          const timeoutId = setTimeout(() => {
+            console.warn(`Directions API timeout for ${place.place_id}`);
+            resolve(null);
+          }, 5000);
+
+          directionsService.route(
+            {
+              origin: { lat: origin.lat, lng: origin.lng },
+              destination: place.geometry!.location!,
+              travelMode: google.maps.TravelMode.WALKING,
+            },
+            (response, status) => {
+              clearTimeout(timeoutId);
+              if (status === 'OK' && response) {
+                resolve(response);
+              } else {
+                resolve(null);
+              }
+            }
+          );
+        });
+
+        if (result?.routes[0]?.legs[0]?.duration) {
+          const duration = result.routes[0].legs[0].duration;
+          verifiedDurations.set(place.place_id, {
+            text: duration.text,
+            value: duration.value,
+          });
+        }
+      } catch (err) {
+        console.error(`Failed to verify walking time for ${place.place_id}:`, err);
+      }
+    });
+
+    await Promise.all(promises);
+    return verifiedDurations;
+  }, []);
+
   return {
     calculateDistances,
     filterByDuration,
     sortByDuration,
+    verifyWalkingTimes,
   };
 };
 

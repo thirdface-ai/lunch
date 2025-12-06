@@ -185,7 +185,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
   const [results, setResults] = useState<FinalResult[]>([]);
 
   const { searchPlaces } = useGooglePlaces();
-  const { calculateDistances, filterByDuration, sortByDuration } = useDistanceMatrix();
+  const { calculateDistances, filterByDuration, sortByDuration, verifyWalkingTimes } = useDistanceMatrix();
   const { logs, progress, addLog, clearLogs, setProgress, resetProgress, startDynamicMessages } = useTerminalLogs(appState);
 
   /**
@@ -462,14 +462,13 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
       // Take up to 5 results (quality over quantity - no padding with generic fallbacks)
       const finalSelection = recommendations.slice(0, 5);
 
-      setProgress(100);
-      addLog('DONE.');
+      setProgress(95);
       Logger.info('SYSTEM', 'Analysis Complete', {
         resultCount: finalSelection.length,
         results: finalSelection.map(r => r.place_id)
       });
 
-      // Build final results with walking times
+      // Build final results with initial walking times
       const finalResults: FinalResult[] = [];
       finalSelection.forEach((rec) => {
         const original = candidatesForGemini.find(p => p.place_id === rec.place_id);
@@ -483,6 +482,36 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
           });
         }
       });
+
+      // Verify walking times with Directions API for accuracy (especially for further places)
+      if (finalResults.length > 0) {
+        addLog('VERIFYING WALKING ROUTES...');
+        try {
+          const verifiedTimes = await verifyWalkingTimes(
+            { lat: preferences.lat, lng: preferences.lng },
+            finalResults.map(r => ({ place_id: r.place_id, geometry: r.geometry }))
+          );
+          
+          // Update results with verified walking times
+          finalResults.forEach(result => {
+            const verified = verifiedTimes.get(result.place_id);
+            if (verified) {
+              result.walking_time_text = verified.text;
+              result.walking_time_value = verified.value;
+            }
+          });
+          
+          Logger.info('SYSTEM', 'Walking times verified', {
+            verified: verifiedTimes.size,
+            total: finalResults.length
+          });
+        } catch (err) {
+          Logger.warn('SYSTEM', 'Walking time verification failed, using estimates', { error: err });
+        }
+      }
+
+      setProgress(100);
+      addLog('DONE.');
 
       // Save search to history
       await SupabaseService.saveSearch(preferences, finalResults.length);
@@ -513,6 +542,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
     calculateDistances,
     filterByDuration,
     sortByDuration,
+    verifyWalkingTimes,
     addLog,
     clearLogs,
     setProgress,
