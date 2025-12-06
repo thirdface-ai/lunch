@@ -1,53 +1,50 @@
 import { GooglePlace, HungerVibe, GeminiRecommendation, PricePoint, DietaryRestriction } from '../types';
 import Logger from '../utils/logger';
+import { supabase } from '../lib/supabase';
+
+// Replicating Type definition locally to avoid importing the full SDK on client
+export enum Type {
+  TYPE_UNSPECIFIED = 'TYPE_UNSPECIFIED',
+  STRING = 'STRING',
+  NUMBER = 'NUMBER',
+  INTEGER = 'INTEGER',
+  BOOLEAN = 'BOOLEAN',
+  ARRAY = 'ARRAY',
+  OBJECT = 'OBJECT',
+  NULL = 'NULL',
+}
+
+const GEMINI_MODEL = 'gemini-2.5-flash';
 
 // Callback type for real-time logging during analysis
 export type AnalysisLogCallback = (message: string) => void;
 
-// Internal helper to call the Vercel AI Gateway API route
-const callGateway = async (
-  prompt: string,
-  schemaType: 'loading_logs' | 'recommendations',
-  config: { temperature?: number; systemInstruction?: string }
-): Promise<string> => {
+// Internal helper to call the Supabase Edge Function
+const callGeminiProxy = async (model: string, contents: string, config: Record<string, unknown>): Promise<string> => {
   const startTime = performance.now();
-  Logger.aiRequest('claude-sonnet-4.5', prompt.substring(0, 500) + '...');
+  Logger.aiRequest(model, contents.substring(0, 500) + '...');
 
   try {
-    const response = await fetch('/api/gateway', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt,
-        systemInstruction: config.systemInstruction,
-        schemaType,
-        config: {
-          temperature: config.temperature,
-        },
-      }),
+    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+      body: { model, contents, config },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Gateway invocation failed');
+    if (error) {
+      throw new Error(error.message || 'Edge Function invocation failed');
     }
 
-    const data = await response.json();
-
     if (!data?.text) {
-      throw new Error('Invalid response from gateway');
+      throw new Error('Invalid response from Gemini proxy');
     }
 
     const duration = Math.round(performance.now() - startTime);
     const estimatedTokens = data.text ? Math.ceil(data.text.length / 4) : 0;
-    Logger.aiResponse('claude-sonnet-4.5', duration, true, estimatedTokens);
+    Logger.aiResponse(model, duration, true, estimatedTokens);
 
     return data.text;
   } catch (error) {
     const duration = Math.round(performance.now() - startTime);
-    Logger.error('AI', `Gateway Call Failed (${duration}ms)`, error);
+    Logger.error('AI', `Gemini Proxy Call Failed (${duration}ms)`, error);
     throw error;
   }
 };
@@ -90,10 +87,17 @@ export const generateLoadingLogs = async (vibe: HungerVibe | null, address: stri
   `;
 
   try {
-    const text = await callGateway(
+    const text = await callGeminiProxy(
+      GEMINI_MODEL,
       prompt,
-      'loading_logs',
-      { temperature: 0.9 }
+      {
+        temperature: 0.9, // Higher temp for more creative/varied responses
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
+      }
     );
     
     if (!text) return getDefaultLoadingMessages();
@@ -278,12 +282,27 @@ Return a JSON array with exactly 3 recommendations.`;
   try {
     onLog?.(`RANKING TOP CANDIDATES...`);
     
-    const text = await callGateway(
+    const text = await callGeminiProxy(
+      GEMINI_MODEL,
       prompt,
-      'recommendations',
       {
         systemInstruction,
         temperature: 0.5,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              place_id: { type: Type.STRING },
+              recommended_dish: { type: Type.STRING },
+              ai_reason: { type: Type.STRING },
+              is_cash_only: { type: Type.BOOLEAN },
+              is_new_opening: { type: Type.BOOLEAN },
+            },
+            required: ['place_id', 'recommended_dish', 'ai_reason', 'is_cash_only'],
+          },
+        },
       }
     );
 

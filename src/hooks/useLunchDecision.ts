@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useGooglePlaces } from './useGooglePlaces';
 import { useDistanceMatrix } from './useDistanceMatrix';
 import { useTerminalLogs } from './useTerminalLogs';
-import { decideLunch } from '../services/gatewayService';
+import { decideLunch } from '../services/geminiService';
 import SupabaseService from '../services/supabaseService';
 import Logger from '../utils/logger';
 import {
