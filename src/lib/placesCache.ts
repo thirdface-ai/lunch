@@ -1,18 +1,21 @@
 import { GooglePlace } from '../types';
+import SupabaseService from '../services/supabaseService';
 import Logger from '../utils/logger';
 
 /**
- * Session-level cache for Places API data to reduce API costs
+ * Two-tier cache for Places API data to reduce API costs
  * 
- * - Places: 15-minute TTL (reviews need freshness for trending/fresh-drop detection)
- * - Distances: Session lifetime (same origin+destination = same walking time)
+ * L1: In-memory (per session) - instant access
+ * L2: Supabase (shared across all users) - 7-day TTL
+ * 
+ * Flow: Check L1 → Check L2 → Fetch from Google API → Save to L1 + L2
  * 
  * Cost tracking (Essentials plan):
  * - Place Details API: ~€0.017 per call
  * - Distance Matrix API: ~€0.005 per element
  */
 
-const PLACE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const PLACE_TTL_MS = 60 * 60 * 1000; // 1 hour for L1 (L2 has 7-day TTL)
 
 // Cost estimates in EUR (Essentials plan pricing)
 const COST_PER_PLACE_DETAIL = 0.017;
@@ -125,14 +128,84 @@ export const PlacesCache = {
   },
 
   /**
-   * Cache multiple places
+   * Cache multiple places (L1 only - synchronous)
    */
   setPlaces(places: GooglePlace[]): void {
     for (const place of places) {
       this.setPlace(place.place_id, place);
     }
-    Logger.info('CACHE', `Cached ${places.length} places`, {
+    Logger.info('CACHE', `Cached ${places.length} places to L1`, {
       totalCached: placeCache.size
+    });
+  },
+
+  /**
+   * Get places with L2 (Supabase) fallback
+   * Checks L1 first, then L2, returns combined results
+   */
+  async getPlacesWithL2(placeIds: string[]): Promise<{ found: Map<string, GooglePlace>; missing: string[] }> {
+    const found = new Map<string, GooglePlace>();
+    let l1Hits = 0;
+    let l2Hits = 0;
+    
+    // Check L1 (in-memory) first
+    const l1Missing: string[] = [];
+    for (const id of placeIds) {
+      const cached = this.getPlace(id);
+      if (cached) {
+        found.set(id, cached);
+        l1Hits++;
+      } else {
+        l1Missing.push(id);
+      }
+    }
+    
+    // Check L2 (Supabase) for remaining
+    if (l1Missing.length > 0) {
+      const l2Results = await SupabaseService.getCachedPlaces(l1Missing);
+      l2Results.forEach((place, id) => {
+        found.set(id, place);
+        // Also save to L1 for faster subsequent access
+        this.setPlace(id, place);
+        l2Hits++;
+      });
+    }
+    
+    // Calculate what's still missing
+    const missing = placeIds.filter(id => !found.has(id));
+    
+    // Update stats
+    const totalHits = l1Hits + l2Hits;
+    stats.placeHits += totalHits;
+    stats.placeMisses += missing.length;
+    stats.estimatedSavingsEur += totalHits * COST_PER_PLACE_DETAIL;
+    
+    if (totalHits > 0 || missing.length > 0) {
+      Logger.info('CACHE', `Place cache lookup: L1=${l1Hits}, L2=${l2Hits}, miss=${missing.length}`, {
+        total: placeIds.length,
+        l1Hits,
+        l2Hits,
+        misses: missing.length,
+        hitRate: `${((totalHits / placeIds.length) * 100).toFixed(1)}%`,
+        estimatedSavings: `€${(totalHits * COST_PER_PLACE_DETAIL).toFixed(3)}`
+      });
+    }
+    
+    return { found, missing };
+  },
+
+  /**
+   * Save places to both L1 and L2 cache
+   */
+  async savePlacesToBothLayers(places: GooglePlace[]): Promise<void> {
+    if (places.length === 0) return;
+    
+    // Save to L1 (synchronous)
+    this.setPlaces(places);
+    
+    // Save to L2 (async, non-blocking)
+    SupabaseService.cachePlaces(places).catch(err => {
+      Logger.warn('CACHE', 'Failed to save to L2 cache', { error: err });
     });
   },
 
@@ -218,14 +291,90 @@ export const DistanceCache = {
   },
 
   /**
-   * Cache multiple distances
+   * Cache multiple distances (L1 only - synchronous)
    */
   setMany(originLat: number, originLng: number, distances: Map<string, CachedDistance>): void {
     distances.forEach((distance, placeId) => {
       this.set(originLat, originLng, placeId, distance);
     });
-    Logger.info('CACHE', `Cached ${distances.size} distances`, {
+    Logger.info('CACHE', `Cached ${distances.size} distances to L1`, {
       totalCached: distanceCache.size
+    });
+  },
+
+  /**
+   * Get distances with L2 (Supabase) fallback
+   */
+  async getManyWithL2(
+    originLat: number, 
+    originLng: number, 
+    placeIds: string[]
+  ): Promise<{ found: Map<string, CachedDistance>; missing: string[] }> {
+    const found = new Map<string, CachedDistance>();
+    let l1Hits = 0;
+    let l2Hits = 0;
+    
+    // Check L1 first
+    const l1Missing: string[] = [];
+    for (const id of placeIds) {
+      const cached = this.get(originLat, originLng, id);
+      if (cached) {
+        found.set(id, cached);
+        l1Hits++;
+      } else {
+        l1Missing.push(id);
+      }
+    }
+    
+    // Check L2 for remaining
+    if (l1Missing.length > 0) {
+      const l2Results = await SupabaseService.getCachedDistances(originLat, originLng, l1Missing);
+      l2Results.forEach((distance, id) => {
+        found.set(id, distance);
+        // Save to L1 for faster subsequent access
+        this.set(originLat, originLng, id, distance);
+        l2Hits++;
+      });
+    }
+    
+    const missing = placeIds.filter(id => !found.has(id));
+    
+    // Update stats
+    const totalHits = l1Hits + l2Hits;
+    stats.distanceHits += totalHits;
+    stats.distanceMisses += missing.length;
+    stats.estimatedSavingsEur += totalHits * COST_PER_DISTANCE_ELEMENT;
+    
+    if (totalHits > 0 || missing.length > 0) {
+      Logger.info('CACHE', `Distance cache lookup: L1=${l1Hits}, L2=${l2Hits}, miss=${missing.length}`, {
+        total: placeIds.length,
+        l1Hits,
+        l2Hits,
+        misses: missing.length,
+        hitRate: `${((totalHits / placeIds.length) * 100).toFixed(1)}%`,
+        estimatedSavings: `€${(totalHits * COST_PER_DISTANCE_ELEMENT).toFixed(3)}`
+      });
+    }
+    
+    return { found, missing };
+  },
+
+  /**
+   * Save distances to both L1 and L2 cache
+   */
+  async saveToBothLayers(
+    originLat: number,
+    originLng: number,
+    distances: Map<string, CachedDistance>
+  ): Promise<void> {
+    if (distances.size === 0) return;
+    
+    // Save to L1 (synchronous)
+    this.setMany(originLat, originLng, distances);
+    
+    // Save to L2 (async, non-blocking)
+    SupabaseService.cacheDistances(originLat, originLng, distances).catch(err => {
+      Logger.warn('CACHE', 'Failed to save distances to L2 cache', { error: err });
     });
   }
 };

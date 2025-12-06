@@ -255,17 +255,16 @@ export const useGooglePlaces = () => {
       return { places: [], uniqueCount: 0, cuisineIntent };
     }
 
-    // Check cache first to reduce API calls
-    const cachedPlaces = PlacesCache.getPlaces(uniquePlaceIds);
-    const uncachedIds = uniquePlaceIds.filter(id => !cachedPlaces.has(id));
+    // Check L1 (memory) + L2 (Supabase) cache to reduce API calls
+    const { found: cachedPlaces, missing: uncachedIds } = await PlacesCache.getPlacesWithL2(uniquePlaceIds);
     
-    Logger.info('SYSTEM', 'Place cache check', {
+    Logger.info('SYSTEM', 'Place cache check (L1+L2)', {
       total: uniquePlaceIds.length,
       cached: cachedPlaces.size,
       toFetch: uncachedIds.length
     });
 
-    // Fetch only uncached place details
+    // Fetch only uncached place details from Google API
     let fetchedPlaces: GooglePlace[] = [];
     if (uncachedIds.length > 0) {
       const detailPromises = uncachedIds.map(id => {
@@ -280,8 +279,8 @@ export const useGooglePlaces = () => {
         )
         .map(res => mapPlace(res.value.place));
       
-      // Cache newly fetched places
-      PlacesCache.setPlaces(fetchedPlaces);
+      // Cache newly fetched places to BOTH L1 and L2
+      await PlacesCache.savePlacesToBothLayers(fetchedPlaces);
     }
 
     // Combine cached and fetched places
@@ -301,7 +300,8 @@ export const useGooglePlaces = () => {
     Logger.info('SYSTEM', '=== PLACES API SUMMARY ===', {
       textSearchCalls: uniqueQueries.length,
       placeDetailCalls: uncachedIds.length,
-      placeDetailsSaved: cachedPlaces.size,
+      cacheHits: cachedPlaces.size,
+      newlyCached: fetchedPlaces.length,
       totalApiCalls: uniqueQueries.length + uncachedIds.length,
       estimatedCost: `€${((uniqueQueries.length * 0.01) + (uncachedIds.length * 0.017)).toFixed(3)}`
     });

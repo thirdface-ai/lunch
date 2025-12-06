@@ -58,9 +58,13 @@ export const useDistanceMatrix = () => {
     // Filter places with valid geometry
     const validPlaces = places.filter(p => p.geometry?.location);
 
-    // Check cache first to reduce API calls
+    // Check L1 (memory) + L2 (Supabase) cache to reduce API calls
     const placeIds = validPlaces.map(p => p.place_id);
-    const cachedDistances = DistanceCache.getMany(origin.lat, origin.lng, placeIds);
+    const { found: cachedDistances, missing: uncachedIds } = await DistanceCache.getManyWithL2(
+      origin.lat, 
+      origin.lng, 
+      placeIds
+    );
     
     // Add cached distances to results
     cachedDistances.forEach((distance, placeId) => {
@@ -68,15 +72,17 @@ export const useDistanceMatrix = () => {
     });
 
     // Filter to only uncached places
-    const uncachedPlaces = validPlaces.filter(p => !cachedDistances.has(p.place_id));
+    const uncachedPlaces = validPlaces.filter(p => uncachedIds.includes(p.place_id));
     
-    Logger.info('SYSTEM', 'Distance cache check', {
+    Logger.info('SYSTEM', 'Distance cache check (L1+L2)', {
       total: validPlaces.length,
       cached: cachedDistances.size,
       toFetch: uncachedPlaces.length
     });
 
     // Only make API calls for uncached places
+    const newlyFetchedDistances = new Map<string, PlaceDuration>();
+    
     if (uncachedPlaces.length > 0) {
       // Batch places to stay within API limits
       const batches: GooglePlace[][] = [];
@@ -117,8 +123,7 @@ export const useDistanceMatrix = () => {
                         value: element.duration.value,
                       };
                       durations.set(place.place_id, distance);
-                      // Cache the newly fetched distance
-                      DistanceCache.set(origin.lat, origin.lng, place.place_id, distance);
+                      newlyFetchedDistances.set(place.place_id, distance);
                     } else {
                       failedCount++;
                     }
@@ -139,16 +144,21 @@ export const useDistanceMatrix = () => {
       );
 
       await Promise.all(batchPromises);
+      
+      // Save newly fetched distances to BOTH L1 and L2 cache
+      if (newlyFetchedDistances.size > 0) {
+        await DistanceCache.saveToBothLayers(origin.lat, origin.lng, newlyFetchedDistances);
+      }
     }
 
     // Log API call summary for this distance calculation
     const batchCount = Math.ceil(uncachedPlaces.length / BATCH_SIZE);
     Logger.info('SYSTEM', '=== DISTANCE MATRIX API SUMMARY ===', {
       totalPlaces: validPlaces.length,
-      cachedDistances: cachedDistances.size,
+      cacheHits: cachedDistances.size,
       apiCalls: batchCount,
       elementsCalculated: uncachedPlaces.length,
-      elementsSaved: cachedDistances.size,
+      newlyCached: newlyFetchedDistances.size,
       estimatedCost: `€${(uncachedPlaces.length * 0.005).toFixed(3)}`
     });
 

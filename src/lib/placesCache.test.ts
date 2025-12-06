@@ -11,6 +11,16 @@ vi.mock('../utils/logger', () => ({
   },
 }));
 
+// Mock SupabaseService for L2 cache tests
+vi.mock('../services/supabaseService', () => ({
+  default: {
+    getCachedPlaces: vi.fn().mockResolvedValue(new Map()),
+    cachePlaces: vi.fn().mockResolvedValue(undefined),
+    getCachedDistances: vi.fn().mockResolvedValue(new Map()),
+    cacheDistances: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 // Helper to create mock place
 const createMockPlace = (id: string, overrides: Partial<GooglePlace> = {}): GooglePlace => ({
   place_id: id,
@@ -67,9 +77,9 @@ describe('PlacesCache', () => {
       const place = createMockPlace('expiring-place');
       PlacesCache.setPlace('expiring-place', place);
       
-      // Fast-forward time by 16 minutes (past 15-min TTL)
+      // Fast-forward time by 61 minutes (past 1-hour L1 TTL)
       vi.useFakeTimers();
-      vi.advanceTimersByTime(16 * 60 * 1000);
+      vi.advanceTimersByTime(61 * 60 * 1000);
       
       const cached = PlacesCache.getPlace('expiring-place');
       expect(cached).toBeNull();
@@ -83,8 +93,8 @@ describe('PlacesCache', () => {
       const place = createMockPlace('fresh-place');
       PlacesCache.setPlace('fresh-place', place);
       
-      // Fast-forward time by 10 minutes (within 15-min TTL)
-      vi.advanceTimersByTime(10 * 60 * 1000);
+      // Fast-forward time by 30 minutes (within 1-hour L1 TTL)
+      vi.advanceTimersByTime(30 * 60 * 1000);
       
       const cached = PlacesCache.getPlace('fresh-place');
       expect(cached).toEqual(place);
@@ -303,6 +313,110 @@ describe('logCacheSummary', () => {
     PlacesCache.getPlaces(['test', 'missing']);
     
     expect(() => logCacheSummary()).not.toThrow();
+  });
+});
+
+describe('PlacesCache L2 Integration', () => {
+  beforeEach(() => {
+    PlacesCache.clear();
+    vi.clearAllMocks();
+  });
+
+  describe('getPlacesWithL2', () => {
+    it('returns L1 cached places first', async () => {
+      const place = createMockPlace('l1-cached');
+      PlacesCache.setPlace('l1-cached', place);
+
+      const { found, missing } = await PlacesCache.getPlacesWithL2(['l1-cached', 'not-cached']);
+
+      expect(found.size).toBe(1);
+      expect(found.get('l1-cached')).toEqual(place);
+      expect(missing).toContain('not-cached');
+    });
+
+    it('returns combined L1 and L2 results', async () => {
+      const l1Place = createMockPlace('l1-place');
+      PlacesCache.setPlace('l1-place', l1Place);
+
+      // L2 will return empty (mocked), so we just verify L1 works
+      const { found } = await PlacesCache.getPlacesWithL2(['l1-place']);
+
+      expect(found.size).toBe(1);
+    });
+
+    it('identifies missing places correctly', async () => {
+      const { missing } = await PlacesCache.getPlacesWithL2(['missing-1', 'missing-2']);
+
+      expect(missing).toHaveLength(2);
+      expect(missing).toContain('missing-1');
+      expect(missing).toContain('missing-2');
+    });
+  });
+
+  describe('savePlacesToBothLayers', () => {
+    it('saves to L1 cache', async () => {
+      const places = [createMockPlace('new-1'), createMockPlace('new-2')];
+
+      await PlacesCache.savePlacesToBothLayers(places);
+
+      expect(PlacesCache.getPlace('new-1')).toBeDefined();
+      expect(PlacesCache.getPlace('new-2')).toBeDefined();
+    });
+
+    it('does not throw for empty array', async () => {
+      await expect(PlacesCache.savePlacesToBothLayers([])).resolves.not.toThrow();
+    });
+  });
+});
+
+describe('DistanceCache L2 Integration', () => {
+  beforeEach(() => {
+    PlacesCache.clear();
+    vi.clearAllMocks();
+  });
+
+  describe('getManyWithL2', () => {
+    it('returns L1 cached distances first', async () => {
+      DistanceCache.set(52.52, 13.405, 'cached-place', { text: '5 mins', value: 300 });
+
+      const { found, missing } = await DistanceCache.getManyWithL2(
+        52.52, 
+        13.405, 
+        ['cached-place', 'not-cached']
+      );
+
+      expect(found.size).toBe(1);
+      expect(found.get('cached-place')).toEqual({ text: '5 mins', value: 300 });
+      expect(missing).toContain('not-cached');
+    });
+
+    it('identifies all places as missing when cache is empty', async () => {
+      const { missing } = await DistanceCache.getManyWithL2(
+        52.52, 
+        13.405, 
+        ['place-1', 'place-2', 'place-3']
+      );
+
+      expect(missing).toHaveLength(3);
+    });
+  });
+
+  describe('saveToBothLayers', () => {
+    it('saves to L1 cache', async () => {
+      const distances = new Map([
+        ['place-1', { text: '5 mins', value: 300 }],
+        ['place-2', { text: '10 mins', value: 600 }],
+      ]);
+
+      await DistanceCache.saveToBothLayers(52.52, 13.405, distances);
+
+      expect(DistanceCache.get(52.52, 13.405, 'place-1')).toEqual({ text: '5 mins', value: 300 });
+      expect(DistanceCache.get(52.52, 13.405, 'place-2')).toEqual({ text: '10 mins', value: 600 });
+    });
+
+    it('does not throw for empty map', async () => {
+      await expect(DistanceCache.saveToBothLayers(52.52, 13.405, new Map())).resolves.not.toThrow();
+    });
   });
 });
 
