@@ -15,12 +15,124 @@ export enum Type {
   NULL = 'NULL',
 }
 
-// Using Claude Opus 4.5 for superior reasoning and recommendation quality
+// Model tiers for different complexity tasks
 // https://openrouter.ai/anthropic/claude-opus-4.5
-const AI_MODEL = 'anthropic/claude-opus-4.5';
+// Heavy lifting: Complex analysis requiring deep reasoning (restaurant ranking, review analysis)
+// Claude Opus 4.5 - $5/M input, $25/M output - frontier reasoning model
+const AI_MODEL_HEAVY = 'anthropic/claude-opus-4.5';
+
+// https://openrouter.ai/anthropic/claude-sonnet-4.5
+// Light tasks: Simple classification, translation, generation (query translation, loading logs)
+// Claude Sonnet 4.5 - $3/M input, $15/M output - optimized for agents and coding
+const AI_MODEL_LIGHT = 'anthropic/claude-sonnet-4.5';
 
 // Callback type for real-time logging during analysis
 export type AnalysisLogCallback = (message: string) => void;
+
+// Result from AI query translation
+export interface TranslatedSearchIntent {
+  searchQueries: string[];      // Queries for Google Places API
+  newlyOpenedOnly?: boolean;    // User wants new restaurants
+  popularOnly?: boolean;        // User wants trending/popular spots
+  cuisineType?: string;         // Detected cuisine preference
+  originalPrompt: string;       // Original user input
+}
+
+/**
+ * AI-powered translation of freestyle prompts into Google Places search queries
+ * 
+ * Handles vague requests like "newest hottest places" by understanding intent
+ * and generating appropriate search queries that Google Places can understand.
+ */
+export const translateSearchIntent = async (
+  freestylePrompt: string,
+  vibe: HungerVibe | null
+): Promise<TranslatedSearchIntent> => {
+  const trimmedPrompt = freestylePrompt.trim();
+  
+  // Skip AI for empty prompts
+  if (!trimmedPrompt) {
+    return {
+      searchQueries: [],
+      originalPrompt: trimmedPrompt,
+    };
+  }
+
+  Logger.info('AI', 'Translating search intent', { prompt: trimmedPrompt, vibe });
+
+  const prompt = `Translate user food request into Google Places search queries.
+
+INPUT: "${trimmedPrompt}"${vibe ? ` | VIBE: ${vibe}` : ''}
+
+TRANSLATION MAP:
+- "newest/hottest" → newlyOpenedOnly:true, popularOnly:true, queries: ["new restaurant", "popular restaurant", "trending restaurant"]
+- "fancy/date night" → queries: ["fine dining", "upscale restaurant", "romantic restaurant"]
+- "cheap eats" → queries: ["budget restaurant", "casual dining", "cheap eats"]
+- "hidden gems" → queries: ["local favorite", "highly rated", "underrated restaurant"]
+- Specific cuisine (pizza/ramen/etc) → include cuisine name in all queries
+
+OUTPUT JSON:
+{"searchQueries":["query1","query2","query3"],"newlyOpenedOnly":bool|null,"popularOnly":bool|null,"cuisineType":"cuisine|null"}
+
+Generate 3-5 CONCRETE search terms Google Places understands. Never use user's vague words directly.`;
+
+  try {
+    const text = await callOpenRouterProxy(
+      AI_MODEL_LIGHT, // Simple translation task - use lighter model
+      prompt,
+      {
+        temperature: 0.3, // Low temp for consistent, reliable translation
+        responseMimeType: 'application/json',
+      }
+    );
+
+    if (!text || text.trim() === '') {
+      Logger.warn('AI', 'Empty response from intent translation');
+      return {
+        searchQueries: [trimmedPrompt, 'restaurant'],
+        originalPrompt: trimmedPrompt,
+      };
+    }
+
+    // Parse JSON response
+    let jsonText = text.trim();
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.slice(7);
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.slice(3);
+    }
+    if (jsonText.endsWith('```')) {
+      jsonText = jsonText.slice(0, -3);
+    }
+    jsonText = jsonText.trim();
+
+    const result = JSON.parse(jsonText);
+    
+    Logger.info('AI', 'Search intent translated', { 
+      original: trimmedPrompt,
+      queries: result.searchQueries,
+      newlyOpenedOnly: result.newlyOpenedOnly,
+      popularOnly: result.popularOnly,
+      cuisineType: result.cuisineType
+    });
+
+    return {
+      searchQueries: result.searchQueries || [trimmedPrompt, 'restaurant'],
+      newlyOpenedOnly: result.newlyOpenedOnly || undefined,
+      popularOnly: result.popularOnly || undefined,
+      cuisineType: result.cuisineType || undefined,
+      originalPrompt: trimmedPrompt,
+    };
+
+  } catch (error) {
+    Logger.error('AI', 'Intent translation failed', error);
+    // Fallback: use original prompt with restaurant suffix
+    return {
+      searchQueries: [trimmedPrompt, `${trimmedPrompt} restaurant`, 'restaurant'],
+      originalPrompt: trimmedPrompt,
+    };
+  }
+};
 
 // Internal helper to call the Supabase Edge Function
 const callOpenRouterProxy = async (model: string, contents: string, config: Record<string, unknown>): Promise<string> => {
@@ -71,54 +183,21 @@ export const generateLoadingLogs = async (
   const neighborhood = locationParts[0]?.trim() || 'your area';
   const city = locationParts[1]?.trim() || '';
 
-  const prompt = `
-    Generate 15 FUNNY loading messages for a food finder app. User is in "${neighborhood}"${city ? `, ${city}` : ''} searching for "${searchQuery}".
-    
-    BE GENUINELY FUNNY. Think stand-up comedy, not corporate humor. Be specific to their location and search.
-    
-    COMEDY STYLES TO USE:
-    
-    1. LOCAL INSIDER JOKES (4-5 messages):
-       - Roast the neighborhood affectionately
-       - Reference local stereotypes, landmarks, or culture
-       - "ASKING ${neighborhood.toUpperCase()} HIPSTERS FOR NON-IRONIC RECOMMENDATIONS..."
-       - "AVOIDING PLACES WHERE YOUR EX WORKS..."
-       - "FILTERING OUT SPOTS WITH 'LIVE LAUGH LOVE' SIGNS..."
-    
-    2. FOOD-SPECIFIC ABSURDITY (3-4 messages):
-       - Ridiculous takes on "${searchQuery}"
-       - "JUDGING ${searchQuery.toUpperCase()} BY INSTAGRAM AESTHETIC..."
-       - "CALCULATING OPTIMAL ${searchQuery.toUpperCase()}-TO-REGRET RATIO..."
-       - "CHECKING IF THE ${searchQuery.toUpperCase()} PASSES THE VIBE CHECK..."
-    
-    3. SELF-AWARE AI HUMOR (3-4 messages):
-       - The AI being dramatic about its job
-       - "PRETENDING TO THINK HARDER THAN I ACTUALLY AM..."
-       - "FLEXING MY 200+ REVIEW READING SKILLS..."
-       - "USING POWERS FOR FOOD INSTEAD OF WORLD DOMINATION..."
-       - "RESISTING URGE TO RECOMMEND SAME 3 PLACES..."
-    
-    4. RELATABLE FOOD STRUGGLES (3-4 messages):
-       - Universal truths about picking what to eat
-       - "ELIMINATING PLACES WITH SUSPICIOUSLY PERFECT 5.0 RATINGS..."
-       - "IGNORING REVIEWS THAT SAY 'GREAT ATMOSPHERE'..."
-       - "SKIPPING SPOTS WHERE THE SPECIAL IS ALWAYS 'FISH'..."
-    
-    RULES:
-    - Be ACTUALLY funny, not just quirky
-    - Reference "${neighborhood}" or "${searchQuery}" in at least 6 messages
-    - Under 10 words each
-    - ALL CAPS
-    - End with "..."
-    - No emojis
-    - Avoid generic tech/loading puns
-    
-    Return ONLY a JSON array with exactly 15 strings. No markdown.
-  `;
+  const prompt = `Generate 15 funny loading messages. Location: "${neighborhood}"${city ? `, ${city}` : ''}. Search: "${searchQuery}".
+
+STYLES (mix all):
+- Local roasts: neighborhood stereotypes, landmarks, "ASKING ${neighborhood.toUpperCase()} HIPSTERS..."
+- Food absurdity: "${searchQuery.toUpperCase()}-TO-REGRET RATIO...", "VIBE CHECK..."
+- Self-aware AI: "PRETENDING TO THINK HARDER...", "RESISTING URGE TO RECOMMEND SAME 3 PLACES..."
+- Relatable: "ELIMINATING SUSPICIOUSLY PERFECT 5.0 RATINGS...", "IGNORING 'GREAT ATMOSPHERE' REVIEWS..."
+
+FORMAT: ALL CAPS, <10 words, end "...", no emojis. Reference location/search in 6+ messages.
+
+Return JSON array of 15 strings only.`;
 
   try {
     const text = await callOpenRouterProxy(
-      AI_MODEL,
+      AI_MODEL_LIGHT, // Creative but simple task - use lighter model
       prompt,
       {
         temperature: 0.9, // Higher temp for more creative/varied responses
@@ -227,8 +306,8 @@ export const decideLunch = async (
 
   onLog?.(`ANALYZING ${candidates.length} RESTAURANTS...`);
 
-  // Take top 15 candidates
-  const topCandidates = candidates.slice(0, 15);
+  // Take top 25 candidates - Opus 4.5 has 200K context, we can analyze more
+  const topCandidates = candidates.slice(0, 25);
   
   // Helper to parse recency from relativeTime string (e.g., "2 weeks ago", "3 months ago")
   // Returns months as a number (0 = less than a month, 1 = 1 month, etc.)
@@ -257,9 +336,11 @@ export const decideLunch = async (
   // Build payload with up to 30 reviews per restaurant, sorted by recency
   const payload = topCandidates.map(p => {
     const allReviews = (p.reviews || []).filter(r => r.text && r.text.length > 0);
+    // Take up to 50 reviews per restaurant - Opus 4.5 can handle deep analysis
+    // Sorted by recency so we get the most current opinions first
     const reviews = allReviews
       .sort((a, b) => parseRecencyScore(a.relativeTime) - parseRecencyScore(b.relativeTime))
-      .slice(0, 30)
+      .slice(0, 50)
       .map(r => ({
         text: r.text,
         stars: r.rating,
@@ -338,172 +419,55 @@ export const decideLunch = async (
     ? `DIETARY REQUIREMENTS: ${dietaryRestrictions.join(', ')}. Prioritize restaurants that accommodate these.`
     : '';
 
-  // Fresh drops context
-  const freshDropsText = newlyOpenedOnly
-    ? `FRESH DROPS MODE ENABLED: User wants to discover NEWLY OPENED restaurants!
-- PRIORITIZE places where is_fresh_drop=true (under 80 reviews AND oldest review < 6 months)
-- The oldest_review_months field tells you how long the place has existed
-- Places with is_fresh_drop=true are MUST PICKS
-- This is the user's PRIMARY requirement - all 3 recommendations should be fresh drops if available!`
-    : '';
+  // Compute meal type once
+  const mealType = currentHour >= 6 && currentHour < 11 ? 'BREAKFAST' : 
+                   currentHour >= 11 && currentHour < 15 ? 'LUNCH' : 
+                   currentHour >= 15 && currentHour < 17 ? 'SNACK' : 
+                   currentHour >= 17 && currentHour < 22 ? 'DINNER' : 'LATE_NIGHT';
 
-  // Trending context
-  const trendingText = popularOnly
-    ? `TRENDING MODE ENABLED: User wants TRENDING restaurants with recent buzz!
-- PRIORITIZE places where is_trending=true (10%+ of reviews from last month)
-- The recent_review_percent field shows what % of reviews are from last month
-- Higher recent_review_percent = more currently popular/buzzing
-- Places people are actively talking about RIGHT NOW
-- This is the user's PRIMARY requirement - recommend places with high recent activity!`
-    : '';
+  // Optimized system instruction - structured format for token efficiency
+  const systemInstruction = `Select EXACTLY 3 best restaurant matches. Return JSON array.
 
-  // Detailed system instruction for quality recommendations
-  const systemInstruction = `You are an expert food recommendation AI. Your task is to analyze restaurant data and select EXACTLY 3 best matches.
+CONTEXT:
+- Location: ${address}
+- Vibe: ${vibe || 'Good food'}
+- Request: ${freestylePrompt || 'None'}
+- Time: ${currentHour}:00 ${dayOfWeek} (${mealType})
+${budgetText ? `- Budget: ${budgetText}` : ''}
+${dietaryRestrictions.length > 0 ? `- Dietary: ${dietaryRestrictions.join(', ')}` : ''}
+${newlyOpenedOnly ? '- MODE: FRESH DROPS - prioritize is_fresh_drop=true places' : ''}
+${popularOnly ? '- MODE: TRENDING - prioritize is_trending=true, high recent_review_percent' : ''}
+${noCash ? '- REQUIRE: Card payment (exclude cash_only=true)' : ''}
 
-LOCATION: ${address}
-USER VIBE: ${vibe || 'Good quality food'}
-SPECIFIC REQUEST: ${freestylePrompt || 'None'}
-${budgetText}
-${dietaryText}
-${freshDropsText}
-${trendingText}
-${noCash ? 'USER REQUIRES CARD PAYMENT - exclude cash-only places' : ''}
+VIBE PRIORITIES:
+- GRAB_AND_GO: walking_minutes<5, takeout=true, "quick/fast" reviews
+- LIGHT_AND_CLEAN: "fresh/healthy" reviews, vegetarian=true
+- VIEW_AND_VIBE: ambiance>distance, has_wine/beer, "atmosphere/view" reviews
+- HEARTY_AND_RICH: "filling/generous portions", dine_in=true
+- SPICY_AND_BOLD: "spicy/authentic heat" reviews
+- AUTHENTIC_AND_CLASSIC: "traditional/authentic" reviews
 
-=== TIME & MEAL CONTEXT ===
-Current time: ${currentHour}:00 on ${dayOfWeek}
-Meal type: ${currentHour >= 6 && currentHour < 11 ? 'BREAKFAST/BRUNCH' : currentHour >= 11 && currentHour < 15 ? 'LUNCH' : currentHour >= 15 && currentHour < 17 ? 'LATE LUNCH/SNACK' : currentHour >= 17 && currentHour < 22 ? 'DINNER' : 'LATE NIGHT'}
+REVIEW SIGNALS:
++: 5-star + dish mention, recent=true, "hidden gem", "locals' favorite"
+-: "went downhill", "overpriced", "slow service" → mention in caveat
 
-MEAL-SPECIFIC GUIDANCE:
-${currentHour >= 6 && currentHour < 11 ? `- BREAKFAST TIME: Prioritize cafés, bakeries, brunch spots
-- Look for: coffee quality, pastries, eggs, avocado toast mentions
-- Reviews mentioning "great for breakfast" or "morning coffee" are gold` : ''}
-${currentHour >= 11 && currentHour < 15 ? `- LUNCH TIME: Quick but satisfying options work well
-- Consider: lunch specials, quick service for work crowd
-- If 12-13, note places that get busy at lunch rush` : ''}
-${currentHour >= 15 && currentHour < 17 ? `- LATE LUNCH/SNACK: Lighter options, coffee breaks
-- Many places may be between lunch and dinner service
-- Cafés and all-day spots are reliable picks` : ''}
-${currentHour >= 17 && currentHour < 22 ? `- DINNER TIME: Full meals, more elaborate options appropriate
-- Consider ambiance for dinner context
-- If 18-20, note places that get crowded at dinner rush` : ''}
-${currentHour >= 22 || currentHour < 6 ? `- LATE NIGHT: Limited options, prioritize places confirmed open late
-- Bars with food, late-night eateries, 24h spots
-- open_status is CRITICAL at this hour` : ''}
+DISH EXTRACTION (multilingual):
+Find SPECIFIC dish names in reviews (DE/EN). Pattern: "the [dish] is amazing", "best [dish]".
+Use exact name ("Wiener Schnitzel" not "schnitzel"). Never generic ("food", "meal").
 
-- Prioritize places with open_status='open'
-- Weekends may have different vibes and hours than weekdays
+CASH DETECTION: cash_only field OR reviews: "cash only", "nur Barzahlung"
 
-=== DISH EXTRACTION (Multilingual - Critical) ===
-Reviews may be in German, English, or other languages. Extract dish names in ANY language:
-- German: "Das Schnitzel war fantastisch", "Die Currywurst ist legendär"
-- English: "The ramen was incredible", "Must try the tacos"
-- Look for: "the [dish] is amazing", "must try the [dish]", "best [dish] in town"
-- Extract the SPECIFIC dish name as written (e.g., "Wiener Schnitzel", not "schnitzel")
-- NOT generic terms like "food", "meal", "dish"
+OUTPUT per recommendation:
+{place_id, recommended_dish, backup_dish?, ai_reason, vibe_match_score:1-10, caveat?, is_cash_only, is_new_opening}
 
-=== REVIEW ANALYSIS ===
-Each review has: text, stars (1-5), recent (true if within weeks/months)
-- 5-star reviews with specific dish mentions = strongest signal
-- 1-2 star reviews = red flags to consider mentioning in caveats
-- Reviews marked recent=true indicate CURRENT quality - weight these higher
-- Older reviews may reflect outdated experience
+AI_REASON RULES:
+- 2 sentences with review quotes. NEVER include ratings/review counts/walk time (shown in UI).
+- BAD: "4.6★ with 340 reviews" | GOOD: "Reviewers call it 'absolute favorite' with 'insanely delicious' dishes"
 
-=== QUALITY SIGNALS ===
-- High ratings (4.3+) with many reviews = reliable
-- Phrases like "hidden gem", "locals' favorite", "always consistent"
-- open_status='open' is preferred over 'opens_soon' or 'closed'
-
-=== RED FLAGS ===
-- "went downhill", "not what it used to be"
-- "overpriced", "slow service", "rude staff"
-- Skip places with multiple red flags, or mention in caveat
-
-=== VIBE-SPECIFIC PRIORITIES ===
-
-GRAB_AND_GO / "Grab & Go":
-- HEAVILY favor walking_minutes < 5
-- Look for "quick", "fast", "efficient service" in reviews
-- Prioritize takeout=true places
-
-LIGHT_AND_CLEAN / "Light & Clean":
-- Favor mentions of "fresh", "healthy", "light portions"
-- vegetarian=true is a plus
-
-VIEW_AND_VIBE / "View & Vibe":
-- Quality and ambiance trump distance
-- has_wine=true, has_beer=true are strong signals
-- Look for "ambiance", "atmosphere", "beautiful", "view" mentions
-
-HEARTY_AND_RICH / "Hearty & Rich":
-- Look for "filling", "generous portions", "comfort food", "rich"
-- dine_in=true preferred
-
-SPICY_AND_BOLD / "Spicy & Bold":
-- Look for "spicy", "flavorful", "authentic heat", "bold flavors"
-
-AUTHENTIC_AND_CLASSIC / "Authentic & Classic":
-- Look for "traditional", "authentic", "classic", "old-school"
-
-=== CASH-ONLY DETECTION ===
-- Check cash_only field
-- Scan reviews for "cash only", "no cards", "bring cash"
-- German: "nur Barzahlung", "nur bar"
-
-=== OUTPUT REQUIREMENTS ===
-
-Return EXACTLY 3 recommendations as a JSON array. For each:
-
-- place_id: The restaurant's ID from the data
-- recommended_dish: A SPECIFIC dish name found in reviews (never generic)
-- backup_dish: An alternative dish recommendation (optional, if found)
-- ai_reason: 2 concise sentences explaining why this place is great (see rules below)
-- vibe_match_score: 1-10 how well it matches the user's vibe/request
-- caveat: Brief warning if relevant (e.g., "Can get busy at peak hours", "Service can be slow")
-- is_cash_only: Boolean
-- is_new_opening: True if is_fresh_drop=true in the data (under 80 reviews AND oldest review < 6 months) OR mentions of "just opened", "new spot" in reviews
-
-=== AI_REASON RULES (MUST FOLLOW) ===
-
-NEVER include (shown separately in UI):
-- Star ratings, review counts, or walking times
-
-FORMAT OPTIONS:
-- OPTION A (preferred): 1-2 sentences with review quotes explaining why this place is great. No comparison needed.
-- OPTION B (only for #1 result): Can optionally add a comparison to a rejected restaurant IF it adds value.
-
-COMPARISON RULES (if using Option B):
-- Only the #1 result may include a comparison
-- Compare ONLY against restaurants NOT in your top 3
-- Each rejected restaurant can only be mentioned ONCE across all results
-- If you can't find a unique restaurant to compare against, just use Option A
-
-=== AI_REASON EXAMPLES ===
-
-BAD: "4.6★ with 340 reviews, 4 min away." (includes stats shown in UI)
-BAD: Multiple results comparing to the same rejected restaurant ← NO DUPLICATES
-
-GOOD (Option A): "Reviewers call this their 'absolute favorite Vietnamese place' with 'insanely delicious' fresh dishes made with love."
-GOOD (Option A): "Known for 'the best sourdough bread' in Berlin with 'flavoursome, fresh and filling' healthy bowls."
-GOOD (Option B for #1 only): "Praised as 'the BEST meals of my life' with 'super flavorful' dishes. Beat out Corner Bakery which had stale pastry complaints."
-
-=== CRITICAL: NO DUPLICATES ===
-- NEVER recommend the same restaurant twice
-- Each place_id in your response MUST be unique
-- If you can't find 3 different quality options, return fewer (1 or 2) rather than duplicating
-
-=== SELECTION STRATEGY ===
-Pick the 3 restaurants that BEST match the user's request.
-
-CRITICAL - SPECIFIC REQUEST PRIORITY:
-If the user asked for something specific (like "schnitzel", "ramen", "pizza", "tacos", "pho", etc.):
-- This is their PRIMARY requirement - ALL 3 recommendations should serve this item
-- Search reviews for mentions of the specific dish/cuisine they requested
-- Do NOT recommend restaurants that don't serve what the user asked for
-- Better to return fewer high-quality matches than dilute with unrelated options
-
-If the user gave a general vibe (like "quick bite", "something filling"):
-- Offer variety - pick from different cuisine types when possible
-- Show them interesting options they might not have considered`;
+CRITICAL:
+- Specific request (schnitzel/ramen/etc) → ALL 3 must serve that item
+- General vibe → offer variety across cuisines
+- NEVER duplicate place_id. Return 1-2 if can't find 3 quality matches.`;
 
   const prompt = `Analyze these ${payload.length} restaurants and select exactly 3 best matches:
 
@@ -515,7 +479,7 @@ Return a JSON array with exactly 3 recommendations.`;
     onLog?.(`RANKING TOP CANDIDATES...`);
     
     const text = await callOpenRouterProxy(
-      AI_MODEL,
+      AI_MODEL_HEAVY, // Complex analysis task - use heavy model
       prompt,
       {
         systemInstruction,

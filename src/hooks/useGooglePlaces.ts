@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { GooglePlace, HungerVibe, PlaceReview } from '../types';
 import { getSearchQueriesForVibe, detectCuisineIntent, CuisineIntent } from '../utils/lunchAlgorithm';
+import { translateSearchIntent, TranslatedSearchIntent } from '../services/aiService';
 import Logger from '../utils/logger';
 
 // Price level mapping from Google Places API enum to numeric value
@@ -89,6 +90,7 @@ interface SearchPlacesResult {
   places: GooglePlace[];
   uniqueCount: number;
   cuisineIntent: CuisineIntent;
+  translatedIntent?: TranslatedSearchIntent; // AI-translated search intent
 }
 
 /**
@@ -163,7 +165,7 @@ export const useGooglePlaces = () => {
     const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
     const location = new google.maps.LatLng(lat, lng);
 
-    // Detect cuisine intent from freestyle prompt
+    // Detect cuisine intent from freestyle prompt (fast, rule-based)
     const cuisineIntent = freestylePrompt 
       ? detectCuisineIntent(freestylePrompt)
       : { isCuisineSpecific: false, searchQueries: [] };
@@ -171,6 +173,7 @@ export const useGooglePlaces = () => {
     // Determine search queries based on cuisine intent
     // CRITICAL: Freestyle prompt should DOMINATE when provided - don't dilute with vibe queries
     let searchQueries: string[];
+    let translatedIntent: TranslatedSearchIntent | undefined;
     
     if (freestylePrompt && freestylePrompt.trim().length > 0) {
       const trimmedPrompt = freestylePrompt.trim();
@@ -183,26 +186,42 @@ export const useGooglePlaces = () => {
           queries: searchQueries 
         });
       } else {
-        // User has a specific freestyle request - make it the PRIMARY search focus
-        // Create multiple variations of the query to maximize relevant results
-        searchQueries = [
-          trimmedPrompt,                           // Exact query: "schnitzel"
-          `${trimmedPrompt} restaurant`,           // With restaurant: "schnitzel restaurant"
-          `best ${trimmedPrompt}`,                 // Quality variant: "best schnitzel"
-          `${trimmedPrompt} near me`,              // Location variant (helps Google)
-        ];
-        
-        // Only add 1-2 vibe queries as secondary fallback, not the full list
-        if (vibe) {
-          const vibeQueries = getSearchQueriesForVibe(vibe);
-          // Take only the first vibe query as a minor supplement
-          searchQueries.push(vibeQueries[0]);
+        // Not a specific cuisine - use AI to translate vague prompts into smart search queries
+        // This handles requests like "newest hottest places", "hidden gems", "something fancy"
+        try {
+          translatedIntent = await translateSearchIntent(trimmedPrompt, vibe);
+          
+          if (translatedIntent.searchQueries.length > 0) {
+            searchQueries = translatedIntent.searchQueries;
+            Logger.info('SYSTEM', 'AI-translated search intent', { 
+              originalPrompt: trimmedPrompt,
+              translatedQueries: searchQueries,
+              newlyOpenedOnly: translatedIntent.newlyOpenedOnly,
+              popularOnly: translatedIntent.popularOnly
+            });
+          } else {
+            // AI returned empty queries - fallback to basic approach
+            searchQueries = [
+              trimmedPrompt,
+              `${trimmedPrompt} restaurant`,
+              'restaurant',
+            ];
+          }
+        } catch (e) {
+          // AI translation failed - fallback to basic approach
+          Logger.warn('SYSTEM', 'AI translation failed, using basic approach', { error: e });
+          searchQueries = [
+            trimmedPrompt,
+            `${trimmedPrompt} restaurant`,
+            `best ${trimmedPrompt}`,
+          ];
         }
         
-        Logger.info('SYSTEM', 'Freestyle-focused search', { 
-          originalPrompt: trimmedPrompt,
-          queries: searchQueries 
-        });
+        // Add vibe query as supplement if no AI translation available
+        if (!translatedIntent && vibe) {
+          const vibeQueries = getSearchQueriesForVibe(vibe);
+          searchQueries.push(vibeQueries[0]);
+        }
       }
     } else {
       // No freestyle prompt: use vibe-based queries
@@ -251,7 +270,7 @@ export const useGooglePlaces = () => {
       filtered: allPlaces.length - foodPlaces.length
     });
 
-    return { places: foodPlaces, uniqueCount: uniquePlaceIds.length, cuisineIntent };
+    return { places: foodPlaces, uniqueCount: uniquePlaceIds.length, cuisineIntent, translatedIntent };
   }, []);
 
   /**

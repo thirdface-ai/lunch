@@ -274,7 +274,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
       const { radius, maxDurationSeconds } = getWalkConfig(preferences.walkLimit);
       setProgress(10);
 
-      const { places, uniqueCount } = await searchPlaces({
+      let searchResult = await searchPlaces({
         lat: preferences.lat,
         lng: preferences.lng,
         radius,
@@ -282,9 +282,32 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         freestylePrompt: preferences.freestylePrompt,
       });
 
+      // If freestyle prompt returns no results, retry with vibe-only or generic search
+      if (searchResult.uniqueCount === 0 && preferences.freestylePrompt) {
+        Logger.warn('SYSTEM', 'Freestyle prompt returned zero results, falling back', { 
+          prompt: preferences.freestylePrompt 
+        });
+        addLog('EXPANDING SEARCH PARAMETERS...');
+        
+        // Retry with just the vibe (if set) or generic restaurant search
+        searchResult = await searchPlaces({
+          lat: preferences.lat,
+          lng: preferences.lng,
+          radius,
+          vibe: preferences.vibe,
+          freestylePrompt: undefined, // Remove the freestyle prompt
+        });
+      }
+
+      const { places, uniqueCount, translatedIntent } = searchResult;
+      
+      // AI may have detected intent from freestyle prompt (e.g., "newest hottest" → newlyOpenedOnly + popularOnly)
+      const aiDetectedNewlyOpened = translatedIntent?.newlyOpenedOnly || false;
+      const aiDetectedPopular = translatedIntent?.popularOnly || false;
+
       if (uniqueCount === 0) {
-        Logger.warn('SYSTEM', 'Zero Candidates Found Initial Search');
-        throw new Error('ZERO ENTITIES FOUND IN SECTOR.');
+        Logger.warn('SYSTEM', 'Zero Candidates Found Even After Fallback');
+        throw new Error('NO RESTAURANTS FOUND IN THIS AREA. TRY A DIFFERENT LOCATION.');
       }
 
       addLog(`FOUND ${places.length} RESTAURANTS NEARBY...`);
@@ -404,6 +427,17 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
       setProgress(65);
       addLog('ANALYZING REVIEWS AND RATINGS...');
 
+      // Combine user preferences with AI-detected intent from freestyle prompt
+      const effectiveNewlyOpenedOnly = preferences.newlyOpenedOnly || aiDetectedNewlyOpened;
+      const effectivePopularOnly = preferences.popularOnly || aiDetectedPopular;
+      
+      if (aiDetectedNewlyOpened || aiDetectedPopular) {
+        Logger.info('SYSTEM', 'AI detected search intent from freestyle prompt', {
+          newlyOpenedOnly: aiDetectedNewlyOpened,
+          popularOnly: aiDetectedPopular
+        });
+      }
+      
       const recommendations = await decideLunch(
         candidatesForGemini,
         durations,
@@ -413,8 +447,8 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         preferences.address,
         preferences.dietaryRestrictions,
         preferences.freestylePrompt,
-        preferences.newlyOpenedOnly,
-        preferences.popularOnly,
+        effectiveNewlyOpenedOnly,
+        effectivePopularOnly,
         addLog // Pass the log callback for real-time personalized updates
       );
 
