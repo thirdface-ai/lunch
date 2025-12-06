@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { generateObject } from 'ai';
+import { gateway } from '@ai-sdk/gateway';
 import { z } from 'zod';
 
 // Rate limiting state (in-memory, resets on cold start)
@@ -86,7 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const schema = schemaType === 'recommendations' ? RecommendationSchema : LoadingLogsSchema;
 
     const result = await generateObject({
-      model: 'anthropic/claude-sonnet-4.5',
+      model: gateway('anthropic/claude-sonnet-4.5'),
       schema,
       prompt,
       system: systemInstruction,

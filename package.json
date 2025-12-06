@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@ai-sdk/gateway": "^2.0.18",
     "@supabase/supabase-js": "^2.39.0",
     "@tanstack/react-query": "^5.17.0",
     "ai": "^5.0.107",
