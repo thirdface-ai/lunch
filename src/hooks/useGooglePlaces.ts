@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { GooglePlace, HungerVibe, PlaceReview } from '../types';
 import { getSearchQueriesForVibe, detectCuisineIntent, CuisineIntent } from '../utils/lunchAlgorithm';
 import { translateSearchIntent, TranslatedSearchIntent } from '../services/aiService';
-import { PlacesCache } from '../lib/placesCache';
+import { PlacesCache, TextSearchCache } from '../lib/placesCache';
 import Logger from '../utils/logger';
 
 // Price level mapping from Google Places API enum to numeric value
@@ -236,20 +236,56 @@ export const useGooglePlaces = () => {
       deduplicated: uniqueQueries.length
     });
 
-    // Search for place IDs
-    const searchIdPromises = uniqueQueries.map(query => {
-      const request = {
-        textQuery: query,
-        locationBias: { center: location, radius },
-        maxResultCount: 20,
-        fields: ['id']
-      };
-      return Place.searchByText(request);
+    // Check text search cache first (L1 + L2)
+    const { found: cachedSearches, missing: uncachedQueries } = await TextSearchCache.getManyWithL2(
+      lat, lng, uniqueQueries, radius
+    );
+
+    // Collect place IDs from cached searches
+    const cachedPlaceIds: string[] = [];
+    cachedSearches.forEach(placeIds => {
+      cachedPlaceIds.push(...placeIds);
     });
 
-    const searchIdResults = await Promise.all(searchIdPromises);
-    const allPlaceIds = searchIdResults.flatMap(result => result.places.map(p => p.id));
-    const uniquePlaceIds = [...new Set(allPlaceIds)];
+    // Only make API calls for uncached queries
+    let fetchedPlaceIds: string[] = [];
+    if (uncachedQueries.length > 0) {
+      const searchIdPromises = uncachedQueries.map(query => {
+        const request = {
+          textQuery: query,
+          locationBias: { center: location, radius },
+          maxResultCount: 20,
+          fields: ['id']
+        };
+        return Place.searchByText(request).then(result => ({
+          query,
+          placeIds: result.places.map(p => p.id).filter((id): id is string => !!id)
+        }));
+      });
+
+      const searchResults = await Promise.all(searchIdPromises);
+      
+      // Cache each search result and collect place IDs
+      for (const { query, placeIds } of searchResults) {
+        fetchedPlaceIds.push(...placeIds);
+        // Save to cache (non-blocking)
+        TextSearchCache.saveToBothLayers(lat, lng, query, radius, placeIds);
+      }
+    }
+
+    // Combine cached and fetched place IDs
+    const allPlaceIds = [...cachedPlaceIds, ...fetchedPlaceIds];
+    const uniquePlaceIds = [...new Set(allPlaceIds)].filter((id): id is string => !!id);
+
+    Logger.info('SYSTEM', '=== TEXT SEARCH SUMMARY ===', {
+      totalQueries: uniqueQueries.length,
+      cachedQueries: cachedSearches.size,
+      apiCalls: uncachedQueries.length,
+      cachedPlaceIds: cachedPlaceIds.length,
+      fetchedPlaceIds: fetchedPlaceIds.length,
+      uniquePlaceIds: uniquePlaceIds.length,
+      estimatedSavings: `€${(cachedSearches.size * 0.032).toFixed(3)}`
+    });
 
     if (uniquePlaceIds.length === 0) {
       return { places: [], uniqueCount: 0, cuisineIntent };

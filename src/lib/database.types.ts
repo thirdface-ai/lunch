@@ -218,6 +218,39 @@ export type Database = {
         }
         Relationships: []
       }
+      text_search_cache: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          origin_lat: number
+          origin_lng: number
+          place_ids: string[]
+          query: string
+          radius: number
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          origin_lat: number
+          origin_lng: number
+          place_ids: string[]
+          query: string
+          radius: number
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          origin_lat?: number
+          origin_lng?: number
+          place_ids?: string[]
+          query?: string
+          radius?: number
+        }
+        Relationships: []
+      }
       user_api_keys: {
         Row: {
           created_at: string | null

@@ -1,14 +1,138 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { ThemeMode } from '../types';
+import { playSoftClick, playSplitFlapForDuration } from '../utils/sounds';
 
 interface PrivacyPolicyProps {
   theme: ThemeMode;
   onClose: () => void;
 }
 
+// Scramble text component for desktop footer (same as Footer.tsx)
+const ScrambleText: React.FC<{ text: string; className?: string; href?: string; onClick?: () => void }> = ({ text, className = '', href, onClick }) => {
+  const [displayText, setDisplayText] = useState(text);
+  const [isHovering, setIsHovering] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [cooldown, setCooldown] = useState(false);
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const iterationRef = useRef(0);
+
+  const scramble = useCallback(() => {
+    if (isAnimating || cooldown) return;
+    
+    iterationRef.current = 0;
+    setIsAnimating(true);
+    const originalText = text;
+    
+    const intervalMs = 47;
+    const animationDuration = originalText.length * 3 * intervalMs;
+    const soundDuration = animationDuration - 70;
+    
+    playSplitFlapForDuration(soundDuration);
+    
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    
+    intervalRef.current = setInterval(() => {
+      setDisplayText(
+        originalText
+          .split('')
+          .map((char, index) => {
+            if (char === ' ') return ' ';
+            if (index < iterationRef.current) {
+              return originalText[index];
+            }
+            return chars[Math.floor(Math.random() * chars.length)];
+          })
+          .join('')
+      );
+      
+      iterationRef.current += 1 / 3;
+      
+      if (iterationRef.current >= originalText.length) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setDisplayText(originalText);
+        setIsAnimating(false);
+        
+        setCooldown(true);
+        // Track timeout for cleanup on unmount
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => setCooldown(false), 300);
+      }
+    }, intervalMs);
+  }, [text, isAnimating, cooldown]);
+
+  const handleMouseEnter = () => {
+    setIsHovering(true);
+    scramble();
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovering(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const content = (
+    <span
+      className={`cursor-pointer transition-all duration-200 font-mono tracking-wider ${className}`}
+      style={{
+        color: isHovering ? '#FF4400' : undefined,
+        textShadow: isHovering ? '0 0 8px rgba(255, 68, 0, 0.6), 0 0 20px rgba(255, 68, 0, 0.3)' : 'none',
+      }}
+    >
+      {displayText}
+    </span>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className="no-underline"
+      >
+        {content}
+      </a>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className="no-underline bg-transparent border-none p-0"
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <span onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+      {content}
+    </span>
+  );
+};
+
 const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isDark = theme === ThemeMode.DARK;
+
+  const handleBackClick = () => {
+    playSoftClick();
+    onClose();
+  };
 
   const lastUpdated = '2025-12-06';
 
@@ -38,7 +162,7 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
             <p className={`font-mono text-[9px] tracking-[0.2em] mt-1 ${isDark ? 'text-dark-text-muted' : 'text-braun-text-muted'}`}>DATA TRANSPARENCY MODULE</p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleBackClick}
             className={`font-mono text-[10px] uppercase tracking-widest px-3 py-2 border transition-all duration-150 hover:border-braun-orange hover:text-braun-orange ${isDark ? 'border-dark-border text-dark-text-muted' : 'border-braun-border text-braun-text-muted'}`}
             aria-label="Close privacy policy"
           >
@@ -261,6 +385,37 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
           </div>
 
         </div>
+      </div>
+
+      {/* Fixed Desktop Footer - Always visible on desktop */}
+      <div 
+        className={`
+          hidden lg:flex fixed bottom-0 left-0 right-0 py-4 px-6
+          font-mono uppercase tracking-wider text-[10px]
+          items-center justify-end gap-4
+          border-t transition-colors duration-300
+          ${isDark 
+            ? 'text-dark-text-muted/50 bg-dark-bg/95 border-dark-border backdrop-blur-sm' 
+            : 'text-braun-text-muted/50 bg-braun-bg/95 border-braun-border backdrop-blur-sm'
+          }
+        `}
+      >
+        <span>
+          Built by{' '}
+          <ScrambleText 
+            text="NOAH NAWARA" 
+            href="https://www.linkedin.com/in/noahnawara/"
+            className={isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'} 
+          />
+        </span>
+        
+        <span className={`${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
+        
+        <ScrambleText 
+          text="IMPRINT" 
+          onClick={handleBackClick}
+          className={isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'} 
+        />
       </div>
     </div>
   );

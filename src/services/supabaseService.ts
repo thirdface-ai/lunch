@@ -130,6 +130,91 @@ export const SupabaseService = {
   // ============================================
 
   /**
+   * Get cached text search results from Supabase (shared across all users)
+   * Returns place IDs for a given search query if still valid
+   */
+  async getCachedTextSearch(
+    lat: number,
+    lng: number,
+    query: string,
+    radius: number
+  ): Promise<string[] | null> {
+    try {
+      // Round to 3 decimal places (~111m precision)
+      const roundedLat = Math.round(lat * 1000) / 1000;
+      const roundedLng = Math.round(lng * 1000) / 1000;
+      const normalizedQuery = query.toLowerCase().trim();
+
+      const { data, error } = await supabase
+        .from('text_search_cache')
+        .select('place_ids')
+        .eq('origin_lat', roundedLat)
+        .eq('origin_lng', roundedLng)
+        .eq('query', normalizedQuery)
+        .eq('radius', radius)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+
+      if (error || !data) {
+        return null;
+      }
+
+      Logger.info('CACHE', `Supabase L2 text search hit: "${query}"`, {
+        placeCount: data.place_ids.length,
+        origin: `${roundedLat},${roundedLng}`
+      });
+
+      return data.place_ids;
+    } catch (e) {
+      Logger.warn('CACHE', 'Supabase text search cache exception', { error: e });
+      return null;
+    }
+  },
+
+  /**
+   * Save text search results to Supabase cache (shared across all users)
+   */
+  async cacheTextSearch(
+    lat: number,
+    lng: number,
+    query: string,
+    radius: number,
+    placeIds: string[]
+  ): Promise<void> {
+    if (placeIds.length === 0) return;
+
+    try {
+      const roundedLat = Math.round(lat * 1000) / 1000;
+      const roundedLng = Math.round(lng * 1000) / 1000;
+      const normalizedQuery = query.toLowerCase().trim();
+
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24); // 24-hour TTL
+
+      const { error } = await supabase
+        .from('text_search_cache')
+        .upsert({
+          origin_lat: roundedLat,
+          origin_lng: roundedLng,
+          query: normalizedQuery,
+          radius,
+          place_ids: placeIds,
+          expires_at: expiresAt.toISOString(),
+        }, { onConflict: 'origin_lat,origin_lng,query,radius' });
+
+      if (error) {
+        Logger.warn('CACHE', 'Supabase text search cache save failed', { error: error.message });
+      } else {
+        Logger.info('CACHE', `Saved text search to Supabase L2: "${query}"`, {
+          placeCount: placeIds.length
+        });
+      }
+    } catch (e) {
+      Logger.warn('CACHE', 'Supabase text search cache save exception', { error: e });
+    }
+  },
+
+  /**
    * Get cached places from Supabase (shared across all users)
    * Only returns non-expired entries
    */
