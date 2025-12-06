@@ -54,7 +54,7 @@ const AppContent: React.FC = () => {
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${isDark ? 'text-dark-text bg-dark-bg' : 'text-braun-dark bg-braun-bg'}`}>
       
       {/* Main content area - grows to push footer down */}
-      <div className="flex-grow">
+      <div className="flex-grow flex flex-col">
         {/* Input Screen */}
         <ControlPanel 
           appState={appState} 

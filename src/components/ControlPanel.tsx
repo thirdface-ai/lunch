@@ -203,9 +203,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const mockMode = isMockMode();
 
   return (
-    <div className={`py-3 sm:py-6 px-3 sm:px-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
+    <div className={`flex-1 flex items-center justify-center p-3 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
       {/* Main Chassis */}
-      <div className={`w-full max-w-5xl mx-auto transition-colors duration-300 border shadow-braun-deep p-1 relative ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
+      <div className={`w-full max-w-5xl transition-colors duration-300 border shadow-braun-deep p-1 relative ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
         
         {/* Screw heads decorations - hidden on mobile */}
         <div className={`hidden sm:flex absolute top-2 left-2 w-2 h-2 rounded-full border opacity-50 items-center justify-center ${isDark ? 'border-dark-text-muted' : 'border-braun-text-muted'}`}><div className={`w-1.5 h-[1px] rotate-45 ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div></div>
