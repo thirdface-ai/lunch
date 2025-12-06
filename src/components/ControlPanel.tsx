@@ -203,9 +203,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const mockMode = isMockMode();
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-3 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
+    <div className={`py-3 sm:py-6 px-3 sm:px-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
       {/* Main Chassis */}
-      <div className={`w-full max-w-5xl transition-colors duration-300 border shadow-braun-deep p-1 relative ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
+      <div className={`w-full max-w-5xl mx-auto transition-colors duration-300 border shadow-braun-deep p-1 relative ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
         
         {/* Screw heads decorations - hidden on mobile */}
         <div className={`hidden sm:flex absolute top-2 left-2 w-2 h-2 rounded-full border opacity-50 items-center justify-center ${isDark ? 'border-dark-text-muted' : 'border-braun-text-muted'}`}><div className={`w-1.5 h-[1px] rotate-45 ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div></div>
@@ -239,34 +239,35 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
 
         {/* Input Module (LCD Style) */}
-        <div className={`p-4 sm:p-8 border-b transition-colors duration-300 ${isDark ? 'border-dark-border bg-[#111]' : 'border-braun-border bg-[#F0F0EC]'}`}>
+        <div className={`p-4 sm:p-6 border-b transition-colors duration-300 ${isDark ? 'border-dark-border bg-[#0C0C0C]' : 'border-braun-border bg-[#EAEAE6]'}`}>
             <div className="flex justify-between items-center mb-2">
                 <label htmlFor="address-input" className={`font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest ${isDark ? darkMuted : 'text-braun-dark'}`}>Target Vector</label>
                 {locating && <span className="font-mono text-[9px] text-braun-orange animate-pulse" role="status">TRIANGULATING...</span>}
             </div>
             
-            <div className={`p-3 sm:p-4 pb-2 pt-2 rounded-sm shadow-inner border-b-2 relative group z-30 transition-colors duration-300 ${isDark ? 'bg-[#000] border-[#222]' : 'bg-[#222] border-[#444]'}`}>
-                <div className="relative flex items-center">
-                    <div className={`relative flex-grow h-14 sm:h-14 flex items-center px-3 sm:px-4 ${isDark ? 'bg-[#050505]' : 'bg-[#2A2A2A]'}`}>
+            <div className={`p-2 rounded-[2px] border relative group z-30 transition-colors duration-300 ${isDark ? 'bg-[#0A0A0A] border-[#1A1A1A]' : 'bg-[#1A1A1A] border-[#333]'}`}>
+                <div className="relative flex items-center gap-2">
+                    <div className={`relative flex-grow h-10 flex items-center px-3 rounded-[1px] ${isDark ? 'bg-[#050505]' : 'bg-[#222]'}`}>
                          <input
                             id="address-input"
                             type="text"
                             value={inputValue}
                             onChange={handleInputChange}
-                                            onBlur={() => { Sounds.inputBlur(); setTimeout(() => setShowPredictions(false), 200); }}
-                                            onFocus={() => { Sounds.inputFocus(); inputValue && predictions.length > 0 && setShowPredictions(true); }}
+                            onBlur={() => { Sounds.inputBlur(); setTimeout(() => setShowPredictions(false), 200); }}
+                            onFocus={() => { Sounds.inputFocus(); inputValue && predictions.length > 0 && setShowPredictions(true); }}
                             placeholder="Enter address..."
                             aria-expanded={showPredictions}
                             aria-haspopup="listbox"
-                            className="w-full bg-transparent text-braun-orange font-mono text-base p-0 focus:outline-none placeholder:text-[#555] tracking-wider z-20"
-                            style={{ textShadow: inputValue ? "0 0 5px rgba(255, 68, 0, 0.5)" : "none" }}
+                            className="w-full bg-transparent text-braun-orange font-mono text-sm p-0 focus:outline-none placeholder:text-[#444] tracking-wide z-20"
+                            style={{ textShadow: inputValue ? "0 0 8px rgba(255, 68, 0, 0.4)" : "none" }}
                         />
-                         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] z-30"></div>
+                         {/* Subtle scanlines */}
+                         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(0,0,0,0)_50%,rgba(0,0,0,0.15)_50%)] bg-[length:100%_2px] opacity-30 z-30 rounded-[1px]"></div>
                          
                          {showPredictions && predictions.length > 0 && (
                              <div 
                                 role="listbox"
-                                className={`absolute top-full left-0 right-0 mt-1 border shadow-braun-deep z-50 max-h-64 overflow-y-auto ${isDark ? 'bg-dark-bg border-dark-border' : 'bg-[#F4F4F0] border-braun-border'}`}
+                                className={`absolute top-full left-0 right-0 mt-2 border shadow-lg z-50 max-h-64 overflow-y-auto rounded-[2px] ${isDark ? 'bg-dark-bg border-dark-border' : 'bg-[#F4F4F0] border-braun-border'}`}
                             >
                                  {predictions.map((p) => (
                                      <button 
@@ -289,14 +290,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     <button 
                         onClick={handleLocateMe}
                         aria-label="Use Current Location"
-                        className={`ml-2 w-14 h-14 sm:w-12 sm:h-12 border rounded-sm flex items-center justify-center transition-all shadow-md group-hover:shadow-[0_0_8px_rgba(255,68,0,0.1)] z-20 flex-shrink-0 ${isDark ? 'bg-[#111] border-[#333] text-[#666] hover:text-braun-orange hover:border-braun-orange active:bg-black' : 'bg-[#333] border-[#555] text-[#888] hover:text-braun-orange hover:border-braun-orange active:bg-[#222]'}`}
+                        className={`w-10 h-10 rounded-[1px] flex items-center justify-center transition-all flex-shrink-0 ${isDark ? 'bg-[#0A0A0A] text-[#555] hover:text-braun-orange' : 'bg-[#2A2A2A] text-[#666] hover:text-braun-orange'}`}
                         title="Acquire GPS Lock"
                     >
-                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                             <circle cx="12" cy="12" r="10" />
-                             <line x1="12" y1="2" x2="12" y2="22" />
-                             <line x1="2" y1="12" x2="22" y2="12" />
-                             <circle cx="12" cy="12" r="3" />
+                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                             <circle cx="12" cy="12" r="8" />
+                             <line x1="12" y1="2" x2="12" y2="6" />
+                             <line x1="12" y1="18" x2="12" y2="22" />
+                             <line x1="2" y1="12" x2="6" y2="12" />
+                             <line x1="18" y1="12" x2="22" y2="12" />
+                             <circle cx="12" cy="12" r="2" fill="currentColor" />
                          </svg>
                     </button>
                 </div>
@@ -344,15 +347,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </div>
 
                 {/* Freestyle Input as Alternative Option */}
-                <div className="relative mt-4 sm:mt-6">
+                <div className="relative mt-4 sm:mt-5">
                      <div className="flex items-center gap-2 mb-2">
                         <div className={`h-[1px] flex-grow ${isDark ? 'bg-dark-border' : 'bg-braun-border'}`}></div>
                         <span className={`font-mono text-[8px] uppercase whitespace-nowrap ${isDark ? darkMuted : lightMuted}`}>OR CUSTOM</span>
                         <div className={`h-[1px] flex-grow ${isDark ? 'bg-dark-border' : 'bg-braun-border'}`}></div>
                      </div>
 
-                    <div className={`p-3 sm:p-4 pb-2 pt-2 rounded-sm shadow-inner border-b-2 relative transition-colors duration-300 group ${isDark ? 'bg-[#000] border-[#222]' : 'bg-[#222] border-[#444]'}`}>
-                        <div className={`relative h-14 sm:h-14 flex items-center px-3 sm:px-4 ${isDark ? 'bg-[#050505]' : 'bg-[#2A2A2A]'}`}>
+                    <div className={`p-2 rounded-[2px] border relative transition-colors duration-300 group ${isDark ? 'bg-[#0A0A0A] border-[#1A1A1A]' : 'bg-[#1A1A1A] border-[#333]'}`}>
+                        <div className={`relative h-10 flex items-center px-3 rounded-[1px] ${isDark ? 'bg-[#050505]' : 'bg-[#222]'}`}>
                             <input
                                 type="text"
                                 aria-label="Custom Prompt"
@@ -360,15 +363,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 onChange={(e) => handleFreestyleChange(e.target.value)}
                                 onFocus={handleFreestyleFocus}
                                 placeholder="Describe your specific craving..."
-                                className={`w-full bg-transparent font-mono text-base p-0 focus:outline-none tracking-wider z-20 text-braun-orange placeholder:text-[#555]`}
-                                style={{ textShadow: preferences.freestylePrompt ? "0 0 5px rgba(255, 68, 0, 0.5)" : "none" }}
+                                className={`w-full bg-transparent font-mono text-sm p-0 focus:outline-none tracking-wide z-20 text-braun-orange placeholder:text-[#444]`}
+                                style={{ textShadow: preferences.freestylePrompt ? "0 0 8px rgba(255, 68, 0, 0.4)" : "none" }}
                             />
-                            {/* Scanline overlay */}
-                            <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] z-30 opacity-70"></div>
+                            {/* Subtle scanlines */}
+                            <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(0,0,0,0)_50%,rgba(0,0,0,0.15)_50%)] bg-[length:100%_2px] opacity-30 z-30 rounded-[1px]"></div>
                             
                             {/* Active Indicator */}
                             {preferences.freestylePrompt && !preferences.vibe && (
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-braun-orange rounded-full animate-pulse shadow-[0_0_5px_#FF4400]"></div>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-braun-orange rounded-full animate-pulse shadow-[0_0_6px_#FF4400]"></div>
                             )}
                         </div>
                     </div>

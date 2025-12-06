@@ -386,37 +386,6 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
 
         </div>
       </div>
-
-      {/* Fixed Desktop Footer - Always visible on desktop */}
-      <div 
-        className={`
-          hidden lg:flex fixed bottom-0 left-0 right-0 py-4 px-6
-          font-mono uppercase tracking-wider text-[10px]
-          items-center justify-end gap-4
-          border-t transition-colors duration-300
-          ${isDark 
-            ? 'text-dark-text-muted/50 bg-dark-bg/95 border-dark-border backdrop-blur-sm' 
-            : 'text-braun-text-muted/50 bg-braun-bg/95 border-braun-border backdrop-blur-sm'
-          }
-        `}
-      >
-        <span>
-          Built by{' '}
-          <ScrambleText 
-            text="NOAH NAWARA" 
-            href="https://www.linkedin.com/in/noahnawara/"
-            className={isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'} 
-          />
-        </span>
-        
-        <span className={`${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
-        
-        <ScrambleText 
-          text="IMPRINT" 
-          onClick={handleBackClick}
-          className={isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'} 
-        />
-      </div>
     </div>
   );
 };

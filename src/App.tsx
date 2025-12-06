@@ -51,37 +51,40 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className={`font-sans transition-colors duration-300 ${isDark ? 'text-dark-text bg-dark-bg' : 'text-braun-dark bg-braun-bg'}`}>
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${isDark ? 'text-dark-text bg-dark-bg' : 'text-braun-dark bg-braun-bg'}`}>
       
-      {/* Input Screen */}
-      <ControlPanel 
-        appState={appState} 
-        preferences={preferences} 
-        setPreferences={setPreferences}
-        onCalculate={handleCalculate}
-        effectiveTheme={effectiveTheme}
-      />
+      {/* Main content area - grows to push footer down */}
+      <div className="flex-grow">
+        {/* Input Screen */}
+        <ControlPanel 
+          appState={appState} 
+          preferences={preferences} 
+          setPreferences={setPreferences}
+          onCalculate={handleCalculate}
+          effectiveTheme={effectiveTheme}
+        />
 
-      {/* Processing Screen / No Results Screen */}
-      <TerminalLog 
-        appState={appState} 
-        logs={logs} 
-        progress={progress}
-        theme={effectiveTheme === 'dark' ? ThemeMode.DARK : ThemeMode.LIGHT}
-        onReset={reset}
-      />
+        {/* Processing Screen / No Results Screen */}
+        <TerminalLog 
+          appState={appState} 
+          logs={logs} 
+          progress={progress}
+          theme={effectiveTheme === 'dark' ? ThemeMode.DARK : ThemeMode.LIGHT}
+          onReset={reset}
+        />
 
-      {/* Results Screen */}
-      <ResultsView 
-        appState={appState} 
-        results={results}
-        userLat={preferences.lat}
-        userLng={preferences.lng}
-        onReset={reset}
-        theme={effectiveTheme === 'dark' ? ThemeMode.DARK : ThemeMode.LIGHT}
-      />
+        {/* Results Screen */}
+        <ResultsView 
+          appState={appState} 
+          results={results}
+          userLat={preferences.lat}
+          userLng={preferences.lng}
+          onReset={reset}
+          theme={effectiveTheme === 'dark' ? ThemeMode.DARK : ThemeMode.LIGHT}
+        />
+      </div>
 
-      {/* Global Footer - visible on all screens */}
+      {/* Global Footer - sticks to bottom when space allows, scrolls with content otherwise */}
       <Footer isDark={isDark} onPrivacyClick={() => setShowPrivacyPolicy(true)} />
     </div>
   );

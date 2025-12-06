@@ -229,7 +229,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   if (appState !== AppState.RESULTS) return null;
 
   return (
-    <div className={`min-h-screen p-3 sm:p-4 sm:h-screen sm:flex sm:items-center sm:justify-center transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
+    <div className={`flex-1 p-3 sm:p-4 sm:flex sm:items-center sm:justify-center transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
       {/* Main Chassis - full height page scroll on mobile, fixed height inline scroll on desktop */}
       <div className={`w-full sm:h-[calc(100vh-2rem)] sm:max-h-[800px] max-w-7xl mx-auto border shadow-braun-deep flex flex-col transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
         
