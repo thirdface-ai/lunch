@@ -2,12 +2,11 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { TerminalLog, AppState, HungerVibe } from '../types';
 import { generateLoadingLogs } from '../services/aiService';
 
-// Message intervals - faster during AI analysis for engagement
-// Starts slower (3-4s), gets faster as suspense builds (2-3s)
+// Message intervals - fast and engaging
 const getMessageInterval = (messageIndex: number): number => {
-  if (messageIndex < 3) return Math.floor(Math.random() * 1000) + 3000;  // 3-4s early
-  if (messageIndex < 6) return Math.floor(Math.random() * 1000) + 2500;  // 2.5-3.5s mid
-  return Math.floor(Math.random() * 1000) + 2000;  // 2-3s late (more suspense)
+  if (messageIndex < 2) return Math.floor(Math.random() * 500) + 1500;  // 1.5-2s first few
+  if (messageIndex < 5) return Math.floor(Math.random() * 500) + 2000;  // 2-2.5s mid
+  return Math.floor(Math.random() * 500) + 2500;  // 2.5-3s later
 };
 
 interface UseTerminalLogsOptions {
@@ -39,12 +38,23 @@ export const useTerminalLogs = (
   const [logs, setLogs] = useState<TerminalLog[]>([]);
   const [progress, setProgress] = useState(0);
   const [dynamicMessages, setDynamicMessages] = useState<string[]>([]);
+  const [isComplete, setIsComplete] = useState(false); // Track when DONE is logged
   const logIdCounter = useRef(0);
   const messageIndexRef = useRef(0);
   const messageIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Add a new log entry
   const addLog = useCallback((text: string) => {
+    // RULE: Nothing appears after DONE
+    if (text.toUpperCase().includes('DONE')) {
+      setIsComplete(true);
+      // Clear any pending dynamic message timers
+      if (messageIntervalRef.current) {
+        clearTimeout(messageIntervalRef.current);
+        messageIntervalRef.current = null;
+      }
+    }
+    
     const newLog: TerminalLog = {
       id: ++logIdCounter.current,
       text,
@@ -69,9 +79,9 @@ export const useTerminalLogs = (
   }, []);
 
   // Display dynamic messages periodically during processing
-  // Messages come faster as time goes on to build suspense
   useEffect(() => {
-    if (appState !== AppState.PROCESSING || dynamicMessages.length === 0) {
+    // Stop if not processing, no messages, or already complete
+    if (appState !== AppState.PROCESSING || dynamicMessages.length === 0 || isComplete) {
       if (messageIntervalRef.current) {
         clearTimeout(messageIntervalRef.current);
         messageIntervalRef.current = null;
@@ -80,10 +90,16 @@ export const useTerminalLogs = (
     }
 
     const scheduleNextMessage = () => {
+      // Double-check we're not complete before scheduling
+      if (isComplete) return;
+      
       const currentIndex = messageIndexRef.current;
       const interval = getMessageInterval(currentIndex);
       
       messageIntervalRef.current = setTimeout(() => {
+        // Triple-check before actually adding the message
+        if (isComplete) return;
+        
         // Get next message (cycle through if we run out)
         const message = dynamicMessages[currentIndex % dynamicMessages.length];
         messageIndexRef.current++;
@@ -92,10 +108,15 @@ export const useTerminalLogs = (
       }, interval);
     };
 
-    // Start quickly - show first AI message early for engagement
-    messageIntervalRef.current = setTimeout(() => {
-      scheduleNextMessage();
-    }, 600);
+    // Show FIRST message immediately when AI messages are ready
+    const firstMessage = dynamicMessages[0];
+    if (firstMessage && messageIndexRef.current === 0) {
+      messageIndexRef.current = 1;
+      addLog(firstMessage);
+    }
+    
+    // Then schedule the rest
+    scheduleNextMessage();
 
     return () => {
       if (messageIntervalRef.current) {
@@ -103,13 +124,14 @@ export const useTerminalLogs = (
         messageIntervalRef.current = null;
       }
     };
-  }, [appState, dynamicMessages, addLog]);
+  }, [appState, dynamicMessages, addLog, isComplete]);
 
-  // Reset dynamic messages when leaving processing state
+  // Reset dynamic messages and complete state when leaving processing state
   useEffect(() => {
     if (appState !== AppState.PROCESSING) {
       setDynamicMessages([]);
       messageIndexRef.current = 0;
+      setIsComplete(false);
     }
   }, [appState]);
 
