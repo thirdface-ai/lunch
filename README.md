@@ -145,8 +145,8 @@ Services Layer
 
 1. User picks location + vibe + constraints
 2. AI translates freestyle prompts into Google Places search queries
-3. Google Places API returns ~20-30 candidates
-4. Places and distances are cached (L1 in-memory + L2 Supabase) to reduce API costs
+3. Check L1 → L2 cache for existing search results (see [Caching System](#the-caching-system-this-is-where-it-gets-good))
+4. On cache miss: Google Places API returns ~20-30 candidates, results cached globally
 5. Claude Opus 4.5 analyzes reviews, extracts dish mentions, scores vibe match
 6. You get 3 recommendations with specific dishes and honest explanations
 7. Results are tracked for variety in future searches
@@ -373,16 +373,72 @@ Then Claude AI picks the best 3 from the top 25 candidates.
 
 ---
 
-## Caching System
+## The Caching System (This Is Where It Gets Good)
 
-Two-tier caching to reduce Google API costs:
+Google Maps APIs are expensive. Every text search costs €0.032, every place detail €0.017, every distance calculation €0.005. Do a few searches and you're bleeding money.
 
-| Layer | Scope | TTL | Purpose |
-|-------|-------|-----|---------|
-| **L1** | In-memory | 1 hour | Instant access within session |
-| **L2** | Supabase | 7 days | Shared across all users |
+So we built a two-tier cache that shares data across all users globally.
 
-Cache performance is logged per session, including estimated cost savings.
+### Architecture: L1 + L2
+
+```
+User searches "ramen near Kreuzberg"
+    |
+    v
+┌─────────────────┐
+│ L1: In-Memory   │ ◄── Instant (0ms), per-session
+│ (Browser)       │     30min TTL for searches, 1hr for places
+└────────┬────────┘
+         │ miss?
+         v
+┌─────────────────┐
+│ L2: Supabase    │ ◄── ~50ms, shared globally
+│ (PostgreSQL)    │     24hr TTL for searches, 7 days for places
+└────────┬────────┘
+         │ miss?
+         v
+┌─────────────────┐
+│ Google Maps API │ ◄── €€€, but results cached for everyone
+└─────────────────┘
+```
+
+### Three Caches Working Together
+
+| Cache | What It Stores | L1 TTL | L2 TTL | Cost/Hit Saved |
+|-------|---------------|--------|--------|----------------|
+| **Text Search** | Query → Place IDs | 30 min | 24 hr | €0.032 |
+| **Place Details** | Place ID → Full data | 1 hr | 7 days | €0.017 |
+| **Distances** | Origin + Place → Walk time | 1 hr | 7 days | €0.005 |
+
+### The Smart Bits
+
+**Coordinate rounding for cache key generation.** Text search keys round lat/lng to 3 decimal places (~111m precision). Someone searching from the coffee shop across the street? They hit your cache. Distance keys use 4 decimal places (~11m). Close enough is close enough.
+
+**L2 → L1 promotion.** When L2 hits, results are immediately saved to L1. Subsequent lookups in the same session are instant.
+
+**Non-blocking L2 writes.** L2 saves are async. The UI never waits for Supabase - your search results appear while the cache update happens in the background.
+
+**Batch operations.** When fetching 25 place details, we check all 25 in L1, then fetch remaining from L2 in one query, then hit Google only for true misses. Not 25 sequential lookups.
+
+**Graceful degradation.** If Supabase is down, L1 still works. If both miss, we just fetch fresh. No errors, no retries, just slightly higher API costs.
+
+**Session cost tracking.** Every cache hit logs estimated savings. At the end of a session, you can see exactly how much money the cache saved.
+
+```
+=== SESSION CACHE SUMMARY ===
+Text Search: 4 hits, 2 misses (66.7%) - €0.128 saved
+Places: 47 hits, 8 misses (85.5%) - €0.799 saved
+Distances: 22 hits, 3 misses (88.0%) - €0.110 saved
+────────────────────────────────────────────────────
+Total API calls avoided: 73
+Estimated session savings: €1.037
+```
+
+### Why This Matters
+
+A cold search (no cache) costs roughly €0.50-1.00 in API calls. A warm search (popular area, recent queries) might cost €0.05 or less. The more people use the app, the better the cache gets for everyone.
+
+The cache also makes repeated searches feel instant. Changed your mind about the walk time? Results appear immediately because we already have the place data.
 
 ---
 

@@ -153,9 +153,14 @@ export const SupabaseService = {
         .eq('query', normalizedQuery)
         .eq('radius', radius)
         .gt('expires_at', new Date().toISOString())
-        .single();
+        .maybeSingle();
 
-      if (error || !data) {
+      if (error) {
+        Logger.warn('CACHE', 'Supabase text search cache query error', { error: error.message });
+        return null;
+      }
+
+      if (!data) {
         return null;
       }
 
