@@ -2,8 +2,13 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { TerminalLog, AppState, HungerVibe } from '../types';
 import { generateLoadingLogs } from '../services/aiService';
 
-// Get random interval between 4-7 seconds (faster for Claude Sonnet 4.5)
-const getRandomInterval = () => Math.floor(Math.random() * 3000) + 4000;
+// Message intervals - faster during AI analysis for engagement
+// Starts slower (3-4s), gets faster as suspense builds (2-3s)
+const getMessageInterval = (messageIndex: number): number => {
+  if (messageIndex < 3) return Math.floor(Math.random() * 1000) + 3000;  // 3-4s early
+  if (messageIndex < 6) return Math.floor(Math.random() * 1000) + 2500;  // 2.5-3.5s mid
+  return Math.floor(Math.random() * 1000) + 2000;  // 2-3s late (more suspense)
+};
 
 interface UseTerminalLogsOptions {
   /** Auto-increment progress when in processing state */
@@ -57,6 +62,7 @@ export const useTerminalLogs = (
   }, []);
 
   // Display dynamic messages periodically during processing
+  // Messages come faster as time goes on to build suspense
   useEffect(() => {
     if (appState !== AppState.PROCESSING || dynamicMessages.length === 0) {
       if (messageIntervalRef.current) {
@@ -67,18 +73,22 @@ export const useTerminalLogs = (
     }
 
     const scheduleNextMessage = () => {
-      const interval = getRandomInterval();
+      const currentIndex = messageIndexRef.current;
+      const interval = getMessageInterval(currentIndex);
+      
       messageIntervalRef.current = setTimeout(() => {
         // Get next message (cycle through if we run out)
-        const message = dynamicMessages[messageIndexRef.current % dynamicMessages.length];
+        const message = dynamicMessages[currentIndex % dynamicMessages.length];
         messageIndexRef.current++;
         addLog(message);
         scheduleNextMessage();
       }, interval);
     };
 
-    // Start the cycle
-    scheduleNextMessage();
+    // Start after a short initial delay (let system messages show first)
+    messageIntervalRef.current = setTimeout(() => {
+      scheduleNextMessage();
+    }, 1500);
 
     return () => {
       if (messageIntervalRef.current) {
@@ -107,7 +117,8 @@ export const useTerminalLogs = (
     setProgress(0);
   }, []);
 
-  // Auto-progress animation when processing (tuned for Claude Sonnet 4.5 speed)
+  // Auto-progress animation when processing
+  // Creates smooth, suspenseful progression that slows as it approaches completion
   useEffect(() => {
     if (!autoProgress || appState !== AppState.PROCESSING) {
       return;
@@ -115,13 +126,24 @@ export const useTerminalLogs = (
 
     const interval = setInterval(() => {
       setProgress(prev => {
-        // Faster progression for quicker AI model
-        if (prev < 40) return Math.min(prev + 0.8, 39);
-        if (prev < 70) return Math.min(prev + 0.5, 69);
-        if (prev < maxAutoProgress) return Math.min(prev + 0.2, maxAutoProgress);
+        // Phase 1: Quick start (0-30%) - "Setting up"
+        if (prev < 30) return Math.min(prev + 1.2, 30);
+        
+        // Phase 2: Steady progress (30-60%) - "Searching & calculating"
+        if (prev < 60) return Math.min(prev + 0.6, 60);
+        
+        // Phase 3: Slower progress (60-80%) - "AI analyzing"
+        if (prev < 80) return Math.min(prev + 0.3, 80);
+        
+        // Phase 4: Suspenseful slowdown (80-92%) - "Almost there..."
+        if (prev < 92) return Math.min(prev + 0.15, 92);
+        
+        // Phase 5: Very slow final stretch (92-97%) - "Building anticipation"
+        if (prev < maxAutoProgress) return Math.min(prev + 0.08, maxAutoProgress);
+        
         return prev;
       });
-    }, 150);
+    }, 120); // Slightly faster tick rate for smoother animation
 
     return () => clearInterval(interval);
   }, [appState, autoProgress, maxAutoProgress]);

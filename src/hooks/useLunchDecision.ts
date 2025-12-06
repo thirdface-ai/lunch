@@ -54,15 +54,13 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
     // Start generating dynamic contextual messages in background (non-blocking)
     startDynamicMessages(preferences.vibe, preferences.address, preferences.freestylePrompt);
 
-    addLog(`ACQUIRING SATELLITE LOCK [${preferences.lat.toFixed(4)}, ${preferences.lng.toFixed(4)}]...`);
+    // Initial log - short and punchy
+    const searchTarget = preferences.freestylePrompt || preferences.vibe || 'lunch spots';
+    addLog(`SEARCHING FOR ${String(searchTarget).toUpperCase()}...`);
 
     try {
       const { radius, maxDurationSeconds } = getWalkConfig(preferences.walkLimit);
-      addLog(`CALIBRATING SCANNER RADIUS: ${radius}m...`);
-
-      // Search for places
-      const vibeLog = preferences.vibe ? preferences.vibe.toUpperCase() : 'CUSTOM DIRECTIVE';
-      addLog(`EXECUTING MULTI-VECTOR SEARCH FOR [${vibeLog}]...`);
+      setProgress(10);
 
       const { places, uniqueCount } = await searchPlaces({
         lat: preferences.lat,
@@ -77,24 +75,24 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('ZERO ENTITIES FOUND IN SECTOR.');
       }
 
-      addLog(`DETECTED ${uniqueCount} UNIQUE ENTITIES...`);
-      addLog(`FILTERED TO ${places.length} VERIFIED FOOD ESTABLISHMENTS...`);
-      setProgress(30);
+      addLog(`FOUND ${places.length} RESTAURANTS NEARBY...`);
+      setProgress(25);
 
       if (places.length === 0) {
         throw new Error('NO FOOD ESTABLISHMENTS FOUND. TRY A DIFFERENT LOCATION OR VIBE.');
       }
 
       // Calculate walking distances
-      addLog('CALIBRATING WALKING VECTORS...');
       const candidatePool = shuffleArray([...places]).slice(0, 50);
+      setProgress(35);
 
       const { durations } = await calculateDistances({
         origin: { lat: preferences.lat, lng: preferences.lng },
         places: candidatePool,
       });
 
-      setProgress(60);
+      addLog('CALCULATING WALKING DISTANCES...');
+      setProgress(45);
 
       // Filter and score candidates
       const allMeasuredCandidates = candidatePool.filter(p => p.geometry?.location);
@@ -102,49 +100,34 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('NO VIABLE CANDIDATES FOUND AFTER PROXIMITY ANALYSIS.');
       }
 
-      addLog(`APPLYING STRICT PROXIMITY FILTER: <= ${preferences.walkLimit} WALK...`);
-
       // Adaptive filtering logic - filter by distance only, not by open status
       let candidatesWithinRange = filterByDuration(allMeasuredCandidates, durations, maxDurationSeconds);
       
-      // Analyze open status for logging (but don't filter)
-      addLog('ANALYZING OPERATIONAL STATUS...');
+      // Analyze open status silently (but don't filter)
       let openCount = 0;
-      let closedCount = 0;
-      let unknownCount = 0;
       candidatesWithinRange.forEach(place => {
         const duration = durations.get(place.place_id);
         const status = getOpenStatusScore(place, duration?.value).status;
         if (status === 'open' || status === 'opens_soon') openCount++;
-        else if (status === 'closed') closedCount++;
-        else unknownCount++;
       });
       
-      const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-      addLog(`STATUS CHECK (${dayName.toUpperCase()}): ${openCount} OPEN, ${closedCount} CLOSED, ${unknownCount} UNKNOWN`);
-      addLog('NOTE: CLOSED ESTABLISHMENTS DEPRIORITIZED BUT INCLUDED.');
+      addLog(`${candidatesWithinRange.length} PLACES WITHIN ${preferences.walkLimit} WALK...`);
+      setProgress(55);
 
       if (candidatesWithinRange.length === 0) {
-        addLog('WARNING: STRICT FILTER YIELDED 0 RESULTS. EXPANDING HORIZON...');
         Logger.warn('SYSTEM', 'Expanding Proximity Search', { originalLimit: maxDurationSeconds });
         candidatesWithinRange = filterByDuration(allMeasuredCandidates, durations, maxDurationSeconds * 1.5);
       }
 
       if (candidatesWithinRange.length === 0) {
-        addLog('WARNING: NO RESULTS IN RANGE. RETRIEVING CLOSEST ENTITIES...');
         Logger.warn('SYSTEM', 'Emergency Fallback Triggered', { count: 5 });
         const sortedByDistance = sortByDuration(allMeasuredCandidates, durations);
         candidatesWithinRange = sortedByDistance.slice(0, 5);
       }
 
-      addLog(`PROXIMITY FILTER COMPLETE. ${candidatesWithinRange.length} CANDIDATES SELECTED.`);
+      setProgress(60);
 
-      if (candidatesWithinRange.length < 5 && candidatesWithinRange.length > 0) {
-        addLog('WARNING: LIMITED CANDIDATE POOL.');
-      }
-
-      // Rank candidates
-      addLog('RANKING CANDIDATES...');
+      // Rank candidates silently
 
       const sortedCandidates = candidatesWithinRange.sort((a, b) => {
         const durationA = durations.get(a.place_id)?.value;
@@ -168,10 +151,6 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         
         // Only apply filter if we still have enough candidates
         if (freshCandidates.length >= MIN_CANDIDATES_FOR_VARIETY) {
-          const filteredCount = candidatesForGemini.length - freshCandidates.length;
-          if (filteredCount > 0) {
-            addLog(`VARIETY FILTER: EXCLUDING ${filteredCount} RECENTLY SHOWN...`);
-          }
           candidatesForGemini = freshCandidates;
         } else {
           Logger.info('SYSTEM', 'Skipping variety filter - limited candidate pool', {
@@ -185,8 +164,9 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('SYSTEM UNABLE TO LOCATE VIABLE TARGETS.');
       }
 
-      // Get AI recommendations via multi-stage deep analysis pipeline
-      addLog('ENGAGING NEURAL ANALYSIS CORE...');
+      // Get AI recommendations - this is where the magic happens
+      setProgress(65);
+      addLog('ANALYZING REVIEWS AND RATINGS...');
 
       const recommendations = await decideLunch(
         candidatesForGemini,
