@@ -60,15 +60,66 @@ const isWithinTimeRange = (rangeStr: string): boolean | null => {
 };
 
 /**
- * Check if a place is currently open based on today's hours string
- * Handles formats like "11:00 am – 10:00 pm", "12:00 – 3:30 pm, 5:30 – 10:30 pm", "Closed"
+ * Extract opening time from a time range string like "11:00 am – 10:00 pm"
+ * Returns the formatted opening time (e.g., "11:00 AM") or null if can't parse
  */
-const isCurrentlyOpen = (todaysHours: string | null | undefined): boolean | null => {
+const extractOpeningTime = (rangeStr: string): string | null => {
+  const parts = rangeStr.split(/\s*[–\-]\s*|\s+to\s+/i);
+  if (parts.length !== 2) return null;
+  
+  const openTimeStr = parts[0].trim();
+  // Validate it's a parseable time
+  if (parseTimeToMinutes(openTimeStr) === null) return null;
+  
+  // Format nicely (capitalize AM/PM)
+  return openTimeStr.toUpperCase().replace(/\s+/g, ' ');
+};
+
+/**
+ * Get the next opening time from today's hours string
+ * Returns formatted time like "11:00 AM" or null if closed all day or can't determine
+ */
+const getNextOpeningTime = (todaysHours: string | null | undefined): string | null => {
   if (!todaysHours) return null;
   
   const cleaned = todaysHours.trim().toLowerCase();
-  if (cleaned === 'closed') return false;
-  if (cleaned === 'open 24 hours') return true;
+  if (cleaned === 'closed') return null; // Closed all day
+  if (cleaned === 'open 24 hours') return null; // Always open
+  
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  
+  // Split by comma to handle multiple time ranges (e.g., lunch and dinner)
+  const timeRanges = todaysHours.split(/\s*,\s*/);
+  
+  // Find the next opening time that's after current time
+  for (const range of timeRanges) {
+    const parts = range.split(/\s*[–\-]\s*|\s+to\s+/i);
+    if (parts.length !== 2) continue;
+    
+    const openTime = parseTimeToMinutes(parts[0]);
+    if (openTime === null) continue;
+    
+    // If this opening time is in the future, return it
+    if (openTime > currentMinutes) {
+      return extractOpeningTime(range);
+    }
+  }
+  
+  // No future opening time found today (closed for rest of day)
+  return null;
+};
+
+/**
+ * Check if a place is currently open based on today's hours string
+ * Returns: { isOpen: boolean | null, nextOpenTime: string | null }
+ */
+const getOpenStatus = (todaysHours: string | null | undefined): { isOpen: boolean | null; nextOpenTime: string | null } => {
+  if (!todaysHours) return { isOpen: null, nextOpenTime: null };
+  
+  const cleaned = todaysHours.trim().toLowerCase();
+  if (cleaned === 'closed') return { isOpen: false, nextOpenTime: null };
+  if (cleaned === 'open 24 hours') return { isOpen: true, nextOpenTime: null };
   
   // Split by comma to handle multiple time ranges (e.g., lunch and dinner)
   const timeRanges = todaysHours.split(/\s*,\s*/);
@@ -76,14 +127,19 @@ const isCurrentlyOpen = (todaysHours: string | null | undefined): boolean | null
   for (const range of timeRanges) {
     const isOpen = isWithinTimeRange(range.trim());
     if (isOpen === true) {
-      return true; // Open if within ANY time range
+      return { isOpen: true, nextOpenTime: null };
     }
   }
   
+  // Not currently open - find next opening time
+  const nextOpenTime = getNextOpeningTime(todaysHours);
+  
   // If we parsed at least one range and none matched, it's closed
-  // If we couldn't parse any ranges, return null to fall back to API
   const parsedAny = timeRanges.some(range => isWithinTimeRange(range.trim()) !== null);
-  return parsedAny ? false : null;
+  return { 
+    isOpen: parsedAny ? false : null, 
+    nextOpenTime 
+  };
 };
 
 interface ResultsViewProps {
@@ -260,12 +316,17 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                             <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>HOURS:</span>
                             {place.opening_hours ? (
                               (() => {
-                                const openStatus = isCurrentlyOpen(todaysHours);
-                                if (openStatus === true) {
+                                const status = getOpenStatus(todaysHours);
+                                if (status.isOpen === true) {
                                   return <span className="text-green-500 font-bold">OPEN</span>;
-                                } else if (openStatus === false) {
-                                  return <span className="text-red-500 font-bold">CLOSED</span>;
+                                } else if (status.isOpen === false) {
+                                  // Show next opening time if available, otherwise just say closed today
+                                  if (status.nextOpenTime) {
+                                    return <span className="text-red-500 font-bold">OPENS {status.nextOpenTime}</span>;
+                                  }
+                                  return <span className="text-red-500 font-bold">CLOSED TODAY</span>;
                                 }
+                                // Fallback to API's open_now status
                                 return place.opening_hours?.open_now 
                                   ? <span className="text-green-500 font-bold">OPEN</span>
                                   : <span className="text-red-500 font-bold">CLOSED</span>;

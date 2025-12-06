@@ -2,8 +2,8 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { TerminalLog, AppState, HungerVibe } from '../types';
 import { generateLoadingLogs } from '../services/aiService';
 
-// Get random interval between 8-12 seconds
-const getRandomInterval = () => Math.floor(Math.random() * 4000) + 8000;
+// Get random interval between 4-7 seconds (faster for Claude Sonnet 4.5)
+const getRandomInterval = () => Math.floor(Math.random() * 3000) + 4000;
 
 interface UseTerminalLogsOptions {
   /** Auto-increment progress when in processing state */
@@ -107,7 +107,7 @@ export const useTerminalLogs = (
     setProgress(0);
   }, []);
 
-  // Auto-progress animation when processing
+  // Auto-progress animation when processing (tuned for Claude Sonnet 4.5 speed)
   useEffect(() => {
     if (!autoProgress || appState !== AppState.PROCESSING) {
       return;
@@ -115,13 +115,13 @@ export const useTerminalLogs = (
 
     const interval = setInterval(() => {
       setProgress(prev => {
-        // Slow down as we approach the max
-        if (prev < 30) return Math.min(prev + 0.5, 29);
-        if (prev < 50) return Math.min(prev + 0.3, 49);
-        if (prev < maxAutoProgress) return Math.min(prev + 0.1, maxAutoProgress);
+        // Faster progression for quicker AI model
+        if (prev < 40) return Math.min(prev + 0.8, 39);
+        if (prev < 70) return Math.min(prev + 0.5, 69);
+        if (prev < maxAutoProgress) return Math.min(prev + 0.2, maxAutoProgress);
         return prev;
       });
-    }, 200);
+    }, 150);
 
     return () => clearInterval(interval);
   }, [appState, autoProgress, maxAutoProgress]);
