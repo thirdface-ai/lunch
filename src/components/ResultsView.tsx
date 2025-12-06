@@ -277,7 +277,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                     {/* Content column */}
                     <div className="flex-1 min-w-0 space-y-3 lg:space-y-4">
                       {/* Name row */}
-                      <div className="flex flex-wrap items-baseline gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <a 
                           href={getPlaceUrl(place.place_id)}
                           target="_blank"
