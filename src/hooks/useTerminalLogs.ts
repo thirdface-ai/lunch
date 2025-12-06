@@ -55,10 +55,17 @@ export const useTerminalLogs = (
 
   // Start generating and displaying dynamic messages
   const startDynamicMessages = useCallback(async (vibe: HungerVibe | null, address: string, freestylePrompt?: string) => {
-    // Generate fresh messages from AI based on user's search
-    const messages = await generateLoadingLogs(vibe, address, freestylePrompt);
-    setDynamicMessages(messages);
-    messageIndexRef.current = 0;
+    try {
+      // Generate fresh messages from AI based on user's search
+      const messages = await generateLoadingLogs(vibe, address, freestylePrompt);
+      if (messages && messages.length > 0) {
+        setDynamicMessages(messages);
+        messageIndexRef.current = 0;
+      }
+    } catch (error) {
+      console.error('Failed to generate loading messages:', error);
+      // Will fall back to no dynamic messages (system messages still show)
+    }
   }, []);
 
   // Display dynamic messages periodically during processing

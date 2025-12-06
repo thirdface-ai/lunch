@@ -79,10 +79,10 @@ describe('generateLoadingLogs', () => {
 
     const result = await generateLoadingLogs(HungerVibe.LIGHT_AND_CLEAN, 'Test Address');
     
-    // Updated fallback messages are more process-oriented
-    expect(result).toContain('SCANNING NEARBY RESTAURANTS...');
-    expect(result).toContain('READING HUNDREDS OF REVIEWS...');
-    expect(result).toContain('CALCULATING WALKING DISTANCES...');
+    // Fallback messages are funny and engaging
+    expect(result).toContain('JUDGING RESTAURANTS BY THEIR FONTS...');
+    expect(result).toContain('READING REVIEWS WRITTEN AT 3AM...');
+    expect(result).toContain('CALCULATING FOOD COMA PROBABILITY...');
   });
 
   it('returns fallback logs when API returns empty text', async () => {
@@ -94,9 +94,9 @@ describe('generateLoadingLogs', () => {
     const result = await generateLoadingLogs(null, 'Address');
     
     // When API returns empty text, it triggers error handling which returns fallback logs
-    expect(result).toContain('SCANNING NEARBY RESTAURANTS...');
-    expect(result).toContain('READING HUNDREDS OF REVIEWS...');
-    expect(result).toContain('CALCULATING WALKING DISTANCES...');
+    expect(result).toContain('JUDGING RESTAURANTS BY THEIR FONTS...');
+    expect(result).toContain('READING REVIEWS WRITTEN AT 3AM...');
+    expect(result).toContain('CALCULATING FOOD COMA PROBABILITY...');
   });
 
   it('handles null vibe gracefully', async () => {

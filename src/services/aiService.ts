@@ -71,45 +71,48 @@ export const generateLoadingLogs = async (
   const city = locationParts[1]?.trim() || '';
 
   const prompt = `
-    Generate 15 unique loading messages for a lunch finder app. The user is searching in "${neighborhood}"${city ? ` (${city})` : ''} for "${searchQuery}".
+    Generate 15 FUNNY loading messages for a lunch finder app. User is in "${neighborhood}"${city ? `, ${city}` : ''} searching for "${searchQuery}".
     
-    THE MESSAGES SHOULD MIX THESE THEMES:
+    BE GENUINELY FUNNY. Think stand-up comedy, not corporate humor. Be specific to their location and search.
     
-    1. LOCATION-SPECIFIC (3-4 messages):
-       - Fun facts or references about ${neighborhood}${city ? ` or ${city}` : ''}
-       - Local culture, landmarks, or food scene
-       - "CONSULTING ${neighborhood.toUpperCase()}'S BEST-KEPT SECRETS..."
-       - "SCANNING EVERY CORNER OF ${neighborhood.toUpperCase()}..."
+    COMEDY STYLES TO USE:
     
-    2. SEARCH-SPECIFIC (3-4 messages):
-       - Reference what they're looking for: "${searchQuery}"
-       - "HUNTING DOWN THE BEST ${searchQuery.toUpperCase()} NEARBY..."
-       - "RATING ${searchQuery.toUpperCase()} SPOTS BY REVIEW QUALITY..."
-       - "FILTERING ${searchQuery.toUpperCase()} OPTIONS BY DISTANCE..."
+    1. LOCAL INSIDER JOKES (4-5 messages):
+       - Roast the neighborhood affectionately
+       - Reference local stereotypes, landmarks, or culture
+       - "ASKING ${neighborhood.toUpperCase()} HIPSTERS FOR NON-IRONIC RECOMMENDATIONS..."
+       - "AVOIDING PLACES WHERE YOUR EX WORKS..."
+       - "FILTERING OUT SPOTS WITH 'LIVE LAUGH LOVE' SIGNS..."
     
-    3. PROCESS-ORIENTED (4-5 messages):
-       - What the AI is actually doing (analyzing reviews, checking ratings, etc.)
-       - "READING 200+ REVIEWS FOR HIDDEN GEMS..."
-       - "CROSS-REFERENCING RATINGS WITH RECENT FEEDBACK..."
-       - "CHECKING WHICH PLACES ARE OPEN RIGHT NOW..."
-       - "CALCULATING WALKING DISTANCES..."
-       - "EXTRACTING DISH RECOMMENDATIONS FROM REVIEWS..."
+    2. FOOD-SPECIFIC ABSURDITY (3-4 messages):
+       - Ridiculous takes on "${searchQuery}"
+       - "JUDGING ${searchQuery.toUpperCase()} BY INSTAGRAM AESTHETIC..."
+       - "CALCULATING OPTIMAL ${searchQuery.toUpperCase()}-TO-REGRET RATIO..."
+       - "CHECKING IF THE ${searchQuery.toUpperCase()} PASSES THE VIBE CHECK..."
     
-    4. WITTY/FUN (3-4 messages):
-       - Self-aware AI humor
-       - Food puns related to ${searchQuery}
-       - "AI STOMACH IS GROWLING TOO..."
-       - "TRYING NOT TO GET DISTRACTED BY FOOD PICS..."
+    3. SELF-AWARE AI HUMOR (3-4 messages):
+       - The AI being dramatic about its job
+       - "PRETENDING TO THINK HARDER THAN I ACTUALLY AM..."
+       - "FLEXING MY 200+ REVIEW READING SKILLS..."
+       - "USING POWERS FOR LUNCH INSTEAD OF WORLD DOMINATION..."
+       - "RESISTING URGE TO RECOMMEND SAME 3 PLACES..."
     
-    REQUIREMENTS:
-    - Each message MUST be unique (no repetition)
-    - Keep each under 12 words
+    4. RELATABLE LUNCH STRUGGLES (3-4 messages):
+       - Universal truths about picking lunch
+       - "ELIMINATING PLACES WITH SUSPICIOUSLY PERFECT 5.0 RATINGS..."
+       - "IGNORING REVIEWS THAT SAY 'GREAT ATMOSPHERE'..."
+       - "SKIPPING SPOTS WHERE THE SPECIAL IS ALWAYS 'FISH'..."
+    
+    RULES:
+    - Be ACTUALLY funny, not just quirky
+    - Reference "${neighborhood}" or "${searchQuery}" in at least 6 messages
+    - Under 10 words each
     - ALL CAPS
-    - End each with "..."
-    - Be informative but also entertaining
-    - At least 5 messages should reference the specific location or search query
+    - End with "..."
+    - No emojis
+    - Avoid generic tech/loading puns
     
-    Return ONLY a valid JSON array with exactly 15 unique strings.
+    Return ONLY a JSON array with exactly 15 strings. No markdown.
   `;
 
   try {
@@ -122,33 +125,64 @@ export const generateLoadingLogs = async (
       }
     );
     
-    if (!text) return getDefaultLoadingMessages();
-    const messages = JSON.parse(text) as string[];
-    // Ensure we have enough messages
-    return messages.length >= 8 ? messages : getDefaultLoadingMessages();
+    if (!text || text.trim() === '') {
+      Logger.warn('AI', 'Empty response for loading logs, using fallbacks');
+      return getDefaultLoadingMessages();
+    }
+    
+    // Extract JSON from response (handle markdown code blocks)
+    let jsonText = text.trim();
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.slice(7);
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.slice(3);
+    }
+    if (jsonText.endsWith('```')) {
+      jsonText = jsonText.slice(0, -3);
+    }
+    jsonText = jsonText.trim();
+    
+    const messages = JSON.parse(jsonText) as string[];
+    
+    // Validate we got an array of strings
+    if (!Array.isArray(messages) || messages.length === 0) {
+      Logger.warn('AI', 'Invalid loading logs format, using fallbacks', { response: text.substring(0, 200) });
+      return getDefaultLoadingMessages();
+    }
+    
+    // Filter to only valid string messages
+    const validMessages = messages.filter(m => typeof m === 'string' && m.length > 0);
+    
+    if (validMessages.length >= 8) {
+      Logger.info('AI', 'Loading logs generated successfully', { count: validMessages.length });
+      return validMessages;
+    }
+    
+    Logger.warn('AI', 'Not enough loading logs generated', { count: validMessages.length });
+    return getDefaultLoadingMessages();
   } catch (e) {
-    Logger.warn('AI', 'Log generation failed, using fallbacks.', { error: e });
+    Logger.warn('AI', 'Log generation failed, using fallbacks.', { error: e instanceof Error ? e.message : e });
     return getDefaultLoadingMessages();
   }
 };
 
 // Fallback messages if AI generation fails
 const getDefaultLoadingMessages = (): string[] => [
-  'SCANNING NEARBY RESTAURANTS...',
-  'READING HUNDREDS OF REVIEWS...',
-  'ANALYZING RATINGS AND FEEDBACK...',
-  'CHECKING OPENING HOURS...',
-  'CALCULATING WALKING DISTANCES...',
-  'EXTRACTING DISH RECOMMENDATIONS...',
-  'FILTERING BY YOUR PREFERENCES...',
-  'RANKING CANDIDATES BY QUALITY...',
-  'LOOKING FOR HIDDEN GEMS...',
-  'CROSS-REFERENCING RECENT REVIEWS...',
-  'ALMOST DONE CRUNCHING DATA...',
-  'FINALIZING TOP PICKS...',
-  'AI IS THINKING REALLY HARD...',
-  'GOOD THINGS TAKE TIME...',
-  'WORTH THE WAIT, PROMISE...'
+  'JUDGING RESTAURANTS BY THEIR FONTS...',
+  'READING REVIEWS WRITTEN AT 3AM...',
+  'FILTERING OUT YOUR EX\'S FAVORITES...',
+  'CALCULATING FOOD COMA PROBABILITY...',
+  'IGNORING PLACES WITH COMIC SANS MENUS...',
+  'BRIBING LOCAL PIGEONS FOR INTEL...',
+  'SKIPPING SPOTS WITH "GREAT VIBES" ONLY...',
+  'CHECKING IF PORTION SIZES ARE LYING...',
+  'AVOIDING PLACES THAT PEAKED IN 2019...',
+  'ELIMINATING SUSPICIOUSLY EMPTY RESTAURANTS...',
+  'PRETENDING TO WORK HARDER THAN I AM...',
+  'USING POWERS FOR LUNCH NOT EVIL...',
+  'ALMOST THERE, DON\'T ORDER PIZZA YET...',
+  'GOOD THINGS TAKE TIME, ALLEGEDLY...',
+  'WORTH THE WAIT, PROBABLY...'
 ];
 
 // Duration type for walking times
@@ -433,12 +467,6 @@ Return a JSON array with exactly 3 recommendations.`;
     
     Logger.info('AI', `Decision complete: ${finalResults.length} recommendations (${results.length - deduplicatedResults.length} duplicates removed)`);
     
-    // Log the picks
-    const pickNames = finalResults.map(r => {
-      const candidate = topCandidates.find(c => c.place_id === r.place_id);
-      return candidate?.name || 'Unknown';
-    });
-    onLog?.(`TOP 3 PICKS: ${pickNames.join(', ').toUpperCase()}`);
 
     return finalResults.map(rec => ({
       ...rec,
