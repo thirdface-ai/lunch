@@ -114,9 +114,10 @@ const ScrambleText: React.FC<{ text: string; className?: string; href?: string }
 
 interface FooterProps {
   isDark: boolean;
+  onPrivacyClick?: () => void;
 }
 
-const Footer: React.FC<FooterProps> = ({ isDark }) => {
+const Footer: React.FC<FooterProps> = ({ isDark, onPrivacyClick }) => {
   return (
     <>
       {/* Mobile: Normal inline footer at bottom of page */}
@@ -139,14 +140,12 @@ const Footer: React.FC<FooterProps> = ({ isDark }) => {
           
           <span className={`${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
           
-          <a 
-            href="https://thirdface.com/imprint" 
-            target="_blank" 
-            rel="noopener noreferrer"
+          <button 
+            onClick={onPrivacyClick}
             className="hover:text-braun-orange transition-colors"
           >
-            Imprint
-          </a>
+            Privacy
+          </button>
         </div>
       </footer>
 
@@ -171,14 +170,12 @@ const Footer: React.FC<FooterProps> = ({ isDark }) => {
           
           <span className={`${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
           
-          <a 
-            href="https://thirdface.com/imprint" 
-            target="_blank" 
-            rel="noopener noreferrer"
+          <button 
+            onClick={onPrivacyClick}
             className="hover:text-braun-orange transition-colors"
           >
-            Imprint
-          </a>
+            Privacy
+          </button>
         </div>
       </footer>
     </>
