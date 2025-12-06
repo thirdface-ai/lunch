@@ -79,12 +79,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { prompt, systemInstruction, schemaType, config } = req.body;
 
+    console.log('[Gateway] Request received:', { schemaType, hasPrompt: !!prompt, hasSystem: !!systemInstruction });
+
     if (!prompt) {
       return res.status(400).json({ error: 'Missing required parameter: prompt' });
     }
 
     // Select schema based on request type
     const schema = schemaType === 'recommendations' ? RecommendationSchema : LoadingLogsSchema;
+
+    console.log('[Gateway] Calling AI Gateway with model: anthropic/claude-sonnet-4.5');
 
     const result = await generateObject({
       model: gateway('anthropic/claude-sonnet-4.5'),
@@ -94,9 +98,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       temperature: config?.temperature ?? 0.5,
     });
 
+    console.log('[Gateway] Success, result object keys:', Object.keys(result));
+
     return res.status(200).json({ text: JSON.stringify(result.object) });
   } catch (error) {
-    console.error('AI Gateway Error:', error);
+    console.error('[Gateway] AI Gateway Error:', error);
+    console.error('[Gateway] Error stack:', error instanceof Error ? error.stack : 'No stack');
     return res.status(500).json({
       error: 'AI Processing Failed',
       details: error instanceof Error ? error.message : 'Unknown error',
