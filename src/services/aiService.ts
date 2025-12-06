@@ -391,15 +391,21 @@ NEVER include in ai_reason (these are shown separately in UI):
 
 ALWAYS include:
 - A specific quote or detail from reviews
-- Name of ONE alternative restaurant and why this one beats it
+- Name of ONE restaurant that DIDN'T make your top 3 and briefly why this one beat it
+
+CRITICAL: When comparing, ONLY reference restaurants you are NOT recommending.
+- If you recommend places A, B, C - compare against D, E, F (places that didn't make the cut)
+- NEVER say "chosen over X" if X is also in your top 3 recommendations
+- This helps users understand why other nearby options were rejected
 
 === AI_REASON EXAMPLES ===
 
 BAD: "Great restaurant with good food. 4.6★ with 340 reviews, 4 min away."
 BAD: "Highly rated spot with quick service."
+BAD: "Chosen over [restaurant that's also in top 3]" - NEVER DO THIS
 
-GOOD: "Reviewers call the Duck Confit 'perfectly crispy with incredible sauce'. Chosen over Café Michel which has slower service during lunch rush."
-GOOD: "Known for 'generous portions' of authentic Schnitzel that locals swear by. Picked over Gasthaus Weber which recent reviews say 'went downhill'."
+GOOD: "Reviewers call the Duck Confit 'perfectly crispy with incredible sauce'. Beat out Café Michel which has slower service during lunch rush."
+GOOD: "Known for 'generous portions' of authentic Schnitzel that locals swear by. Edged out Gasthaus Weber where recent reviews noted 'quality dropped'."
 
 === CRITICAL: NO DUPLICATES ===
 - NEVER recommend the same restaurant twice
