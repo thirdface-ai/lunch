@@ -220,14 +220,16 @@ const ResultsView: React.FC<ResultsViewProps> = ({
     onReset();
   };
 
-  // Generate Google Maps URL for a place
-  const getPlaceUrl = (placeId: string) => 
-    `https://www.google.com/maps/place/?q=place_id:${placeId}`;
+  // Generate Google Maps URL for a place (works on desktop, mobile browsers, AND native Maps app)
+  const getPlaceUrl = (name: string, vicinity: string | undefined, placeId: string) => {
+    const query = encodeURIComponent(`${name} ${vicinity || ''}`.trim());
+    return `https://www.google.com/maps/search/?api=1&query=${query}&query_place_id=${placeId}`;
+  };
 
   if (appState !== AppState.RESULTS) return null;
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-2 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
+    <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
       {/* Main Chassis */}
       <div className={`w-full max-w-7xl border shadow-braun-deep flex flex-col transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
         
@@ -263,10 +265,10 @@ const ResultsView: React.FC<ResultsViewProps> = ({
               return (
                 <article 
                   key={place.place_id} 
-                  className={`p-4 sm:p-6 lg:p-8 border-b last:border-b-0 transition-colors group ${isDark ? 'border-dark-border hover:bg-dark-surface' : 'border-braun-border hover:bg-white'}`}
+                  className={`px-4 py-5 sm:p-6 lg:p-8 border-b last:border-b-0 transition-colors group ${isDark ? 'border-dark-border hover:bg-dark-surface' : 'border-braun-border hover:bg-white'}`}
                 >
                   {/* Grid Layout: Fixed number column + content */}
-                  <div className="flex gap-4 lg:gap-6">
+                  <div className="flex gap-3 lg:gap-6">
                     {/* Fixed-width number column */}
                     <div className="flex-shrink-0 w-6 lg:w-8">
                       <span className="font-mono text-braun-orange text-xs lg:text-sm font-bold tabular-nums">
@@ -275,11 +277,11 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                     </div>
                     
                     {/* Content column */}
-                    <div className="flex-1 min-w-0 space-y-3 lg:space-y-4">
+                    <div className="flex-1 min-w-0 space-y-4">
                       {/* Name row */}
                       <div className="flex flex-wrap items-center gap-2">
                         <a 
-                          href={getPlaceUrl(place.place_id)}
+                          href={getPlaceUrl(place.name, place.vicinity, place.place_id)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={`font-sans font-bold text-lg lg:text-xl leading-tight group-hover:text-braun-orange transition-colors ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}
@@ -295,9 +297,9 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                         )}
                       </div>
 
-                      {/* Metadata row - clean grid alignment */}
+                      {/* Metadata row - 2x2 grid on mobile, flex row on desktop */}
                       <div className={`font-mono text-[10px] lg:text-[11px] uppercase tracking-wider ${isDark ? 'text-[#888]' : 'text-braun-text-muted'}`}>
-                        <div className="flex flex-wrap gap-x-6 lg:gap-x-8 gap-y-1">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:flex sm:flex-wrap sm:gap-x-6 lg:gap-x-8 sm:gap-y-1">
                           <span className="inline-flex items-center gap-2">
                             <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>RATING:</span>
                             <span>{(place.rating || 0).toFixed(1)}</span>
@@ -342,7 +344,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                       </p>
 
                       {/* TRY section */}
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-3">
                         <div className="flex items-center gap-2">
                           <span className={`font-mono text-[10px] lg:text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-[#666]' : 'text-braun-text-muted'}`}>TRY:</span>
                           <span className={`font-sans text-[13px] lg:text-sm font-medium border-b ${isDark ? 'text-dark-text border-dark-border' : 'text-braun-dark border-braun-dark/20'}`}>
