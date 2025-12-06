@@ -159,14 +159,12 @@ describe('decideLunch', () => {
       false,
       'Berlin, Germany',
       [],
-      undefined, // durations
-      undefined, // curatedData
-      undefined  // freestylePrompt
+      undefined
     );
 
-    expect(result.recommendations).toHaveLength(1);
-    expect(result.recommendations[0].place_id).toBe('place-1');
-    expect(result.recommendations[0].cash_warning_msg).toBeNull();
+    expect(result).toHaveLength(1);
+    expect(result[0].place_id).toBe('place-1');
+    expect(result[0].cash_warning_msg).toBeNull();
   });
 
   it('adds cash warning message when is_cash_only is true', async () => {
@@ -192,13 +190,11 @@ describe('decideLunch', () => {
       false,
       'Berlin',
       [],
-      undefined, // durations
-      undefined, // curatedData
-      undefined  // freestylePrompt
+      undefined
     );
 
-    expect(result.recommendations[0].is_cash_only).toBe(true);
-    expect(result.recommendations[0].cash_warning_msg).toBe('Note: This location may be cash-only.');
+    expect(result[0].is_cash_only).toBe(true);
+    expect(result[0].cash_warning_msg).toBe('Note: This location may be cash-only.');
   });
 
   it('returns empty array on API error', async () => {
@@ -214,12 +210,10 @@ describe('decideLunch', () => {
       true,
       'Test Address',
       [DietaryRestriction.VEGAN],
-      undefined, // durations
-      undefined, // curatedData
-      undefined  // freestylePrompt
+      undefined
     );
 
-    expect(result.recommendations).toEqual([]);
+    expect(result).toEqual([]);
   });
 
   it('returns empty array when API returns empty text', async () => {
@@ -235,12 +229,10 @@ describe('decideLunch', () => {
       false,
       'Address',
       [],
-      undefined, // durations
-      undefined, // curatedData
       'I want sushi'
     );
 
-    expect(result.recommendations).toEqual([]);
+    expect(result).toEqual([]);
   });
 
   it('includes dietary restrictions in request when provided', async () => {
@@ -256,9 +248,7 @@ describe('decideLunch', () => {
       false,
       'Address',
       [DietaryRestriction.VEGAN, DietaryRestriction.GLUTEN_FREE],
-      undefined, // durations
-      undefined, // curatedData
-      undefined  // freestylePrompt
+      undefined
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
@@ -280,8 +270,6 @@ describe('decideLunch', () => {
       false,
       'Address',
       [],
-      undefined, // durations
-      undefined, // curatedData
       'I want the best ramen in town'
     );
 
@@ -302,9 +290,7 @@ describe('decideLunch', () => {
       true, // noCash
       'Berlin',
       [],
-      undefined, // durations
-      undefined, // curatedData
-      undefined  // freestylePrompt
+      undefined
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
@@ -354,9 +340,7 @@ describe('decideLunch', () => {
       false,
       'Rome, Italy',
       [],
-      undefined, // durations
-      undefined, // curatedData
-      undefined  // freestylePrompt
+      undefined
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
@@ -381,18 +365,17 @@ describe('decideLunch', () => {
     });
 
     // Should not throw
-    const result = await decideLunch(
-      minimalCandidates,
-      HungerVibe.AUTHENTIC_AND_CLASSIC,
-      null,
-      false,
-      'Address',
-      [],
-      undefined, // durations
-      undefined, // curatedData
-      undefined  // freestylePrompt
-    );
-    expect(result.recommendations).toEqual([]);
+    await expect(
+      decideLunch(
+        minimalCandidates,
+        HungerVibe.AUTHENTIC_AND_CLASSIC,
+        null,
+        false,
+        'Address',
+        [],
+        undefined
+      )
+    ).resolves.toEqual([]);
   });
 
   it('passes correct model to API for deep analysis', async () => {
@@ -408,9 +391,7 @@ describe('decideLunch', () => {
       false,
       'Berlin',
       [],
-      undefined, // durations
-      undefined, // curatedData
-      undefined  // freestylePrompt
+      undefined
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;

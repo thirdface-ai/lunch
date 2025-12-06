@@ -2,8 +2,7 @@ import { supabase, getSessionId } from '../lib/supabase';
 import { 
   FinalResult, 
   UserPreferences,
-  SearchHistoryRecord,
-  PipelineTimingRecord
+  SearchHistoryRecord
 } from '../types';
 
 /**
@@ -114,29 +113,6 @@ export const SupabaseService = {
     } catch (e) {
       console.warn('Fetch recently recommended exception:', e);
       return new Set();
-    }
-  },
-
-  /**
-   * Log AI pipeline timing metrics
-   * Tracks duration of each stage: Haiku pre-processing, main model, total
-   */
-  async logPipelineTiming(timing: Omit<PipelineTimingRecord, 'id' | 'created_at' | 'session_id'>): Promise<void> {
-    try {
-      const record: PipelineTimingRecord = {
-        session_id: getSessionId(),
-        ...timing,
-      };
-
-      const { error } = await supabase
-        .from('pipeline_timing')
-        .insert([record]);
-
-      if (error) {
-        console.warn('Failed to log pipeline timing:', error.message);
-      }
-    } catch (e) {
-      console.warn('Pipeline timing log exception:', e);
     }
   },
 };

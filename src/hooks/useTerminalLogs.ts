@@ -19,7 +19,7 @@ interface UseTerminalLogsReturn {
   clearLogs: () => void;
   setProgress: (value: number | ((prev: number) => number)) => void;
   resetProgress: () => void;
-  startDynamicMessages: (vibe: HungerVibe | null, address: string) => void;
+  startDynamicMessages: (vibe: HungerVibe | null, address: string, freestylePrompt?: string) => void;
 }
 
 /**
@@ -49,9 +49,9 @@ export const useTerminalLogs = (
   }, []);
 
   // Start generating and displaying dynamic messages
-  const startDynamicMessages = useCallback(async (vibe: HungerVibe | null, address: string) => {
-    // Generate fresh messages from AI
-    const messages = await generateLoadingLogs(vibe, address);
+  const startDynamicMessages = useCallback(async (vibe: HungerVibe | null, address: string, freestylePrompt?: string) => {
+    // Generate fresh messages from AI based on user's search
+    const messages = await generateLoadingLogs(vibe, address, freestylePrompt);
     setDynamicMessages(messages);
     messageIndexRef.current = 0;
   }, []);

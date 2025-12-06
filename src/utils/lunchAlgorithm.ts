@@ -1,4 +1,4 @@
-import { HungerVibe, PricePoint, GooglePlace, CuratedReviewData } from '../types';
+import { HungerVibe, PricePoint, GooglePlace } from '../types';
 
 /**
  * Cuisine intent detection result
@@ -300,14 +300,12 @@ export const getOpenStatusScore = (
 
 /**
  * Calculate candidate score for ranking
- * Now includes Haiku curation data for smarter ranking
  */
 export const calculateCandidateScore = (
   p: GooglePlace,
   price: PricePoint | null,
   durationSeconds: number | undefined,
-  maxDurationSeconds: number,
-  curatedData?: CuratedReviewData
+  maxDurationSeconds: number
 ): number => {
   let score = 0;
   const MAX_PROXIMITY_SCORE = 15;
@@ -362,28 +360,6 @@ export const calculateCandidateScore = (
 
   // 6. Raw Rating Score (Weight: 1 per star)
   score += rating;
-
-  // === HAIKU CURATION BONUSES ===
-  if (curatedData) {
-    // 7. Vibe Match Score (Weight: 0-30) - CRITICAL for relevance
-    // vibe_score is 0-10, multiply by 3 for significant impact
-    score += (curatedData.vibe_score || 0) * 3;
-
-    // 8. Dish Discovery Bonus (Weight: 2 per dish, max 10)
-    // Restaurants with identified dishes are more likely to satisfy
-    const dishBonus = Math.min(curatedData.extracted_dishes.length * 2, 10);
-    score += dishBonus;
-
-    // 9. Quality Signals Bonus (Weight: 3 per signal, max 9)
-    // "hidden gem", "consistent", "locals love it" etc.
-    const qualityBonus = Math.min(curatedData.quality_signals.length * 3, 9);
-    score += qualityBonus;
-
-    // 10. Red Flags Penalty (Weight: -5 per flag, max -15)
-    // "went downhill", "overpriced", "rude staff" etc.
-    const redFlagPenalty = Math.min(curatedData.red_flags.length * 5, 15);
-    score -= redFlagPenalty;
-  }
 
   return score;
 };
