@@ -1,5 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { GooglePlace } from '../types';
+import { DistanceCache } from '../lib/placesCache';
+import Logger from '../utils/logger';
 
 const BATCH_SIZE = 25;
 const MATRIX_TIMEOUT_MS = 10000; // 10 second timeout per batch
@@ -56,64 +58,99 @@ export const useDistanceMatrix = () => {
     // Filter places with valid geometry
     const validPlaces = places.filter(p => p.geometry?.location);
 
-    // Batch places to stay within API limits
-    const batches: GooglePlace[][] = [];
-    for (let i = 0; i < validPlaces.length; i += BATCH_SIZE) {
-      batches.push(validPlaces.slice(i, i + BATCH_SIZE));
+    // Check cache first to reduce API calls
+    const placeIds = validPlaces.map(p => p.place_id);
+    const cachedDistances = DistanceCache.getMany(origin.lat, origin.lng, placeIds);
+    
+    // Add cached distances to results
+    cachedDistances.forEach((distance, placeId) => {
+      durations.set(placeId, distance);
+    });
+
+    // Filter to only uncached places
+    const uncachedPlaces = validPlaces.filter(p => !cachedDistances.has(p.place_id));
+    
+    Logger.info('SYSTEM', 'Distance cache check', {
+      total: validPlaces.length,
+      cached: cachedDistances.size,
+      toFetch: uncachedPlaces.length
+    });
+
+    // Only make API calls for uncached places
+    if (uncachedPlaces.length > 0) {
+      // Batch places to stay within API limits
+      const batches: GooglePlace[][] = [];
+      for (let i = 0; i < uncachedPlaces.length; i += BATCH_SIZE) {
+        batches.push(uncachedPlaces.slice(i, i + BATCH_SIZE));
+      }
+
+      // Process batches with timeout handling
+      const batchPromises = batches.map(batch =>
+        new Promise<void>((resolve) => {
+          // Set timeout to prevent hanging if callback never fires
+          const timeoutId = setTimeout(() => {
+            console.warn('Distance matrix request timed out for batch');
+            failedCount += batch.length;
+            resolve();
+          }, MATRIX_TIMEOUT_MS);
+
+          // Extract destinations - batch already comes from validPlaces so all have geometry.location
+          const destinations = batch.map(p => p.geometry!.location!);
+
+          try {
+            service.getDistanceMatrix(
+              {
+                origins: [{ lat: origin.lat, lng: origin.lng }],
+                destinations,
+                travelMode,
+              },
+              (response, status) => {
+                clearTimeout(timeoutId);
+
+                if (status === 'OK' && response?.rows[0]) {
+                  // Iterate using same index as destinations array
+                  batch.forEach((place, idx) => {
+                    const element = response.rows[0].elements[idx];
+                    if (element?.status === 'OK' && element.duration) {
+                      const distance = {
+                        text: element.duration.text,
+                        value: element.duration.value,
+                      };
+                      durations.set(place.place_id, distance);
+                      // Cache the newly fetched distance
+                      DistanceCache.set(origin.lat, origin.lng, place.place_id, distance);
+                    } else {
+                      failedCount++;
+                    }
+                  });
+                } else {
+                  failedCount += batch.length;
+                }
+                resolve();
+              }
+            );
+          } catch (err) {
+            clearTimeout(timeoutId);
+            console.error('Distance matrix request failed:', err);
+            failedCount += batch.length;
+            resolve();
+          }
+        })
+      );
+
+      await Promise.all(batchPromises);
     }
 
-    // Process batches with timeout handling
-    const batchPromises = batches.map(batch =>
-      new Promise<void>((resolve) => {
-        // Set timeout to prevent hanging if callback never fires
-        const timeoutId = setTimeout(() => {
-          console.warn('Distance matrix request timed out for batch');
-          failedCount += batch.length;
-          resolve();
-        }, MATRIX_TIMEOUT_MS);
-
-        // Extract destinations - batch already comes from validPlaces so all have geometry.location
-        const destinations = batch.map(p => p.geometry!.location!);
-
-        try {
-          service.getDistanceMatrix(
-            {
-              origins: [{ lat: origin.lat, lng: origin.lng }],
-              destinations,
-              travelMode,
-            },
-            (response, status) => {
-              clearTimeout(timeoutId);
-
-              if (status === 'OK' && response?.rows[0]) {
-                // Iterate using same index as destinations array
-                batch.forEach((place, idx) => {
-                  const element = response.rows[0].elements[idx];
-                  if (element?.status === 'OK' && element.duration) {
-                    durations.set(place.place_id, {
-                      text: element.duration.text,
-                      value: element.duration.value,
-                    });
-                  } else {
-                    failedCount++;
-                  }
-                });
-              } else {
-                failedCount += batch.length;
-              }
-              resolve();
-            }
-          );
-        } catch (err) {
-          clearTimeout(timeoutId);
-          console.error('Distance matrix request failed:', err);
-          failedCount += batch.length;
-          resolve();
-        }
-      })
-    );
-
-    await Promise.all(batchPromises);
+    // Log API call summary for this distance calculation
+    const batchCount = Math.ceil(uncachedPlaces.length / BATCH_SIZE);
+    Logger.info('SYSTEM', '=== DISTANCE MATRIX API SUMMARY ===', {
+      totalPlaces: validPlaces.length,
+      cachedDistances: cachedDistances.size,
+      apiCalls: batchCount,
+      elementsCalculated: uncachedPlaces.length,
+      elementsSaved: cachedDistances.size,
+      estimatedCost: `€${(uncachedPlaces.length * 0.005).toFixed(3)}`
+    });
 
     return { durations, failedCount };
   }, [getService]);

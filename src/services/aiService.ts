@@ -333,14 +333,14 @@ export const decideLunch = async (
     return parseRecencyMonths(relativeTime);
   };
   
-  // Build payload with up to 30 reviews per restaurant, sorted by recency
+  // Build payload with reviews per restaurant, sorted by recency
   const payload = topCandidates.map(p => {
     const allReviews = (p.reviews || []).filter(r => r.text && r.text.length > 0);
-    // Take up to 50 reviews per restaurant - Opus 4.5 can handle deep analysis
+    // Google Places API returns max 5 reviews per place
     // Sorted by recency so we get the most current opinions first
     const reviews = allReviews
       .sort((a, b) => parseRecencyScore(a.relativeTime) - parseRecencyScore(b.relativeTime))
-      .slice(0, 50)
+      .slice(0, 5)
       .map(r => ({
         text: r.text,
         stars: r.rating,

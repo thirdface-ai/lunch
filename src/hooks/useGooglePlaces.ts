@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { GooglePlace, HungerVibe, PlaceReview } from '../types';
 import { getSearchQueriesForVibe, detectCuisineIntent, CuisineIntent } from '../utils/lunchAlgorithm';
 import { translateSearchIntent, TranslatedSearchIntent } from '../services/aiService';
+import { PlacesCache } from '../lib/placesCache';
 import Logger from '../utils/logger';
 
 // Price level mapping from Google Places API enum to numeric value
@@ -228,8 +229,15 @@ export const useGooglePlaces = () => {
       searchQueries = getSearchQueriesForVibe(vibe);
     }
 
+    // Deduplicate and limit queries to reduce API costs
+    const uniqueQueries = [...new Set(searchQueries)].slice(0, 3);
+    Logger.info('SYSTEM', 'Search queries optimized', {
+      original: searchQueries.length,
+      deduplicated: uniqueQueries.length
+    });
+
     // Search for place IDs
-    const searchIdPromises = searchQueries.map(query => {
+    const searchIdPromises = uniqueQueries.map(query => {
       const request = {
         textQuery: query,
         locationBias: { center: location, radius },
@@ -247,18 +255,37 @@ export const useGooglePlaces = () => {
       return { places: [], uniqueCount: 0, cuisineIntent };
     }
 
-    // Fetch detailed place information
-    const detailPromises = uniquePlaceIds.map(id => {
-      const place = new Place({ id });
-      return place.fetchFields({ fields: PLACE_FIELDS as unknown as string[] });
+    // Check cache first to reduce API calls
+    const cachedPlaces = PlacesCache.getPlaces(uniquePlaceIds);
+    const uncachedIds = uniquePlaceIds.filter(id => !cachedPlaces.has(id));
+    
+    Logger.info('SYSTEM', 'Place cache check', {
+      total: uniquePlaceIds.length,
+      cached: cachedPlaces.size,
+      toFetch: uncachedIds.length
     });
 
-    const detailResults = await Promise.allSettled(detailPromises);
-    const allPlaces = detailResults
-      .filter((res): res is PromiseFulfilledResult<{ place: google.maps.places.Place }> =>
-        res.status === 'fulfilled' && !!res.value?.place
-      )
-      .map(res => mapPlace(res.value.place));
+    // Fetch only uncached place details
+    let fetchedPlaces: GooglePlace[] = [];
+    if (uncachedIds.length > 0) {
+      const detailPromises = uncachedIds.map(id => {
+        const place = new Place({ id });
+        return place.fetchFields({ fields: PLACE_FIELDS as unknown as string[] });
+      });
+
+      const detailResults = await Promise.allSettled(detailPromises);
+      fetchedPlaces = detailResults
+        .filter((res): res is PromiseFulfilledResult<{ place: google.maps.places.Place }> =>
+          res.status === 'fulfilled' && !!res.value?.place
+        )
+        .map(res => mapPlace(res.value.place));
+      
+      // Cache newly fetched places
+      PlacesCache.setPlaces(fetchedPlaces);
+    }
+
+    // Combine cached and fetched places
+    const allPlaces = [...cachedPlaces.values(), ...fetchedPlaces];
 
     // CRITICAL: Filter out non-food establishments (e.g., cap stores, clothing shops)
     // Only keep places that have at least one food-related type
@@ -268,6 +295,15 @@ export const useGooglePlaces = () => {
       total: allPlaces.length,
       passed: foodPlaces.length,
       filtered: allPlaces.length - foodPlaces.length
+    });
+
+    // Log API call summary for this search
+    Logger.info('SYSTEM', '=== PLACES API SUMMARY ===', {
+      textSearchCalls: uniqueQueries.length,
+      placeDetailCalls: uncachedIds.length,
+      placeDetailsSaved: cachedPlaces.size,
+      totalApiCalls: uniqueQueries.length + uncachedIds.length,
+      estimatedCost: `€${((uniqueQueries.length * 0.01) + (uncachedIds.length * 0.017)).toFixed(3)}`
     });
 
     return { places: foodPlaces, uniqueCount: uniquePlaceIds.length, cuisineIntent, translatedIntent };

@@ -4,6 +4,9 @@ import {
   calculateCandidateScore,
   shuffleArray,
   getWalkConfig,
+  detectCuisineIntent,
+  getOpenStatusScore,
+  willBeOpenOnArrival,
 } from './lunchAlgorithm';
 import { HungerVibe, PricePoint, GooglePlace } from '../types';
 
@@ -233,6 +236,193 @@ describe('getWalkConfig', () => {
     const config = getWalkConfig('unknown');
     expect(config.radius).toBe(5000);
     expect(config.maxDurationSeconds).toBe(2400);
+  });
+});
+
+describe('detectCuisineIntent', () => {
+  describe('specific cuisine detection', () => {
+    it('detects ramen as cuisine-specific', () => {
+      const result = detectCuisineIntent('I want ramen');
+      expect(result.isCuisineSpecific).toBe(true);
+      expect(result.cuisineType).toBe('ramen');
+      expect(result.searchQueries).toContain('ramen');
+    });
+
+    it('detects sushi as cuisine-specific', () => {
+      const result = detectCuisineIntent('sushi for lunch');
+      expect(result.isCuisineSpecific).toBe(true);
+      expect(result.cuisineType).toBe('sushi');
+    });
+
+    it('detects pizza as cuisine-specific', () => {
+      const result = detectCuisineIntent('best pizza nearby');
+      expect(result.isCuisineSpecific).toBe(true);
+      expect(result.cuisineType).toBe('pizza');
+    });
+
+    it('detects burger as cuisine-specific', () => {
+      const result = detectCuisineIntent('burger place');
+      expect(result.isCuisineSpecific).toBe(true);
+      expect(result.cuisineType).toBe('burger');
+    });
+
+    it('detects thai as cuisine-specific', () => {
+      const result = detectCuisineIntent('thai food');
+      expect(result.isCuisineSpecific).toBe(true);
+      expect(result.cuisineType).toBe('thai');
+    });
+
+    it('detects indian as cuisine-specific', () => {
+      const result = detectCuisineIntent('indian curry');
+      expect(result.isCuisineSpecific).toBe(true);
+      // Could be 'indian' or 'curry' depending on order
+      expect(result.isCuisineSpecific).toBe(true);
+    });
+
+    it('detects korean as cuisine-specific', () => {
+      const result = detectCuisineIntent('korean bbq');
+      expect(result.isCuisineSpecific).toBe(true);
+      expect(result.cuisineType).toBe('korean');
+    });
+
+    it('detects vietnamese as cuisine-specific', () => {
+      const result = detectCuisineIntent('vietnamese pho');
+      expect(result.isCuisineSpecific).toBe(true);
+      // Could be 'vietnamese' or 'pho'
+      expect(result.isCuisineSpecific).toBe(true);
+    });
+
+    it('detects mexican as cuisine-specific', () => {
+      const result = detectCuisineIntent('mexican tacos');
+      expect(result.isCuisineSpecific).toBe(true);
+    });
+
+    it('detects vegan as cuisine-specific', () => {
+      const result = detectCuisineIntent('vegan restaurant');
+      expect(result.isCuisineSpecific).toBe(true);
+      expect(result.cuisineType).toBe('vegan');
+    });
+  });
+
+  describe('non-specific queries', () => {
+    it('returns non-specific for generic query', () => {
+      const result = detectCuisineIntent('something good');
+      expect(result.isCuisineSpecific).toBe(false);
+      expect(result.cuisineType).toBeUndefined();
+    });
+
+    it('returns non-specific for empty query', () => {
+      const result = detectCuisineIntent('');
+      expect(result.isCuisineSpecific).toBe(false);
+    });
+
+    it('returns non-specific for whitespace query', () => {
+      const result = detectCuisineIntent('   ');
+      expect(result.isCuisineSpecific).toBe(false);
+    });
+
+    it('returns non-specific for mood-based query', () => {
+      const result = detectCuisineIntent('something fancy');
+      expect(result.isCuisineSpecific).toBe(false);
+    });
+
+    it('returns non-specific for location query', () => {
+      const result = detectCuisineIntent('nearby restaurant');
+      expect(result.isCuisineSpecific).toBe(false);
+    });
+  });
+
+  describe('search queries generation', () => {
+    it('generates multiple search queries for cuisine', () => {
+      const result = detectCuisineIntent('ramen');
+      expect(result.searchQueries.length).toBeGreaterThan(1);
+      expect(result.searchQueries).toContain('ramen');
+    });
+
+    it('includes original query for non-specific searches', () => {
+      const result = detectCuisineIntent('hidden gem');
+      expect(result.searchQueries).toContain('hidden gem');
+    });
+
+    it('includes restaurant fallback for non-specific searches', () => {
+      const result = detectCuisineIntent('something tasty');
+      expect(result.searchQueries).toContain('restaurant');
+    });
+  });
+
+  describe('case insensitivity', () => {
+    it('detects cuisine regardless of case', () => {
+      expect(detectCuisineIntent('RAMEN').isCuisineSpecific).toBe(true);
+      expect(detectCuisineIntent('Sushi').isCuisineSpecific).toBe(true);
+      expect(detectCuisineIntent('PIZZA').isCuisineSpecific).toBe(true);
+    });
+  });
+});
+
+describe('getOpenStatusScore', () => {
+  const createMockPlaceWithHours = (openNow: boolean, weekdayText?: string[]): GooglePlace => ({
+    place_id: 'test-place',
+    name: 'Test Restaurant',
+    opening_hours: {
+      open_now: openNow,
+      weekday_text: weekdayText,
+    },
+  });
+
+  it('returns high score for open place', () => {
+    const place = createMockPlaceWithHours(true);
+    const result = getOpenStatusScore(place, 300);
+    
+    expect(result.status).toBe('open');
+    expect(result.score).toBeGreaterThan(0);
+  });
+
+  it('returns penalty for closed place', () => {
+    const place = createMockPlaceWithHours(false, ['Monday: Closed']);
+    const result = getOpenStatusScore(place, 300);
+    
+    expect(result.status).toBe('closed');
+    expect(result.score).toBeLessThan(0);
+  });
+
+  it('returns unknown status for place without hours', () => {
+    const place: GooglePlace = {
+      place_id: 'no-hours',
+      name: 'Unknown Hours Place',
+    };
+    const result = getOpenStatusScore(place, 300);
+    
+    expect(result.status).toBe('unknown');
+  });
+});
+
+describe('willBeOpenOnArrival', () => {
+  it('returns true for currently open place', () => {
+    const place: GooglePlace = {
+      place_id: 'test',
+      name: 'Test',
+      opening_hours: { open_now: true },
+    };
+    
+    expect(willBeOpenOnArrival(place, 300)).toBe(true);
+  });
+
+  it('returns true for place without opening hours', () => {
+    const place: GooglePlace = {
+      place_id: 'test',
+      name: 'Test',
+    };
+    
+    expect(willBeOpenOnArrival(place, 300)).toBe(true);
+  });
+
+  it('returns true for place without opening_hours property', () => {
+    const place: GooglePlace = {
+      place_id: 'test',
+      name: 'Test',
+    };
+    
+    expect(willBeOpenOnArrival(place, undefined)).toBe(true);
   });
 });
 

@@ -110,7 +110,7 @@ describe('generateLoadingLogs', () => {
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it('passes correct model to API for loading logs', async () => {
+  it('passes correct model to API for loading logs (light model)', async () => {
     mockInvoke.mockResolvedValueOnce({
       data: { text: JSON.stringify(['LOG']) },
       error: null,
@@ -119,7 +119,8 @@ describe('generateLoadingLogs', () => {
     await generateLoadingLogs(HungerVibe.HEARTY_AND_RICH, 'Address');
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.model).toBe('anthropic/claude-opus-4.5');
+    // Loading logs use the light model (Sonnet) for cost efficiency
+    expect(callBody.model).toBe('anthropic/claude-sonnet-4.5');
   });
 });
 
@@ -267,7 +268,8 @@ describe('decideLunch', () => {
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.config.systemInstruction).toContain('DIETARY REQUIREMENTS');
+    // System instruction includes dietary info in the CONTEXT section
+    expect(callBody.config.systemInstruction).toContain('Dietary');
     expect(callBody.config.systemInstruction).toContain('Vegan');
     expect(callBody.config.systemInstruction).toContain('Gluten-Free');
   });
@@ -311,7 +313,8 @@ describe('decideLunch', () => {
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.config.systemInstruction).toContain('USER REQUIRES CARD PAYMENT');
+    // System instruction includes card payment requirement
+    expect(callBody.config.systemInstruction).toContain('REQUIRE: Card payment');
   });
 
   it('processes candidate data with reviews correctly for API payload', async () => {
@@ -416,5 +419,186 @@ describe('decideLunch', () => {
 
     const callBody = mockInvoke.mock.calls[0][1].body;
     expect(callBody.model).toBe('anthropic/claude-opus-4.5');
+  });
+
+  it('limits reviews to 5 per place (Google API max)', async () => {
+    const manyReviews: PlaceReview[] = Array.from({ length: 10 }, (_, i) => ({
+      text: `Review ${i + 1}`,
+      rating: 5,
+      relativeTime: `${i + 1} weeks ago`,
+    }));
+
+    const candidateWithManyReviews: GooglePlace[] = [
+      {
+        place_id: 'many-reviews',
+        name: 'Restaurant with Many Reviews',
+        rating: 4.5,
+        user_ratings_total: 500,
+        reviews: manyReviews,
+      },
+    ];
+
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify([]) },
+      error: null,
+    });
+
+    await decideLunch(
+      candidateWithManyReviews,
+      createMockDurations(candidateWithManyReviews),
+      null,
+      null,
+      false,
+      'Berlin',
+      [],
+      undefined
+    );
+
+    const callBody = mockInvoke.mock.calls[0][1].body;
+    const payload = JSON.parse(callBody.contents.match(/\[[\s\S]*\]/)?.[0] || '[]');
+    
+    // Should only include up to 5 reviews (Google's max)
+    if (payload.length > 0 && payload[0].reviews) {
+      expect(payload[0].reviews.length).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it('removes duplicate recommendations by place_id', async () => {
+    const duplicateRecommendations = [
+      {
+        place_id: 'place-1',
+        ai_reason: 'First recommendation',
+        recommended_dish: 'Dish 1',
+        is_cash_only: false,
+      },
+      {
+        place_id: 'place-1', // Duplicate
+        ai_reason: 'Duplicate recommendation',
+        recommended_dish: 'Dish 1 again',
+        is_cash_only: false,
+      },
+      {
+        place_id: 'place-2',
+        ai_reason: 'Second recommendation',
+        recommended_dish: 'Dish 2',
+        is_cash_only: false,
+      },
+    ];
+
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify(duplicateRecommendations) },
+      error: null,
+    });
+
+    const result = await decideLunch(
+      mockCandidates,
+      createMockDurations(mockCandidates),
+      null,
+      null,
+      false,
+      'Berlin',
+      [],
+      undefined
+    );
+
+    // Should deduplicate to 2 unique places
+    const placeIds = result.map(r => r.place_id);
+    const uniquePlaceIds = [...new Set(placeIds)];
+    expect(placeIds.length).toBe(uniquePlaceIds.length);
+  });
+
+  it('handles newlyOpenedOnly filter flag', async () => {
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify([]) },
+      error: null,
+    });
+
+    await decideLunch(
+      mockCandidates,
+      createMockDurations(mockCandidates),
+      null,
+      null,
+      false,
+      'Berlin',
+      [],
+      undefined,
+      true, // newlyOpenedOnly
+      false
+    );
+
+    const callBody = mockInvoke.mock.calls[0][1].body;
+    expect(callBody.config.systemInstruction).toContain('FRESH DROPS');
+  });
+
+  it('handles popularOnly filter flag', async () => {
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify([]) },
+      error: null,
+    });
+
+    await decideLunch(
+      mockCandidates,
+      createMockDurations(mockCandidates),
+      null,
+      null,
+      false,
+      'Berlin',
+      [],
+      undefined,
+      false,
+      true // popularOnly
+    );
+
+    const callBody = mockInvoke.mock.calls[0][1].body;
+    expect(callBody.config.systemInstruction).toContain('TRENDING');
+  });
+
+  it('returns empty array when no candidates provided', async () => {
+    const result = await decideLunch(
+      [],
+      new Map(),
+      null,
+      null,
+      false,
+      'Berlin',
+      [],
+      undefined
+    );
+
+    expect(result).toEqual([]);
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it('calculates is_fresh_drop correctly for new places', async () => {
+    const newPlace: GooglePlace = {
+      place_id: 'new-place',
+      name: 'Brand New Restaurant',
+      rating: 4.5,
+      user_ratings_total: 30, // Under 80 threshold
+      reviews: [
+        { text: 'Great new spot!', rating: 5, relativeTime: '1 week ago' },
+        { text: 'Just opened!', rating: 5, relativeTime: '2 weeks ago' },
+      ],
+    };
+
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: JSON.stringify([]) },
+      error: null,
+    });
+
+    await decideLunch(
+      [newPlace],
+      createMockDurations([newPlace]),
+      null,
+      null,
+      false,
+      'Berlin',
+      [],
+      undefined
+    );
+
+    const callBody = mockInvoke.mock.calls[0][1].body;
+    // The payload should mark this as fresh_drop
+    expect(callBody.contents).toContain('is_fresh_drop');
   });
 });

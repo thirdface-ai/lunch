@@ -4,6 +4,7 @@ import { useDistanceMatrix } from './useDistanceMatrix';
 import { useTerminalLogs } from './useTerminalLogs';
 import { decideLunch } from '../services/aiService';
 import SupabaseService from '../services/supabaseService';
+import { logCacheSummary } from '../lib/placesCache';
 import Logger from '../utils/logger';
 import {
   calculateCandidateScore,
@@ -185,7 +186,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
   const [results, setResults] = useState<FinalResult[]>([]);
 
   const { searchPlaces } = useGooglePlaces();
-  const { calculateDistances, filterByDuration, sortByDuration, verifyWalkingTimes } = useDistanceMatrix();
+  const { calculateDistances, filterByDuration, sortByDuration } = useDistanceMatrix();
   const { logs, progress, addLog, clearLogs, setProgress, resetProgress, startDynamicMessages } = useTerminalLogs(appState);
 
   /**
@@ -317,8 +318,8 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('NO FOOD ESTABLISHMENTS FOUND. TRY A DIFFERENT LOCATION OR VIBE.');
       }
 
-      // Calculate walking distances
-      const candidatePool = shuffleArray([...places]).slice(0, 50);
+      // Calculate walking distances - limit to 30 candidates (AI analyzes top 25)
+      const candidatePool = shuffleArray([...places]).slice(0, 30);
       setProgress(35);
 
       const { durations } = await calculateDistances({
@@ -483,32 +484,8 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         }
       });
 
-      // Verify walking times with Directions API for accuracy (especially for further places)
-      if (finalResults.length > 0) {
-        addLog('VERIFYING WALKING ROUTES...');
-        try {
-          const verifiedTimes = await verifyWalkingTimes(
-            { lat: preferences.lat, lng: preferences.lng },
-            finalResults.map(r => ({ place_id: r.place_id, geometry: r.geometry }))
-          );
-          
-          // Update results with verified walking times
-          finalResults.forEach(result => {
-            const verified = verifiedTimes.get(result.place_id);
-            if (verified) {
-              result.walking_time_text = verified.text;
-              result.walking_time_value = verified.value;
-            }
-          });
-          
-          Logger.info('SYSTEM', 'Walking times verified', {
-            verified: verifiedTimes.size,
-            total: finalResults.length
-          });
-        } catch (err) {
-          Logger.warn('SYSTEM', 'Walking time verification failed, using estimates', { error: err });
-        }
-      }
+      // Walking times from Distance Matrix are accurate enough for 5-20 min walks
+      // Removed Directions API verification to reduce API costs
 
       setProgress(100);
       addLog('DONE.');
@@ -518,6 +495,9 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
       
       // Save recommended places for variety tracking (non-blocking)
       SupabaseService.saveRecommendedPlaces(finalResults);
+
+      // Log cache performance summary for cost tracking
+      logCacheSummary();
 
       setTimeout(() => {
         setResults(finalResults);
@@ -542,7 +522,6 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
     calculateDistances,
     filterByDuration,
     sortByDuration,
-    verifyWalkingTimes,
     addLog,
     clearLogs,
     setProgress,

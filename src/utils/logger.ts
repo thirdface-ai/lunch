@@ -7,7 +7,7 @@ export enum LogLevel {
   DEBUG = 'DEBUG'
 }
 
-export type LogCategory = 'AI' | 'SYSTEM' | 'USER' | 'NETWORK';
+export type LogCategory = 'AI' | 'SYSTEM' | 'USER' | 'NETWORK' | 'CACHE';
 
 export interface LogEvent {
   timestamp: string;
