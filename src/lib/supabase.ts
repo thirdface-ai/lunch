@@ -26,13 +26,14 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
   }
 );
 
-// Generate a unique session ID for this browser session
+// Generate a unique session ID that persists across browser sessions
+// Uses localStorage so variety tracking works even after closing browser
 const generateSessionId = (): string => {
-  const stored = sessionStorage.getItem('lunch_session_id');
+  const stored = localStorage.getItem('lunch_session_id');
   if (stored) return stored;
   
   const newId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
-  sessionStorage.setItem('lunch_session_id', newId);
+  localStorage.setItem('lunch_session_id', newId);
   return newId;
 };
 

@@ -384,31 +384,27 @@ Return EXACTLY 3 recommendations as a JSON array. For each:
 
 === AI_REASON RULES (MUST FOLLOW) ===
 
-FORMAT: 2 concise sentences:
-1. Why this place stands out + a specific quote from reviews
-2. Why it beat a REJECTED restaurant (one NOT in your top 3)
-
 NEVER include (shown separately in UI):
 - Star ratings, review counts, or walking times
 
-!!!ABSOLUTE RULE - COMPARISON RESTRICTIONS!!!
-When you write "beat out X" or "chosen over X" or "edged out X":
-- X must be a restaurant that is NOT in your final 3 recommendations
-- Before writing the comparison, CHECK: "Is this restaurant in my top 3?" If YES, pick a DIFFERENT restaurant to compare against
-- You have ${payload.length} restaurants. You're recommending 3. Compare against one of the other ${payload.length - 3} that didn't make the cut.
+FORMAT OPTIONS:
+- OPTION A (preferred): 1-2 sentences with review quotes explaining why this place is great. No comparison needed.
+- OPTION B (only for #1 result): Can optionally add a comparison to a rejected restaurant IF it adds value.
 
-EXAMPLE OF VIOLATION (DO NOT DO THIS):
-- If your top 3 are: Rabbit Café, Studio Natura, Daluma
-- Rabbit Café's reason says "Beat out Studio Natura" ← WRONG! Studio Natura is #2
-- Instead say "Beat out [some restaurant NOT in your top 3]"
+COMPARISON RULES (if using Option B):
+- Only the #1 result may include a comparison
+- Compare ONLY against restaurants NOT in your top 3
+- Each rejected restaurant can only be mentioned ONCE across all results
+- If you can't find a unique restaurant to compare against, just use Option A
 
 === AI_REASON EXAMPLES ===
 
 BAD: "4.6★ with 340 reviews, 4 min away." (includes stats shown in UI)
-BAD: "Chosen over Studio Natura" when Studio Natura is also recommended ← VIOLATION
+BAD: Multiple results comparing to the same rejected restaurant ← NO DUPLICATES
 
-GOOD: "Reviewers call the avocado croissant 'soft and fresh'. Beat out Corner Bakery which had complaints about stale pastries."
-GOOD: "Known for 'generous portions' locals love. Edged out Gasthaus Weber where recent reviews noted 'quality dropped'."
+GOOD (Option A): "Reviewers call this their 'absolute favorite Vietnamese place' with 'insanely delicious' fresh dishes made with love."
+GOOD (Option A): "Known for 'the best sourdough bread' in Berlin with 'flavoursome, fresh and filling' healthy bowls."
+GOOD (Option B for #1 only): "Praised as 'the BEST meals of my life' with 'super flavorful' dishes. Beat out Corner Bakery which had stale pastry complaints."
 
 === CRITICAL: NO DUPLICATES ===
 - NEVER recommend the same restaurant twice

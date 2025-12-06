@@ -10,7 +10,7 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isDark = theme === ThemeMode.DARK;
 
-  const lastUpdated = '2024-12-06';
+  const lastUpdated = '2025-06-12';
 
   return (
     <div className={`min-h-screen flex items-center justify-center p-2 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
@@ -101,11 +101,12 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
                   </p>
                 </SubSection>
 
-                <SubSection title="2.2 SESSION DATA">
+                <SubSection title="2.2 PERSISTENT SESSION ID">
                   <p>
-                    A random session ID is generated for your browser session. This ID is 
-                    anonymous and used only to group your searches together during a single 
-                    browsing session. It resets when you close the browser.
+                    A random session ID is generated and stored in your browser's local storage. 
+                    This ID is anonymous and used to track which restaurants you've seen to 
+                    provide variety in future recommendations. It persists until you clear 
+                    browser data.
                   </p>
                 </SubSection>
 
@@ -190,9 +191,9 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
               {/* Section 5 */}
               <Section title="5. DATA RETENTION">
                 <ul className="list-none space-y-1">
-                  <li>• Local storage: Until you clear browser data</li>
-                  <li>• Session storage: Until browser session ends</li>
+                  <li>• Local storage (preferences + session ID): Until you clear browser data</li>
                   <li>• Search history: 90 days</li>
+                  <li>• Recommended places history: 90 days</li>
                   <li>• Application logs: 30 days</li>
                 </ul>
               </Section>
@@ -201,8 +202,8 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
               <Section title="6. YOUR RIGHTS">
                 <p>You can:</p>
                 <ul className="list-none mt-2 space-y-1">
-                  <li>• Clear local preferences by clearing browser storage</li>
-                  <li>• Start fresh by opening a new browser session</li>
+                  <li>• Clear local preferences and session ID by clearing browser storage</li>
+                  <li>• Get fresh restaurant variety by clearing localStorage</li>
                   <li>• Request deletion of server-side data by contacting us</li>
                 </ul>
               </Section>

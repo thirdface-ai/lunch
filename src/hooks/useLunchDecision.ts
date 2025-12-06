@@ -349,13 +349,20 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         return scoreB - scoreA;
       });
 
-      // Fetch recently recommended places to add variety (last ~10 searches worth)
-      const recentlyRecommended = await SupabaseService.getRecentlyRecommendedIds(50);
+      // Fetch recently recommended places to add variety (last ~30 searches worth)
+      const recentlyRecommended = await SupabaseService.getRecentlyRecommendedIds(100);
       
       // Filter out recently shown restaurants for variety
       // Always prioritize fresh results, but ensure minimum viable pool
       const MIN_CANDIDATES_FOR_AI = 5;
       let candidatesForGemini = sortedCandidates.slice(0, 40);
+      
+      // Log variety tracking status
+      Logger.info('SYSTEM', 'Variety tracking', {
+        totalCandidates: candidatesForGemini.length,
+        recentlyShownCount: recentlyRecommended.size,
+        recentlyShownIds: Array.from(recentlyRecommended).slice(0, 10) // Log first 10 for debugging
+      });
       
       if (recentlyRecommended.size > 0) {
         const freshCandidates = candidatesForGemini.filter(
@@ -365,6 +372,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         if (freshCandidates.length >= MIN_CANDIDATES_FOR_AI) {
           // Enough fresh candidates - use only fresh ones
           candidatesForGemini = freshCandidates;
+          addLog(`PRIORITIZING ${freshCandidates.length} FRESH OPTIONS...`);
           Logger.info('SYSTEM', 'Variety filter applied', {
             freshCount: freshCandidates.length,
             filteredOut: recentlyRecommended.size
@@ -375,11 +383,13 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
             .filter(c => recentlyRecommended.has(c.place_id))
             .slice(0, MIN_CANDIDATES_FOR_AI - freshCandidates.length);
           candidatesForGemini = [...freshCandidates, ...recentlyShownSorted];
+          addLog(`MIXING ${freshCandidates.length} NEW + ${recentlyShownSorted.length} FAMILIAR...`);
           Logger.info('SYSTEM', 'Variety filter partial - prioritizing fresh', {
             freshCount: freshCandidates.length,
             paddedWith: recentlyShownSorted.length
           });
         } else {
+          addLog(`ALL OPTIONS FAMILIAR - SHOWING BEST MATCHES...`);
           Logger.info('SYSTEM', 'No fresh candidates - using best available', {
             recentCount: recentlyRecommended.size
           });
