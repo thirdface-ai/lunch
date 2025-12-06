@@ -338,8 +338,8 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                         </div>
                       </div>
 
-                      {/* Description - constrained width for readability */}
-                      <p className={`font-sans text-[13px] lg:text-sm leading-relaxed max-w-xl ${isDark ? 'text-[#AAA]' : 'text-[#444]'}`}>
+                      {/* Description - use available width on desktop */}
+                      <p className={`font-sans text-[13px] lg:text-sm leading-relaxed max-w-xl lg:max-w-none ${isDark ? 'text-[#AAA]' : 'text-[#444]'}`}>
                         {place.ai_reason}
                       </p>
 
