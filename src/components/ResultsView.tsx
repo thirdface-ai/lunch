@@ -229,9 +229,9 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   if (appState !== AppState.RESULTS) return null;
 
   return (
-    <div className={`h-screen sm:p-4 flex items-center justify-center transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
-      {/* Main Chassis - fixed height on desktop */}
-      <div className={`w-full h-full sm:h-[calc(100vh-2rem)] sm:max-h-[800px] max-w-7xl mx-auto border shadow-braun-deep flex flex-col transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
+    <div className={`min-h-screen p-3 sm:p-4 sm:h-screen sm:flex sm:items-center sm:justify-center transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
+      {/* Main Chassis - full height page scroll on mobile, fixed height inline scroll on desktop */}
+      <div className={`w-full sm:h-[calc(100vh-2rem)] sm:max-h-[800px] max-w-7xl mx-auto border shadow-braun-deep flex flex-col transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
         
         {/* Header */}
         <div className={`px-4 py-3 sm:p-6 flex justify-between items-center sm:items-end border-b flex-shrink-0 transition-colors duration-300 ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
@@ -248,10 +248,10 @@ const ResultsView: React.FC<ResultsViewProps> = ({
         </div>
 
         {/* Split View - takes remaining height */}
-        <div className={`flex-1 min-h-0 flex flex-col lg:flex-row transition-colors duration-300 ${isDark ? 'bg-[#151515]' : 'bg-[#F9F9F7]'}`}>
+        <div className={`flex-1 sm:min-h-0 flex flex-col lg:flex-row transition-colors duration-300 ${isDark ? 'bg-[#151515]' : 'bg-[#F9F9F7]'}`}>
           
-          {/* List Column - scrollable */}
-          <div className="flex-1 overflow-y-auto min-h-0">
+          {/* List Column - scrollable on desktop only */}
+          <div className="flex-1 sm:overflow-y-auto sm:min-h-0">
             {results.map((place, idx) => {
               // Find today's hours by matching the day name in the weekday_text strings
               // Use the browser's locale to match Google Places API's weekdayDescriptions language
