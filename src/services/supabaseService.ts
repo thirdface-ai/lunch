@@ -93,9 +93,9 @@ export const SupabaseService = {
   /**
    * Get recently recommended place IDs for the current session
    * Used to filter out recently shown restaurants for variety
-   * @param limit Number of recent recommendations to fetch (default: 15 = ~5 searches)
+   * @param limit Number of recent recommendations to fetch (default: 50 = ~10 searches)
    */
-  async getRecentlyRecommendedIds(limit = 15): Promise<Set<string>> {
+  async getRecentlyRecommendedIds(limit = 50): Promise<Set<string>> {
     try {
       const { data, error } = await supabase
         .from('recommended_places')
