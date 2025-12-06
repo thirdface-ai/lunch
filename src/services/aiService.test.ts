@@ -122,6 +122,37 @@ describe('generateLoadingLogs', () => {
     // Loading logs use the light model (Sonnet) for cost efficiency
     expect(callBody.model).toBe('anthropic/claude-sonnet-4.5');
   });
+
+  it('handles JSON with trailing commas gracefully', async () => {
+    // AI sometimes generates invalid JSON with trailing commas like ["item",]
+    const invalidJsonWithTrailingComma = '["LOG 1...", "LOG 2...", "LOG 3...", "LOG 4...", "LOG 5...", "LOG 6...", "LOG 7...", "LOG 8...",]';
+    
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: invalidJsonWithTrailingComma },
+      error: null,
+    });
+
+    const result = await generateLoadingLogs(HungerVibe.GRAB_AND_GO, 'Berlin');
+    
+    // Should parse successfully after cleanup
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(8);
+    expect(result[0]).toBe('LOG 1...');
+  });
+
+  it('handles JSON wrapped in markdown code blocks', async () => {
+    const markdownWrapped = '```json\n["LOG 1...", "LOG 2...", "LOG 3...", "LOG 4...", "LOG 5...", "LOG 6...", "LOG 7...", "LOG 8..."]\n```';
+    
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: markdownWrapped },
+      error: null,
+    });
+
+    const result = await generateLoadingLogs(HungerVibe.LIGHT_AND_CLEAN, 'Berlin');
+    
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(8);
+  });
 });
 
 describe('decideLunch', () => {
@@ -600,5 +631,31 @@ describe('decideLunch', () => {
     const callBody = mockInvoke.mock.calls[0][1].body;
     // The payload should mark this as fresh_drop
     expect(callBody.contents).toContain('is_fresh_drop');
+  });
+
+  it('handles JSON with trailing commas gracefully', async () => {
+    // AI sometimes generates invalid JSON with trailing commas
+    const invalidJsonWithTrailingComma = '[{"place_id":"place-1","ai_reason":"Great food","recommended_dish":"Pizza","is_cash_only":false,},]';
+    
+    mockInvoke.mockResolvedValueOnce({
+      data: { text: invalidJsonWithTrailingComma },
+      error: null,
+    });
+
+    const result = await decideLunch(
+      mockCandidates,
+      createMockDurations(mockCandidates),
+      null,
+      null,
+      false,
+      'Berlin',
+      [],
+      undefined
+    );
+
+    // Should parse successfully after cleanup
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(1);
+    expect(result[0].place_id).toBe('place-1');
   });
 });

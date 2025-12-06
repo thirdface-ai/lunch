@@ -234,7 +234,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
       <div className={`w-full sm:h-[calc(100vh-2rem)] sm:max-h-[800px] max-w-7xl mx-auto border shadow-braun-deep flex flex-col transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
         
         {/* Header */}
-        <div className={`px-4 py-3 sm:p-6 flex justify-between items-center sm:items-end border-b flex-shrink-0 transition-colors duration-300 ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
+        <div className={`px-4 py-4 sm:p-6 flex justify-between items-center sm:items-end border-b flex-shrink-0 transition-colors duration-300 ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
           <div>
             <h1 className={`font-sans font-bold text-base sm:text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>{funnyTitle}</h1>
           </div>
@@ -265,10 +265,10 @@ const ResultsView: React.FC<ResultsViewProps> = ({
               return (
                 <article 
                   key={place.place_id} 
-                  className={`px-4 py-4 sm:p-6 lg:p-8 border-b last:border-b-0 transition-colors group ${isDark ? 'border-dark-border hover:bg-dark-surface' : 'border-braun-border hover:bg-white'}`}
+                  className={`px-4 py-5 sm:p-6 lg:p-8 border-b last:border-b-0 transition-colors group ${isDark ? 'border-dark-border hover:bg-dark-surface' : 'border-braun-border hover:bg-white'}`}
                 >
                   {/* Grid Layout: Fixed number column + content */}
-                  <div className="flex gap-3 lg:gap-6">
+                  <div className="flex gap-4 lg:gap-6">
                     {/* Fixed-width number column */}
                     <div className="flex-shrink-0 w-6 lg:w-8">
                       <span className="font-mono text-braun-orange text-sm lg:text-sm font-bold tabular-nums leading-tight">
@@ -277,7 +277,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                     </div>
                     
                     {/* Content column */}
-                    <div className="flex-1 min-w-0 space-y-1 sm:space-y-4">
+                    <div className="flex-1 min-w-0 space-y-3 sm:space-y-4">
                       {/* Name row */}
                       <div className="flex flex-wrap items-center gap-2">
                         <a 
@@ -344,7 +344,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                       </p>
 
                       {/* TRY section */}
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1 sm:pt-3">
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 sm:pt-3">
                         <div className="flex items-center gap-2">
                           <span className={`font-mono text-[10px] lg:text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-[#666]' : 'text-braun-text-muted'}`}>TRY:</span>
                           <span className={`font-sans text-[13px] lg:text-sm font-medium border-b ${isDark ? 'text-dark-text border-dark-border' : 'text-braun-dark border-braun-dark/20'}`}>

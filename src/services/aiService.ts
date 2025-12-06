@@ -39,6 +39,21 @@ export interface TranslatedSearchIntent {
 }
 
 /**
+ * Clean common JSON issues from AI responses.
+ * AI models occasionally produce malformed JSON that needs cleanup before parsing.
+ */
+const cleanJsonResponse = (jsonText: string): string => {
+  // 1. Remove trailing commas before ] or } (e.g., ["item",] → ["item"])
+  //    This is a common AI mistake: generating ["a", "b",] instead of ["a", "b"]
+  let cleaned = jsonText.replace(/,(\s*[\]}])/g, '$1');
+  
+  // 2. Remove any control characters that might slip through (except newlines/tabs)
+  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
+  
+  return cleaned;
+};
+
+/**
  * AI-powered translation of freestyle prompts into Google Places search queries
  * 
  * Handles vague requests like "newest hottest places" by understanding intent
@@ -105,6 +120,9 @@ Generate 3-5 CONCRETE search terms Google Places understands. Never use user's v
       jsonText = jsonText.slice(0, -3);
     }
     jsonText = jsonText.trim();
+    
+    // Fix common JSON issues from AI responses
+    jsonText = cleanJsonResponse(jsonText);
 
     const result = JSON.parse(jsonText);
     
@@ -193,7 +211,7 @@ STYLES (mix all):
 
 FORMAT: ALL CAPS, <10 words, end "...", no emojis. Reference location/search in 6+ messages.
 
-Return JSON array of 15 strings only.`;
+Return ONLY a valid JSON array of 15 strings. No trailing commas. Example: ["MSG1...", "MSG2..."]`;
 
   try {
     const text = await callOpenRouterProxy(
@@ -221,6 +239,9 @@ Return JSON array of 15 strings only.`;
       jsonText = jsonText.slice(0, -3);
     }
     jsonText = jsonText.trim();
+    
+    // Fix common JSON issues from AI responses
+    jsonText = cleanJsonResponse(jsonText);
     
     const messages = JSON.parse(jsonText) as string[];
     
@@ -505,6 +526,9 @@ Return a JSON array with exactly 3 recommendations.`;
       jsonText = jsonText.slice(0, -3);
     }
     jsonText = jsonText.trim();
+    
+    // Fix common JSON issues from AI responses
+    jsonText = cleanJsonResponse(jsonText);
 
     let results: Omit<GeminiRecommendation, 'cash_warning_msg'>[];
     try {
