@@ -69,6 +69,7 @@ export interface UserPreferences {
   walkLimit: WalkLimit;
   noCash: boolean;
   newlyOpenedOnly: boolean;
+  popularOnly: boolean;
   theme: ThemeMode;
   dietaryRestrictions: DietaryRestriction[];
   freestylePrompt?: string;

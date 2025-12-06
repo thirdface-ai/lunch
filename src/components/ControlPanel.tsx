@@ -214,7 +214,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         <div className={`hidden sm:flex absolute bottom-2 right-2 w-2 h-2 rounded-full border opacity-50 items-center justify-center ${isDark ? 'border-dark-text-muted' : 'border-braun-text-muted'}`}><div className={`w-1.5 h-[1px] rotate-45 ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div></div>
 
         {/* Branding Header */}
-        <div className={`pt-4 pb-4 px-4 sm:pt-6 sm:pb-6 sm:px-8 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end border-b transition-colors duration-300 ${isDark ? 'border-dark-border bg-dark-surface' : 'border-braun-border bg-[#F4F4F0]'}`}>
+        <div className={`pt-4 pb-4 px-4 sm:pt-6 sm:pb-6 sm:px-8 flex justify-between items-start sm:items-end border-b transition-colors duration-300 ${isDark ? 'border-dark-border bg-dark-surface' : 'border-braun-border bg-[#F4F4F0]'}`}>
             <div>
                 <div className="flex items-center gap-2">
                     <h1 className={`font-sans font-bold text-lg sm:text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>THIRDFACE FOOD DECIDER</h1>
@@ -226,18 +226,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </div>
                 <p className={`font-mono text-[9px] tracking-[0.2em] mt-1 ${isDark ? darkMuted : lightMuted}`}>{mockMode ? 'TEST MODE / NO API KEYS' : 'UNIT 01 / MK.III'}</p>
             </div>
-            <div className="flex flex-col items-start sm:items-end gap-2">
-                <button 
-                    onClick={toggleTheme} 
-                    aria-label={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
-                    className={`flex items-center gap-2 px-3 py-2 sm:px-2 sm:py-1 rounded-[1px] border transition-colors ${isDark ? 'border-dark-border bg-dark-bg' : 'border-braun-border bg-[#E5E5E0]'}`}
-                >
-                    <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-braun-dark' : 'bg-braun-orange'}`}></div>
-                    <span className={`font-mono text-[9px] sm:text-[8px] uppercase tracking-wider ${isDark ? darkMuted : lightMuted}`}>
-                        {isDark ? 'NIGHT MODE' : 'DAY MODE'}
-                    </span>
-                </button>
-            </div>
+            <button 
+                onClick={toggleTheme} 
+                aria-label={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
+                className={`flex items-center gap-1.5 px-2 py-1.5 sm:px-2 sm:py-1 rounded-[1px] border transition-colors shrink-0 ${isDark ? 'border-dark-border bg-dark-bg' : 'border-braun-border bg-[#E5E5E0]'}`}
+            >
+                <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isDark ? 'bg-braun-dark' : 'bg-braun-orange'}`}></div>
+                <span className={`font-mono text-[8px] sm:text-[8px] uppercase tracking-wider ${isDark ? darkMuted : lightMuted}`}>
+                    {isDark ? 'NIGHT' : 'DAY'}
+                </span>
+            </button>
         </div>
 
         {/* Input Module (LCD Style) */}
@@ -410,6 +408,19 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 `}
                             >
                                 No Cash
+                            </button>
+                            <button
+                                role="checkbox"
+                                aria-checked={preferences.popularOnly}
+                                onClick={() => { Sounds.toggle(!preferences.popularOnly); setPreferences(prev => ({ ...prev, popularOnly: !prev.popularOnly })); }}
+                                className={`px-3 py-2.5 sm:py-2 rounded-[1px] font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none border focus:ring-1 focus:ring-white/30
+                                    ${preferences.popularOnly
+                                        ? `${isDark ? 'bg-dark-text text-dark-bg border-dark-text' : 'bg-braun-dark text-white border-braun-dark'} shadow-sm` 
+                                        : `${isDark ? 'text-dark-text-muted border-dark-border hover:bg-white/10 hover:text-white' : 'text-braun-text-muted border-braun-border hover:bg-white/50 hover:text-braun-dark'}`
+                                    }
+                                `}
+                            >
+                                Trending
                             </button>
                         </div>
                     </div>

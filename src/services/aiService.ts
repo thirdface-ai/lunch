@@ -208,6 +208,7 @@ export const decideLunch = async (
   dietaryRestrictions: DietaryRestriction[],
   freestylePrompt?: string,
   newlyOpenedOnly?: boolean,
+  popularOnly?: boolean,
   onLog?: AnalysisLogCallback
 ): Promise<GeminiRecommendation[]> => {
   Logger.info('AI', '=== FOOD DECISION (SINGLE CALL) ===', { 
@@ -215,7 +216,8 @@ export const decideLunch = async (
     vibe, 
     price, 
     freestylePrompt,
-    newlyOpenedOnly
+    newlyOpenedOnly,
+    popularOnly
   });
 
   if (candidates.length === 0) {
@@ -271,8 +273,23 @@ export const decideLunch = async (
       ? Math.max(...allReviews.map(r => parseRecencyMonths(r.relativeTime)))
       : 999;
     
-    // A place is "freshly opened" if oldest review is less than 3 months old
-    const isFreshDrop = oldestReviewMonths < 3;
+    // Count recent reviews (within last 1 month) for popularity/trending signal
+    const recentReviewCount = allReviews.filter(r => parseRecencyMonths(r.relativeTime) <= 1).length;
+    
+    // A place is "freshly opened" if:
+    // 1. Under 80 reviews (main signal) AND
+    // 2. Oldest review is less than 6 months old (prevents old slow places from qualifying)
+    const reviewCount = p.user_ratings_total || 0;
+    const isFreshDrop = reviewCount < 80 && oldestReviewMonths < 6;
+    
+    // Calculate what % of total reviews are from the last month
+    // If 10%+ of all reviews are from last month, it's trending (actively buzzing)
+    // E.g., 100 total reviews with 10+ from last month = hot spot
+    // E.g., 500 total reviews with 50+ from last month = very popular
+    const totalReviews = p.user_ratings_total || 1;
+    const reviewSampleSize = Math.max(1, Math.min(totalReviews, allReviews.length)); // Prevent division by zero
+    const recentReviewPercent = (recentReviewCount / reviewSampleSize) * 100;
+    const isTrending = recentReviewPercent >= 10;
     
     const duration = durations.get(p.place_id);
     const walkingMinutes = duration ? Math.ceil(duration.value / 60) : null;
@@ -297,6 +314,8 @@ export const decideLunch = async (
       dine_in: p.dine_in,
       is_fresh_drop: isFreshDrop,
       oldest_review_months: oldestReviewMonths < 100 ? oldestReviewMonths : null,
+      is_trending: isTrending,
+      recent_review_percent: Math.round(recentReviewPercent),
     };
   });
   
@@ -322,10 +341,20 @@ export const decideLunch = async (
   // Fresh drops context
   const freshDropsText = newlyOpenedOnly
     ? `FRESH DROPS MODE ENABLED: User wants to discover NEWLY OPENED restaurants!
-- PRIORITIZE places where is_fresh_drop=true (oldest review < 3 months old)
+- PRIORITIZE places where is_fresh_drop=true (under 80 reviews AND oldest review < 6 months)
 - The oldest_review_months field tells you how long the place has existed
-- Places with oldest_review_months < 3 are MUST PICKS
+- Places with is_fresh_drop=true are MUST PICKS
 - This is the user's PRIMARY requirement - all 3 recommendations should be fresh drops if available!`
+    : '';
+
+  // Trending context
+  const trendingText = popularOnly
+    ? `TRENDING MODE ENABLED: User wants TRENDING restaurants with recent buzz!
+- PRIORITIZE places where is_trending=true (10%+ of reviews from last month)
+- The recent_review_percent field shows what % of reviews are from last month
+- Higher recent_review_percent = more currently popular/buzzing
+- Places people are actively talking about RIGHT NOW
+- This is the user's PRIMARY requirement - recommend places with high recent activity!`
     : '';
 
   // Detailed system instruction for quality recommendations
@@ -337,6 +366,7 @@ SPECIFIC REQUEST: ${freestylePrompt || 'None'}
 ${budgetText}
 ${dietaryText}
 ${freshDropsText}
+${trendingText}
 ${noCash ? 'USER REQUIRES CARD PAYMENT - exclude cash-only places' : ''}
 
 === TIME & MEAL CONTEXT ===
@@ -430,7 +460,7 @@ Return EXACTLY 3 recommendations as a JSON array. For each:
 - vibe_match_score: 1-10 how well it matches the user's vibe/request
 - caveat: Brief warning if relevant (e.g., "Can get busy at peak hours", "Service can be slow")
 - is_cash_only: Boolean
-- is_new_opening: True if is_fresh_drop=true in the data (oldest review < 3 months) OR mentions of "just opened", "new spot" in reviews
+- is_new_opening: True if is_fresh_drop=true in the data (under 80 reviews AND oldest review < 6 months) OR mentions of "just opened", "new spot" in reviews
 
 === AI_REASON RULES (MUST FOLLOW) ===
 
