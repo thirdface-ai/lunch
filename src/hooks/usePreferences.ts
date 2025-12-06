@@ -20,6 +20,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   price: null,
   walkLimit: WalkLimit.FIFTEEN_MIN,
   noCash: false,
+  newlyOpenedOnly: false,
   theme: ThemeMode.SYSTEM,
   dietaryRestrictions: [],
   freestylePrompt: '',
@@ -67,6 +68,7 @@ const saveToStorage = (preferences: UserPreferences): void => {
       price: preferences.price,
       walkLimit: preferences.walkLimit,
       noCash: preferences.noCash,
+      newlyOpenedOnly: preferences.newlyOpenedOnly,
       theme: preferences.theme,
       dietaryRestrictions: preferences.dietaryRestrictions,
     };

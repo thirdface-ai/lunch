@@ -413,6 +413,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         preferences.address,
         preferences.dietaryRestrictions,
         preferences.freestylePrompt,
+        preferences.newlyOpenedOnly,
         addLog // Pass the log callback for real-time personalized updates
       );
 

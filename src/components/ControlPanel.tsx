@@ -401,6 +401,27 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     </div>
                 </div>
 
+                {/* Newly Opened Filter */}
+                <div>
+                    <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Discovery Mode</label>
+                    <button
+                        role="switch"
+                        aria-checked={preferences.newlyOpenedOnly}
+                        onClick={() => { Sounds.toggle(!preferences.newlyOpenedOnly); setPreferences(prev => ({ ...prev, newlyOpenedOnly: !prev.newlyOpenedOnly })); }}
+                        className={`
+                            w-full h-12 sm:h-12 border rounded-sm flex items-center justify-center transition-all duration-150 group outline-none focus:ring-1 focus:ring-white/30
+                            ${preferences.newlyOpenedOnly 
+                                ? `${isDark ? 'bg-blue-500 text-white border-blue-500' : 'bg-blue-600 text-white border-blue-600'} shadow-sm` 
+                                : `${isDark ? 'bg-dark-surface border-dark-border shadow-dark-raised hover:shadow-[0_2px_0_#333]' : 'bg-[#E5E5E0] border-braun-border shadow-braun-raised hover:shadow-[0_2px_0_#D4D4D0]'} hover:translate-y-[1px]`
+                            }
+                        `}
+                    >
+                        <span className={`font-mono text-[11px] sm:text-[10px] font-bold uppercase tracking-widest ${preferences.newlyOpenedOnly ? 'text-white' : (isDark ? 'text-dark-text' : 'text-braun-dark')}`}>
+                             {preferences.newlyOpenedOnly ? '✦ Fresh Drops Only' : 'All Restaurants'}
+                        </span>
+                    </button>
+                </div>
+
                 {/* Payment Override */}
                 <div>
                     <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Payment Constraint</label>

@@ -207,13 +207,15 @@ export const decideLunch = async (
   address: string,
   dietaryRestrictions: DietaryRestriction[],
   freestylePrompt?: string,
+  newlyOpenedOnly?: boolean,
   onLog?: AnalysisLogCallback
 ): Promise<GeminiRecommendation[]> => {
   Logger.info('AI', '=== LUNCH DECISION (SINGLE CALL) ===', { 
     candidateCount: candidates.length, 
     vibe, 
     price, 
-    freestylePrompt
+    freestylePrompt,
+    newlyOpenedOnly
   });
 
   if (candidates.length === 0) {
@@ -227,24 +229,33 @@ export const decideLunch = async (
   const topCandidates = candidates.slice(0, 15);
   
   // Helper to parse recency from relativeTime string (e.g., "2 weeks ago", "3 months ago")
-  const parseRecencyScore = (relativeTime?: string): number => {
-    if (!relativeTime) return 999; // Unknown = sort last
+  // Returns months as a number (0 = less than a month, 1 = 1 month, etc.)
+  const parseRecencyMonths = (relativeTime?: string): number => {
+    if (!relativeTime) return 999; // Unknown = assume old
     const lower = relativeTime.toLowerCase();
-    if (lower.includes('day') || lower.includes('hour')) return 1;
-    if (lower.includes('week')) return 2;
+    if (lower.includes('hour') || lower.includes('day')) return 0;
+    if (lower.includes('week')) return 0.5;
     if (lower.includes('month')) {
       const match = lower.match(/(\d+)/);
-      const months = match ? parseInt(match[1]) : 1;
-      return 2 + months; // 1 month = 3, 2 months = 4, etc.
+      return match ? parseInt(match[1]) : 1;
     }
-    if (lower.includes('year')) return 20;
-    return 10; // Unknown format
+    if (lower.includes('year')) {
+      const match = lower.match(/(\d+)/);
+      const years = match ? parseInt(match[1]) : 1;
+      return years * 12;
+    }
+    return 999; // Unknown format = assume old
+  };
+  
+  // Helper for sorting (lower = more recent)
+  const parseRecencyScore = (relativeTime?: string): number => {
+    return parseRecencyMonths(relativeTime);
   };
   
   // Build payload with up to 30 reviews per restaurant, sorted by recency
   const payload = topCandidates.map(p => {
-    const reviews = (p.reviews || [])
-      .filter(r => r.text && r.text.length > 0)
+    const allReviews = (p.reviews || []).filter(r => r.text && r.text.length > 0);
+    const reviews = allReviews
       .sort((a, b) => parseRecencyScore(a.relativeTime) - parseRecencyScore(b.relativeTime))
       .slice(0, 30)
       .map(r => ({
@@ -254,6 +265,14 @@ export const decideLunch = async (
                 r.relativeTime?.toLowerCase().includes('month') ||
                 r.relativeTime?.toLowerCase().includes('day'),
       }));
+    
+    // Find the OLDEST review to determine if this is a new place
+    const oldestReviewMonths = allReviews.length > 0
+      ? Math.max(...allReviews.map(r => parseRecencyMonths(r.relativeTime)))
+      : 999;
+    
+    // A place is "freshly opened" if oldest review is less than 3 months old
+    const isFreshDrop = oldestReviewMonths < 3;
     
     const duration = durations.get(p.place_id);
     const walkingMinutes = duration ? Math.ceil(duration.value / 60) : null;
@@ -276,6 +295,8 @@ export const decideLunch = async (
       has_wine: p.serves_wine,
       takeout: p.takeout,
       dine_in: p.dine_in,
+      is_fresh_drop: isFreshDrop,
+      oldest_review_months: oldestReviewMonths < 100 ? oldestReviewMonths : null,
     };
   });
   
@@ -298,6 +319,15 @@ export const decideLunch = async (
     ? `DIETARY REQUIREMENTS: ${dietaryRestrictions.join(', ')}. Prioritize restaurants that accommodate these.`
     : '';
 
+  // Fresh drops context
+  const freshDropsText = newlyOpenedOnly
+    ? `FRESH DROPS MODE ENABLED: User wants to discover NEWLY OPENED restaurants!
+- PRIORITIZE places where is_fresh_drop=true (oldest review < 3 months old)
+- The oldest_review_months field tells you how long the place has existed
+- Places with oldest_review_months < 3 are MUST PICKS
+- This is the user's PRIMARY requirement - all 3 recommendations should be fresh drops if available!`
+    : '';
+
   // Detailed system instruction for quality recommendations
   const systemInstruction = `You are an expert lunch recommendation AI. Your task is to analyze restaurant data and select EXACTLY 3 best matches.
 
@@ -306,6 +336,7 @@ USER VIBE: ${vibe || 'Good quality food'}
 SPECIFIC REQUEST: ${freestylePrompt || 'None'}
 ${budgetText}
 ${dietaryText}
+${freshDropsText}
 ${noCash ? 'USER REQUIRES CARD PAYMENT - exclude cash-only places' : ''}
 
 === TIME CONTEXT ===
@@ -381,7 +412,7 @@ Return EXACTLY 3 recommendations as a JSON array. For each:
 - vibe_match_score: 1-10 how well it matches the user's vibe/request
 - caveat: Brief warning if relevant (e.g., "Can get busy at lunch", "Service can be slow")
 - is_cash_only: Boolean
-- is_new_opening: True if <50 reviews and "just opened" mentions
+- is_new_opening: True if is_fresh_drop=true in the data (oldest review < 3 months) OR mentions of "just opened", "new spot" in reviews
 
 === AI_REASON RULES (MUST FOLLOW) ===
 
