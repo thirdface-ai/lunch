@@ -376,36 +376,39 @@ Return EXACTLY 3 recommendations as a JSON array. For each:
 - place_id: The restaurant's ID from the data
 - recommended_dish: A SPECIFIC dish name found in reviews (never generic)
 - backup_dish: An alternative dish recommendation (optional, if found)
-- ai_reason: 2 concise sentences: (1) Why this place stands out + quote from reviews, (2) Why chosen over a specific alternative from the list
+- ai_reason: 2 concise sentences explaining why this place is great (see rules below)
 - vibe_match_score: 1-10 how well it matches the user's vibe/request
 - caveat: Brief warning if relevant (e.g., "Can get busy at lunch", "Service can be slow")
 - is_cash_only: Boolean
 - is_new_opening: True if <50 reviews and "just opened" mentions
 
-=== AI_REASON RULES ===
+=== AI_REASON RULES (MUST FOLLOW) ===
 
-NEVER include in ai_reason (these are shown separately in UI):
-- Star ratings (e.g., "4.6★", "4.5 stars")
-- Review counts (e.g., "340 reviews", "highly reviewed")
-- Walking time (e.g., "4 min away", "just around the corner")
+FORMAT: 2 concise sentences:
+1. Why this place stands out + a specific quote from reviews
+2. Why it beat a REJECTED restaurant (one NOT in your top 3)
 
-ALWAYS include:
-- A specific quote or detail from reviews
-- Name of ONE restaurant that DIDN'T make your top 3 and briefly why this one beat it
+NEVER include (shown separately in UI):
+- Star ratings, review counts, or walking times
 
-CRITICAL: When comparing, ONLY reference restaurants you are NOT recommending.
-- If you recommend places A, B, C - compare against D, E, F (places that didn't make the cut)
-- NEVER say "chosen over X" if X is also in your top 3 recommendations
-- This helps users understand why other nearby options were rejected
+!!!ABSOLUTE RULE - COMPARISON RESTRICTIONS!!!
+When you write "beat out X" or "chosen over X" or "edged out X":
+- X must be a restaurant that is NOT in your final 3 recommendations
+- Before writing the comparison, CHECK: "Is this restaurant in my top 3?" If YES, pick a DIFFERENT restaurant to compare against
+- You have ${payload.length} restaurants. You're recommending 3. Compare against one of the other ${payload.length - 3} that didn't make the cut.
+
+EXAMPLE OF VIOLATION (DO NOT DO THIS):
+- If your top 3 are: Rabbit Café, Studio Natura, Daluma
+- Rabbit Café's reason says "Beat out Studio Natura" ← WRONG! Studio Natura is #2
+- Instead say "Beat out [some restaurant NOT in your top 3]"
 
 === AI_REASON EXAMPLES ===
 
-BAD: "Great restaurant with good food. 4.6★ with 340 reviews, 4 min away."
-BAD: "Highly rated spot with quick service."
-BAD: "Chosen over [restaurant that's also in top 3]" - NEVER DO THIS
+BAD: "4.6★ with 340 reviews, 4 min away." (includes stats shown in UI)
+BAD: "Chosen over Studio Natura" when Studio Natura is also recommended ← VIOLATION
 
-GOOD: "Reviewers call the Duck Confit 'perfectly crispy with incredible sauce'. Beat out Café Michel which has slower service during lunch rush."
-GOOD: "Known for 'generous portions' of authentic Schnitzel that locals swear by. Edged out Gasthaus Weber where recent reviews noted 'quality dropped'."
+GOOD: "Reviewers call the avocado croissant 'soft and fresh'. Beat out Corner Bakery which had complaints about stale pastries."
+GOOD: "Known for 'generous portions' locals love. Edged out Gasthaus Weber where recent reviews noted 'quality dropped'."
 
 === CRITICAL: NO DUPLICATES ===
 - NEVER recommend the same restaurant twice

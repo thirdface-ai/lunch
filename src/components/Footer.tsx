@@ -120,16 +120,15 @@ interface FooterProps {
 const Footer: React.FC<FooterProps> = ({ isDark, onPrivacyClick }) => {
   return (
     <>
-      {/* Mobile: Fixed footer at bottom */}
+      {/* Mobile: Inline footer at bottom of content */}
       <footer 
         className={`
           sm:hidden
-          fixed z-50 bottom-0 left-0 right-0
-          py-3 font-mono uppercase tracking-wider text-[9px]
+          py-6 font-mono uppercase tracking-wider text-[9px]
           ${isDark ? 'text-dark-text-muted/50 bg-dark-bg' : 'text-braun-text-muted/50 bg-braun-bg'}
         `}
       >
-        <div className="flex items-center justify-center gap-2">
+        <p className="text-center whitespace-nowrap">
           <a 
             href="https://www.linkedin.com/in/noahnawara/"
             target="_blank"
@@ -138,14 +137,14 @@ const Footer: React.FC<FooterProps> = ({ isDark, onPrivacyClick }) => {
           >
             NOAH NAWARA
           </a>
-          <span className={`${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
+          <span className={`mx-2 ${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
           <button 
             onClick={onPrivacyClick}
             className="hover:text-braun-orange transition-colors"
           >
             PRIVACY
           </button>
-        </div>
+        </p>
       </footer>
 
       {/* Desktop: Fixed subtle footer in corner */}
