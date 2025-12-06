@@ -23,21 +23,29 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const [showPredictions, setShowPredictions] = useState(false);
   
   const [locating, setLocating] = useState(false);
-  const PlaceLibraryRef = useRef<any>(null);
+  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize Places Library (New API)
+  // Initialize AutocompleteService (much cheaper than Text Search API)
   useEffect(() => {
-    const initPlaces = async () => {
+    const initAutocomplete = async () => {
         try {
             if ((window as any).google && (window as any).google.maps) {
-                const { Place } = await (window as any).google.maps.importLibrary("places");
-                PlaceLibraryRef.current = Place;
+                await (window as any).google.maps.importLibrary("places");
+                autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
             }
         } catch (error) {
             console.error("Failed to load Maps Places library", error);
         }
     };
-    initPlaces();
+    initAutocomplete();
+    
+    // Cleanup debounce timer on unmount
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
   }, []);
 
   // Sync Input with Preferences (e.g. from Geolocation)
@@ -45,50 +53,67 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     setInputValue(preferences.address);
   }, [preferences.address]);
 
-  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInputValue(value);
     
-    if (value && value.length > 2 && PlaceLibraryRef.current) {
-        try {
-            const { places } = await PlaceLibraryRef.current.searchByText({
-                textQuery: value,
-                fields: ['displayName', 'formattedAddress', 'location', 'id'],
-                isOpenNow: false, 
-            });
-
-            if (places && places.length > 0) {
-                setPredictions(places);
-                setShowPredictions(true);
+    // Clear previous debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    if (value && value.length > 2 && autocompleteServiceRef.current) {
+      // Debounce: wait 300ms after user stops typing before making API call
+      debounceTimerRef.current = setTimeout(() => {
+        autocompleteServiceRef.current!.getPlacePredictions(
+          { 
+            input: value,
+            types: ['geocode', 'establishment']
+          },
+          (results, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+              setPredictions(results);
+              setShowPredictions(true);
             } else {
-                setPredictions([]);
-                setShowPredictions(false);
+              setPredictions([]);
+              setShowPredictions(false);
             }
-        } catch (err) {
-            setPredictions([]);
-            setShowPredictions(false);
-        }
+          }
+        );
+      }, 300);
     } else {
-        setPredictions([]);
-        setShowPredictions(false);
+      setPredictions([]);
+      setShowPredictions(false);
     }
   };
 
-  const handlePredictionSelect = (place: any) => {
+  const handlePredictionSelect = (prediction: google.maps.places.AutocompletePrediction) => {
       Sounds.select();
-      const address = place.formattedAddress || place.displayName;
-      const lat = place.location.lat();
-      const lng = place.location.lng();
-
+      const address = prediction.description;
+      
       setInputValue(address);
       setShowPredictions(false);
       
-      setPreferences(prev => ({
-           ...prev,
-           address: address,
-           lat: lat,
-           lng: lng
-       }));
+      // Use Geocoder to get lat/lng from the place_id (Autocomplete doesn't include coordinates)
+      const geocoder = new google.maps.Geocoder();
+      geocoder.geocode({ placeId: prediction.place_id }, (results, status) => {
+        if (status === 'OK' && results && results[0]) {
+          const location = results[0].geometry.location;
+          setPreferences(prev => ({
+            ...prev,
+            address: address,
+            lat: location.lat(),
+            lng: location.lng()
+          }));
+        } else {
+          // Fallback: just set the address without coordinates
+          console.warn('Geocoding failed for place:', prediction.place_id, status);
+          setPreferences(prev => ({
+            ...prev,
+            address: address
+          }));
+        }
+      });
   };
 
   const handleLocateMe = () => {
@@ -269,17 +294,17 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 role="listbox"
                                 className={`absolute top-full left-0 right-0 mt-2 border shadow-lg z-50 max-h-64 overflow-y-auto rounded-[2px] ${isDark ? 'bg-dark-bg border-dark-border' : 'bg-[#F4F4F0] border-braun-border'}`}
                             >
-                                 {predictions.map((p) => (
+                                 {predictions.map((p: google.maps.places.AutocompletePrediction) => (
                                      <button 
-                                         key={p.id}
+                                         key={p.place_id}
                                          role="option"
                                          onMouseDown={(e) => e.preventDefault()}
                                          onClick={() => handlePredictionSelect(p)}
                                          className={`w-full text-left p-3 border-b cursor-pointer font-mono text-xs truncate transition-colors group/item focus:outline-none focus:ring-1 focus:ring-white/30 ${isDark ? 'border-dark-border hover:bg-white/5 text-dark-text' : 'border-braun-border/50 hover:bg-braun-orange/10 text-braun-dark'}`}
                                      >
                                          <div className="flex flex-col pointer-events-none">
-                                             <span className="font-bold group-hover/item:text-braun-orange">{p.displayName}</span>
-                                             <span className={`${isDark ? darkMuted : lightMuted} text-[10px]`}>{p.formattedAddress}</span>
+                                             <span className="font-bold group-hover/item:text-braun-orange">{p.structured_formatting.main_text}</span>
+                                             <span className={`${isDark ? darkMuted : lightMuted} text-[10px]`}>{p.structured_formatting.secondary_text}</span>
                                          </div>
                                      </button>
                                  ))}

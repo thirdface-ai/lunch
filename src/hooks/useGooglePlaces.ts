@@ -230,7 +230,9 @@ export const useGooglePlaces = () => {
     }
 
     // Deduplicate and limit queries to reduce API costs
-    const uniqueQueries = [...new Set(searchQueries)].slice(0, 3);
+    // Reduced from 3 to 2 queries to cut text search costs by ~33%
+    // Cache will help maintain coverage across sessions
+    const uniqueQueries = [...new Set(searchQueries)].slice(0, 2);
     Logger.info('SYSTEM', 'Search queries optimized', {
       original: searchQueries.length,
       deduplicated: uniqueQueries.length
