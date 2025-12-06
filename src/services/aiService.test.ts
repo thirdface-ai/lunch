@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateLoadingLogs, decideLunch, Type } from './aiService';
+import { generateLoadingLogs, decideLunch, Type, PlaceDuration } from './aiService';
 import { HungerVibe, PricePoint, DietaryRestriction, GooglePlace, PlaceReview } from '../types';
+
+// Helper to create mock durations map
+const createMockDurations = (candidates: GooglePlace[]): Map<string, PlaceDuration> => {
+  const map = new Map<string, PlaceDuration>();
+  candidates.forEach((c, i) => {
+    map.set(c.place_id, { text: `${(i + 1) * 5} mins`, value: (i + 1) * 300 });
+  });
+  return map;
+};
 
 // Mock the supabase functions invoke
 const mockInvoke = vi.fn();
@@ -70,9 +79,10 @@ describe('generateLoadingLogs', () => {
 
     const result = await generateLoadingLogs(HungerVibe.LIGHT_AND_CLEAN, 'Test Address');
     
-    expect(result).toContain('SNIFFING OUT THE GOOD STUFF...');
-    expect(result).toContain('JUDGING RESTAURANTS BY THEIR FONTS...');
-    expect(result).toContain('CALCULATING FOOD COMA PROBABILITY...');
+    // Updated fallback messages are more process-oriented
+    expect(result).toContain('SCANNING NEARBY RESTAURANTS...');
+    expect(result).toContain('READING HUNDREDS OF REVIEWS...');
+    expect(result).toContain('CALCULATING WALKING DISTANCES...');
   });
 
   it('returns fallback logs when API returns empty text', async () => {
@@ -84,9 +94,9 @@ describe('generateLoadingLogs', () => {
     const result = await generateLoadingLogs(null, 'Address');
     
     // When API returns empty text, it triggers error handling which returns fallback logs
-    expect(result).toContain('SNIFFING OUT THE GOOD STUFF...');
-    expect(result).toContain('JUDGING RESTAURANTS BY THEIR FONTS...');
-    expect(result).toContain('CALCULATING FOOD COMA PROBABILITY...');
+    expect(result).toContain('SCANNING NEARBY RESTAURANTS...');
+    expect(result).toContain('READING HUNDREDS OF REVIEWS...');
+    expect(result).toContain('CALCULATING WALKING DISTANCES...');
   });
 
   it('handles null vibe gracefully', async () => {
@@ -154,6 +164,7 @@ describe('decideLunch', () => {
 
     const result = await decideLunch(
       mockCandidates,
+      createMockDurations(mockCandidates),
       HungerVibe.HEARTY_AND_RICH,
       PricePoint.PAYING_MYSELF,
       false,
@@ -185,6 +196,7 @@ describe('decideLunch', () => {
 
     const result = await decideLunch(
       mockCandidates,
+      createMockDurations(mockCandidates),
       HungerVibe.GRAB_AND_GO,
       null,
       false,
@@ -205,6 +217,7 @@ describe('decideLunch', () => {
 
     const result = await decideLunch(
       mockCandidates,
+      createMockDurations(mockCandidates),
       HungerVibe.LIGHT_AND_CLEAN,
       PricePoint.PAYING_MYSELF,
       true,
@@ -224,6 +237,7 @@ describe('decideLunch', () => {
 
     const result = await decideLunch(
       mockCandidates,
+      createMockDurations(mockCandidates),
       null,
       null,
       false,
@@ -243,6 +257,7 @@ describe('decideLunch', () => {
 
     await decideLunch(
       mockCandidates,
+      createMockDurations(mockCandidates),
       HungerVibe.LIGHT_AND_CLEAN,
       null,
       false,
@@ -265,6 +280,7 @@ describe('decideLunch', () => {
 
     await decideLunch(
       mockCandidates,
+      createMockDurations(mockCandidates),
       null,
       null,
       false,
@@ -285,6 +301,7 @@ describe('decideLunch', () => {
 
     await decideLunch(
       mockCandidates,
+      createMockDurations(mockCandidates),
       HungerVibe.SPICY_AND_BOLD,
       PricePoint.COMPANY_CARD,
       true, // noCash
@@ -335,6 +352,7 @@ describe('decideLunch', () => {
 
     await decideLunch(
       candidatesWithDetails,
+      createMockDurations(candidatesWithDetails),
       HungerVibe.VIEW_AND_VIBE,
       PricePoint.COMPANY_CARD,
       false,
@@ -368,6 +386,7 @@ describe('decideLunch', () => {
     await expect(
       decideLunch(
         minimalCandidates,
+        createMockDurations(minimalCandidates),
         HungerVibe.AUTHENTIC_AND_CLASSIC,
         null,
         false,
@@ -386,6 +405,7 @@ describe('decideLunch', () => {
 
     await decideLunch(
       mockCandidates,
+      createMockDurations(mockCandidates),
       HungerVibe.GRAB_AND_GO,
       null,
       false,
