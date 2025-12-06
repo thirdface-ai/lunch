@@ -3,6 +3,7 @@ export enum AppState {
   INPUT = 'INPUT',
   PROCESSING = 'PROCESSING',
   RESULTS = 'RESULTS',
+  NO_RESULTS = 'NO_RESULTS',
   ERROR = 'ERROR'
 }
 

@@ -16,7 +16,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   lat: null,
   lng: null,
   mode: TransportMode.WALK,
-  vibe: HungerVibe.GRAB_AND_GO,
+  vibe: null,
   price: null,
   walkLimit: WalkLimit.FIFTEEN_MIN,
   noCash: false,
@@ -62,9 +62,12 @@ const saveToStorage = (preferences: UserPreferences): void => {
   
   try {
     // Only persist non-sensitive, reusable preferences
+    // Note: vibe is intentionally NOT persisted - should start fresh each session
     const toStore = {
+      address: preferences.address,
+      lat: preferences.lat,
+      lng: preferences.lng,
       mode: preferences.mode,
-      vibe: preferences.vibe,
       price: preferences.price,
       walkLimit: preferences.walkLimit,
       noCash: preferences.noCash,

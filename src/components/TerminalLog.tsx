@@ -1,21 +1,43 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { AppState, TerminalLog as LogType, ThemeMode } from '../types';
 import Sounds from '../utils/sounds';
+
+// Funny messages for when no results are found
+const SAD_MESSAGES = [
+  "Your filters are more exclusive than a Berlin techno club's door policy.",
+  "Even the hungriest AI couldn't find a match. That's... impressive?",
+  "Congratulations! You've achieved the impossible: zero food options.",
+  "Your standards are higher than Berlin rent prices.",
+  "Not even a Döner stand survived your criteria. Brutal.",
+  "The algorithm cried a single digital tear and gave up.",
+  "We searched high and low. Mostly low. Found nothing.",
+  "Your preferences created a food paradox. Scientists are baffled.",
+  "Plot twist: The food was inside you all along. (Please eat something.)",
+  "Error 404: Edible food not found within your extremely specific parameters.",
+  "The AI tried its best. Its best wasn't good enough. It's reconsidering its career.",
+  "Your filters eliminated literally everything. Achievement unlocked?",
+];
 
 interface TerminalLogProps {
   appState: AppState;
   logs: LogType[];
   progress?: number;
   theme: ThemeMode;
+  onReset?: () => void;
 }
 
-const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0, theme }) => {
+const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0, theme, onReset }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const prevLogsLengthRef = useRef(0);
   const hasPlayedInitRef = useRef(false);
   const hasPlayedSuccessRef = useRef(false);
   const isDark = theme === ThemeMode.DARK;
+  
+  // Pick a random sad message when entering NO_RESULTS state
+  const sadMessage = useMemo(() => {
+    return SAD_MESSAGES[Math.floor(Math.random() * SAD_MESSAGES.length)];
+  }, [appState]);
 
   // Play init sound when processing starts
   useEffect(() => {
@@ -51,8 +73,56 @@ const TerminalLog: React.FC<TerminalLogProps> = ({ appState, logs, progress = 0,
     }
   }, [logs]);
 
-  if (appState !== AppState.PROCESSING) return null;
+  // Only render for PROCESSING or NO_RESULTS states
+  if (appState !== AppState.PROCESSING && appState !== AppState.NO_RESULTS) return null;
 
+  // NO_RESULTS state - show sad face screen
+  if (appState === AppState.NO_RESULTS) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-3 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
+        <div className={`w-full max-w-2xl border p-1 relative flex flex-col shadow-braun-deep transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
+          
+          {/* Header */}
+          <div className={`pt-4 pb-4 px-4 sm:pt-6 sm:pb-6 sm:px-8 flex justify-between items-center border-b shrink-0 transition-colors duration-300 ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
+            <div>
+              <h1 className={`font-sans font-bold text-lg sm:text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>NO RESULTS</h1>
+              <p className={`font-mono text-[9px] tracking-[0.2em] mt-1 ${isDark ? 'text-dark-text-muted' : 'text-braun-text-muted'}`}>SEARCH YIELDED ZERO MATCHES</p>
+            </div>
+            <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div>
+          </div>
+
+          {/* Sad Face Content */}
+          <div className={`p-8 sm:p-12 flex flex-col items-center justify-center text-center transition-colors duration-300 ${isDark ? 'bg-[#111]' : 'bg-[#F0F0EC]'}`}>
+            
+            {/* Big Sad Face */}
+            <div className={`text-[120px] sm:text-[160px] leading-none mb-6 select-none ${isDark ? 'opacity-20' : 'opacity-10'}`}>
+              :(
+            </div>
+            
+            {/* Funny Message */}
+            <p className={`font-mono text-sm sm:text-base max-w-md leading-relaxed mb-8 ${isDark ? 'text-dark-text-muted' : 'text-braun-text-muted'}`}>
+              {sadMessage}
+            </p>
+
+            {/* Restart Button */}
+            <button
+              onClick={onReset}
+              className="px-8 py-3 bg-braun-orange text-white font-sans font-bold text-sm uppercase tracking-widest rounded-sm shadow-braun-deep hover:shadow-[0_0_20px_rgba(255,68,0,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+            >
+              Try Again
+            </button>
+
+            {/* Suggestions */}
+            <div className={`mt-8 font-mono text-[10px] uppercase tracking-wider ${isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'}`}>
+              <p>Try: Wider radius • Fewer filters • Different vibe</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // PROCESSING state - show terminal
   return (
     <div className={`min-h-screen flex items-center justify-center p-3 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
       {/* Main Chassis */}

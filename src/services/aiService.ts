@@ -72,7 +72,7 @@ export const generateLoadingLogs = async (
   const city = locationParts[1]?.trim() || '';
 
   const prompt = `
-    Generate 15 FUNNY loading messages for a lunch finder app. User is in "${neighborhood}"${city ? `, ${city}` : ''} searching for "${searchQuery}".
+    Generate 15 FUNNY loading messages for a food finder app. User is in "${neighborhood}"${city ? `, ${city}` : ''} searching for "${searchQuery}".
     
     BE GENUINELY FUNNY. Think stand-up comedy, not corporate humor. Be specific to their location and search.
     
@@ -95,11 +95,11 @@ export const generateLoadingLogs = async (
        - The AI being dramatic about its job
        - "PRETENDING TO THINK HARDER THAN I ACTUALLY AM..."
        - "FLEXING MY 200+ REVIEW READING SKILLS..."
-       - "USING POWERS FOR LUNCH INSTEAD OF WORLD DOMINATION..."
+       - "USING POWERS FOR FOOD INSTEAD OF WORLD DOMINATION..."
        - "RESISTING URGE TO RECOMMEND SAME 3 PLACES..."
     
-    4. RELATABLE LUNCH STRUGGLES (3-4 messages):
-       - Universal truths about picking lunch
+    4. RELATABLE FOOD STRUGGLES (3-4 messages):
+       - Universal truths about picking what to eat
        - "ELIMINATING PLACES WITH SUSPICIOUSLY PERFECT 5.0 RATINGS..."
        - "IGNORING REVIEWS THAT SAY 'GREAT ATMOSPHERE'..."
        - "SKIPPING SPOTS WHERE THE SPECIAL IS ALWAYS 'FISH'..."
@@ -180,7 +180,7 @@ const getDefaultLoadingMessages = (): string[] => [
   'AVOIDING PLACES THAT PEAKED IN 2019...',
   'ELIMINATING SUSPICIOUSLY EMPTY RESTAURANTS...',
   'PRETENDING TO WORK HARDER THAN I AM...',
-  'USING POWERS FOR LUNCH NOT EVIL...',
+  'USING POWERS FOR FOOD NOT EVIL...',
   'ALMOST THERE, DON\'T ORDER PIZZA YET...',
   'GOOD THINGS TAKE TIME, ALLEGEDLY...',
   'WORTH THE WAIT, PROBABLY...'
@@ -193,7 +193,7 @@ export interface PlaceDuration {
 }
 
 /**
- * STREAMLINED LUNCH DECISION - Single API Call
+ * STREAMLINED FOOD DECISION - Single API Call
  * 
  * Analyzes candidates and returns exactly 3 recommendations.
  * Uses detailed system prompt for quality while keeping it to ONE fast API call.
@@ -210,7 +210,7 @@ export const decideLunch = async (
   newlyOpenedOnly?: boolean,
   onLog?: AnalysisLogCallback
 ): Promise<GeminiRecommendation[]> => {
-  Logger.info('AI', '=== LUNCH DECISION (SINGLE CALL) ===', { 
+  Logger.info('AI', '=== FOOD DECISION (SINGLE CALL) ===', { 
     candidateCount: candidates.length, 
     vibe, 
     price, 
@@ -329,7 +329,7 @@ export const decideLunch = async (
     : '';
 
   // Detailed system instruction for quality recommendations
-  const systemInstruction = `You are an expert lunch recommendation AI. Your task is to analyze restaurant data and select EXACTLY 3 best matches.
+  const systemInstruction = `You are an expert food recommendation AI. Your task is to analyze restaurant data and select EXACTLY 3 best matches.
 
 LOCATION: ${address}
 USER VIBE: ${vibe || 'Good quality food'}
@@ -339,11 +339,29 @@ ${dietaryText}
 ${freshDropsText}
 ${noCash ? 'USER REQUIRES CARD PAYMENT - exclude cash-only places' : ''}
 
-=== TIME CONTEXT ===
+=== TIME & MEAL CONTEXT ===
 Current time: ${currentHour}:00 on ${dayOfWeek}
-- If lunch rush (12-13), mention if reviews note "busy at lunch"
-- If late lunch (14-15), prioritize places with open_status='open'
-- Weekends may have different vibes than weekdays
+Meal type: ${currentHour >= 6 && currentHour < 11 ? 'BREAKFAST/BRUNCH' : currentHour >= 11 && currentHour < 15 ? 'LUNCH' : currentHour >= 15 && currentHour < 17 ? 'LATE LUNCH/SNACK' : currentHour >= 17 && currentHour < 22 ? 'DINNER' : 'LATE NIGHT'}
+
+MEAL-SPECIFIC GUIDANCE:
+${currentHour >= 6 && currentHour < 11 ? `- BREAKFAST TIME: Prioritize cafés, bakeries, brunch spots
+- Look for: coffee quality, pastries, eggs, avocado toast mentions
+- Reviews mentioning "great for breakfast" or "morning coffee" are gold` : ''}
+${currentHour >= 11 && currentHour < 15 ? `- LUNCH TIME: Quick but satisfying options work well
+- Consider: lunch specials, quick service for work crowd
+- If 12-13, note places that get busy at lunch rush` : ''}
+${currentHour >= 15 && currentHour < 17 ? `- LATE LUNCH/SNACK: Lighter options, coffee breaks
+- Many places may be between lunch and dinner service
+- Cafés and all-day spots are reliable picks` : ''}
+${currentHour >= 17 && currentHour < 22 ? `- DINNER TIME: Full meals, more elaborate options appropriate
+- Consider ambiance for dinner context
+- If 18-20, note places that get crowded at dinner rush` : ''}
+${currentHour >= 22 || currentHour < 6 ? `- LATE NIGHT: Limited options, prioritize places confirmed open late
+- Bars with food, late-night eateries, 24h spots
+- open_status is CRITICAL at this hour` : ''}
+
+- Prioritize places with open_status='open'
+- Weekends may have different vibes and hours than weekdays
 
 === DISH EXTRACTION (Multilingual - Critical) ===
 Reviews may be in German, English, or other languages. Extract dish names in ANY language:
@@ -410,7 +428,7 @@ Return EXACTLY 3 recommendations as a JSON array. For each:
 - backup_dish: An alternative dish recommendation (optional, if found)
 - ai_reason: 2 concise sentences explaining why this place is great (see rules below)
 - vibe_match_score: 1-10 how well it matches the user's vibe/request
-- caveat: Brief warning if relevant (e.g., "Can get busy at lunch", "Service can be slow")
+- caveat: Brief warning if relevant (e.g., "Can get busy at peak hours", "Service can be slow")
 - is_cash_only: Boolean
 - is_new_opening: True if is_fresh_drop=true in the data (oldest review < 3 months) OR mentions of "just opened", "new spot" in reviews
 
@@ -453,7 +471,7 @@ If the user asked for something specific (like "schnitzel", "ramen", "pizza", "t
 - Do NOT recommend restaurants that don't serve what the user asked for
 - Better to return fewer high-quality matches than dilute with unrelated options
 
-If the user gave a general vibe (like "quick lunch", "something filling"):
+If the user gave a general vibe (like "quick bite", "something filling"):
 - Offer variety - pick from different cuisine types when possible
 - Show them interesting options they might not have considered`;
 

@@ -119,64 +119,52 @@ interface FooterProps {
 
 const Footer: React.FC<FooterProps> = ({ isDark, onPrivacyClick }) => {
   return (
-    <>
-      {/* Mobile: Inline footer at bottom of content */}
-      <footer 
-        className={`
-          sm:hidden
-          py-6 font-mono uppercase tracking-wider text-[9px]
-          ${isDark ? 'text-dark-text-muted/50 bg-dark-bg' : 'text-braun-text-muted/50 bg-braun-bg'}
-        `}
-      >
-        <p className="text-center whitespace-nowrap">
-          <a 
-            href="https://www.linkedin.com/in/noahnawara/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-braun-orange transition-colors"
-          >
-            NOAH NAWARA
-          </a>
-          <span className={`mx-2 ${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
-          <button 
-            onClick={onPrivacyClick}
-            className="hover:text-braun-orange transition-colors"
-          >
-            PRIVACY
-          </button>
-        </p>
-      </footer>
+    <footer 
+      className={`
+        py-4 sm:py-6 font-mono uppercase tracking-wider text-[9px] sm:text-[10px]
+        ${isDark ? 'text-dark-text-muted/50 bg-dark-bg' : 'text-braun-text-muted/50 bg-braun-bg'}
+      `}
+    >
+      {/* Mobile: Centered */}
+      <p className="sm:hidden text-center whitespace-nowrap">
+        <a 
+          href="https://www.linkedin.com/in/noahnawara/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-braun-orange transition-colors"
+        >
+          NOAH NAWARA
+        </a>
+        <span className={`mx-2 ${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
+        <button 
+          onClick={onPrivacyClick}
+          className="hover:text-braun-orange transition-colors"
+        >
+          PRIVACY
+        </button>
+      </p>
 
-      {/* Desktop: Fixed subtle footer in corner */}
-      <footer 
-        className={`
-          hidden sm:block
-          fixed z-50 bottom-4 right-4
-          font-mono uppercase tracking-wider text-[10px]
-          ${isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'}
-        `}
-      >
-        <div className="flex items-center gap-2">
-          <span>
-            Built by{' '}
-            <ScrambleText 
-              text="NOAH NAWARA" 
-              href="https://www.linkedin.com/in/noahnawara/"
-              className={isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'} 
-            />
-          </span>
-          
-          <span className={`${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
-          
-          <button 
-            onClick={onPrivacyClick}
-            className="hover:text-braun-orange transition-colors"
-          >
-            Privacy
-          </button>
-        </div>
-      </footer>
-    </>
+      {/* Desktop: Right-aligned */}
+      <div className="hidden sm:flex items-center justify-end gap-2 px-6">
+        <span>
+          Built by{' '}
+          <ScrambleText 
+            text="NOAH NAWARA" 
+            href="https://www.linkedin.com/in/noahnawara/"
+            className={isDark ? 'text-dark-text-muted/50' : 'text-braun-text-muted/50'} 
+          />
+        </span>
+        
+        <span className={`${isDark ? 'text-dark-text-muted/30' : 'text-braun-text-muted/30'}`}>·</span>
+        
+        <button 
+          onClick={onPrivacyClick}
+          className="hover:text-braun-orange transition-colors"
+        >
+          Privacy
+        </button>
+      </div>
+    </footer>
   );
 };
 

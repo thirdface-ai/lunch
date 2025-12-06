@@ -62,12 +62,13 @@ const AppContent: React.FC = () => {
         effectiveTheme={effectiveTheme}
       />
 
-      {/* Processing Screen */}
+      {/* Processing Screen / No Results Screen */}
       <TerminalLog 
         appState={appState} 
         logs={logs} 
         progress={progress}
         theme={effectiveTheme === 'dark' ? ThemeMode.DARK : ThemeMode.LIGHT}
+        onReset={reset}
       />
 
       {/* Results Screen */}

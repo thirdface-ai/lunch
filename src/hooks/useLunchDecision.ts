@@ -457,7 +457,12 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
 
       setTimeout(() => {
         setResults(finalResults);
-        setAppState(AppState.RESULTS);
+        // Show NO_RESULTS state if we couldn't find any places
+        if (finalResults.length === 0) {
+          setAppState(AppState.NO_RESULTS);
+        } else {
+          setAppState(AppState.RESULTS);
+        }
       }, 500);
 
     } catch (error) {

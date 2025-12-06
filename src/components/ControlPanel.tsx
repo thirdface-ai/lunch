@@ -122,8 +122,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       Sounds.mediumClick();
       setPreferences(prev => ({
           ...prev,
-          vibe: vibe,
-          freestylePrompt: '' // Clear custom prompt when selecting a preset
+          // Toggle: if same vibe is clicked, unselect it (set to null)
+          vibe: prev.vibe === vibe ? null : vibe,
+          freestylePrompt: prev.vibe === vibe ? prev.freestylePrompt : '' // Only clear custom prompt when selecting a new preset
       }));
   };
 
@@ -216,7 +217,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         <div className={`pt-4 pb-4 px-4 sm:pt-6 sm:pb-6 sm:px-8 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end border-b transition-colors duration-300 ${isDark ? 'border-dark-border bg-dark-surface' : 'border-braun-border bg-[#F4F4F0]'}`}>
             <div>
                 <div className="flex items-center gap-2">
-                    <h1 className={`font-sans font-bold text-lg sm:text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>THIRDFACE LUNCH DECIDER</h1>
+                    <h1 className={`font-sans font-bold text-lg sm:text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>THIRDFACE FOOD DECIDER</h1>
                     {mockMode && (
                         <span className="font-mono text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-blue-500 text-white rounded-[1px]">
                             MOCK
@@ -319,7 +320,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             aria-checked={preferences.vibe === vibe}
                             onClick={() => handleVibeSelect(vibe)}
                             className={`
-                                relative p-3 sm:p-3 flex flex-col justify-between items-start min-h-[72px] sm:min-h-[90px]
+                                relative p-3 sm:p-3 flex flex-col justify-between items-start min-h-[56px] sm:min-h-[68px]
                                 transition-all duration-75 ease-out rounded-sm text-left group
                                 border focus:outline-none focus:ring-1 focus:ring-white/30
                                 ${preferences.vibe === vibe 
@@ -376,10 +377,69 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </div>
             </div>
 
-            {/* Top Right: Range & Payment (4 cols) */}
-            <div className={`col-span-12 md:col-span-4 p-4 sm:p-8 flex flex-col justify-start gap-5 sm:gap-8 ${isDark ? 'bg-[#111]' : 'bg-[#F0F0EC]'}`}>
-                {/* Proximity Slider */}
-                <div>
+            {/* Top Right: Filters Section (4 cols) - aligned with left column */}
+            <div className={`col-span-12 md:col-span-4 p-4 sm:p-8 flex flex-col justify-between ${isDark ? 'bg-[#111]' : 'bg-[#F0F0EC]'}`}>
+                {/* Top group: Additional Filters + Dietary Needs (aligns with Mental State) */}
+                <div className="space-y-5 sm:space-y-6">
+                    {/* Additional Filters */}
+                    <div>
+                        <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Additional Filters</label>
+                        <div className="flex flex-wrap gap-2" role="group" aria-label="Additional Filters">
+                            <button
+                                role="checkbox"
+                                aria-checked={preferences.newlyOpenedOnly}
+                                onClick={() => { Sounds.toggle(!preferences.newlyOpenedOnly); setPreferences(prev => ({ ...prev, newlyOpenedOnly: !prev.newlyOpenedOnly })); }}
+                                className={`px-3 py-2.5 sm:py-2 rounded-[1px] font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none border focus:ring-1 focus:ring-white/30
+                                    ${preferences.newlyOpenedOnly
+                                        ? `${isDark ? 'bg-dark-text text-dark-bg border-dark-text' : 'bg-braun-dark text-white border-braun-dark'} shadow-sm` 
+                                        : `${isDark ? 'text-dark-text-muted border-dark-border hover:bg-white/10 hover:text-white' : 'text-braun-text-muted border-braun-border hover:bg-white/50 hover:text-braun-dark'}`
+                                    }
+                                `}
+                            >
+                                Fresh Drops
+                            </button>
+                            <button
+                                role="checkbox"
+                                aria-checked={preferences.noCash}
+                                onClick={() => { Sounds.toggle(!preferences.noCash); setPreferences(prev => ({ ...prev, noCash: !prev.noCash })); }}
+                                className={`px-3 py-2.5 sm:py-2 rounded-[1px] font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none border focus:ring-1 focus:ring-white/30
+                                    ${preferences.noCash
+                                        ? `${isDark ? 'bg-dark-text text-dark-bg border-dark-text' : 'bg-braun-dark text-white border-braun-dark'} shadow-sm` 
+                                        : `${isDark ? 'text-dark-text-muted border-dark-border hover:bg-white/10 hover:text-white' : 'text-braun-text-muted border-braun-border hover:bg-white/50 hover:text-braun-dark'}`
+                                    }
+                                `}
+                            >
+                                No Cash
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Dietary Needs */}
+                    <div>
+                        <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Dietary Needs</label>
+                        <div className="flex flex-wrap gap-2" role="group" aria-label="Dietary Restrictions">
+                            {Object.values(DietaryRestriction).map((restriction) => (
+                                <button
+                                    key={restriction}
+                                    role="checkbox"
+                                    aria-checked={(preferences.dietaryRestrictions || []).includes(restriction)}
+                                    onClick={() => handleDietaryToggle(restriction)}
+                                    className={`px-3 py-2.5 sm:py-2 rounded-[1px] font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none border focus:ring-1 focus:ring-white/30
+                                        ${(preferences.dietaryRestrictions || []).includes(restriction)
+                                            ? `${isDark ? 'bg-dark-text text-dark-bg border-dark-text' : 'bg-braun-dark text-white border-braun-dark'} shadow-sm` 
+                                            : `${isDark ? 'text-dark-text-muted border-dark-border hover:bg-white/10 hover:text-white' : 'text-braun-text-muted border-braun-border hover:bg-white/50 hover:text-braun-dark'}`
+                                        }
+                                    `}
+                                >
+                                    {restriction}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Bottom: Proximity Range (aligns with custom input) */}
+                <div className="mt-4 sm:mt-0">
                     <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Proximity Range</label>
                     <div className={`flex h-14 sm:h-14 rounded-sm border p-1 gap-1 ${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'}`} role="radiogroup" aria-label="Walk Limit">
                         {Object.values(WalkLimit).map((limit) => (
@@ -396,71 +456,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 `}
                             >
                                 <span className="font-mono text-[11px] sm:text-[10px] font-bold uppercase tracking-wide">{limit}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Newly Opened Filter */}
-                <div>
-                    <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Discovery Mode</label>
-                    <button
-                        role="switch"
-                        aria-checked={preferences.newlyOpenedOnly}
-                        onClick={() => { Sounds.toggle(!preferences.newlyOpenedOnly); setPreferences(prev => ({ ...prev, newlyOpenedOnly: !prev.newlyOpenedOnly })); }}
-                        className={`
-                            w-full h-12 sm:h-12 border rounded-sm flex items-center justify-center transition-all duration-150 group outline-none focus:ring-1 focus:ring-white/30
-                            ${preferences.newlyOpenedOnly 
-                                ? `${isDark ? 'bg-blue-500 text-white border-blue-500' : 'bg-blue-600 text-white border-blue-600'} shadow-sm` 
-                                : `${isDark ? 'bg-dark-surface border-dark-border shadow-dark-raised hover:shadow-[0_2px_0_#333]' : 'bg-[#E5E5E0] border-braun-border shadow-braun-raised hover:shadow-[0_2px_0_#D4D4D0]'} hover:translate-y-[1px]`
-                            }
-                        `}
-                    >
-                        <span className={`font-mono text-[11px] sm:text-[10px] font-bold uppercase tracking-widest ${preferences.newlyOpenedOnly ? 'text-white' : (isDark ? 'text-dark-text' : 'text-braun-dark')}`}>
-                             {preferences.newlyOpenedOnly ? '✦ Fresh Drops Only' : 'All Restaurants'}
-                        </span>
-                    </button>
-                </div>
-
-                {/* Payment Override */}
-                <div>
-                    <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Payment Constraint</label>
-                    <button
-                        role="switch"
-                        aria-checked={preferences.noCash}
-                        onClick={() => { Sounds.toggle(!preferences.noCash); setPreferences(prev => ({ ...prev, noCash: !prev.noCash })); }}
-                        className={`
-                            w-full h-12 sm:h-12 border rounded-sm flex items-center justify-center transition-all duration-150 group outline-none focus:ring-1 focus:ring-white/30
-                            ${preferences.noCash 
-                                ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-sm` 
-                                : `${isDark ? 'bg-dark-surface border-dark-border shadow-dark-raised hover:shadow-[0_2px_0_#333]' : 'bg-[#E5E5E0] border-braun-border shadow-braun-raised hover:shadow-[0_2px_0_#D4D4D0]'} hover:translate-y-[1px]`
-                            }
-                        `}
-                    >
-                        <span className={`font-mono text-[11px] sm:text-[10px] font-bold uppercase tracking-widest ${preferences.noCash ? (isDark ? 'text-dark-bg' : 'text-white') : (isDark ? 'text-dark-text' : 'text-braun-dark')}`}>
-                             {preferences.noCash ? 'Cashless Only' : 'All Payment Types'}
-                        </span>
-                    </button>
-                </div>
-
-                {/* Dietary Needs */}
-                <div>
-                    <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Dietary Needs</label>
-                    <div className="flex flex-wrap gap-2" role="group" aria-label="Dietary Restrictions">
-                        {Object.values(DietaryRestriction).map((restriction) => (
-                            <button
-                                key={restriction}
-                                role="checkbox"
-                                aria-checked={(preferences.dietaryRestrictions || []).includes(restriction)}
-                                onClick={() => handleDietaryToggle(restriction)}
-                                className={`px-3 py-2.5 sm:py-2 rounded-[1px] font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-wide transition-all duration-200 outline-none border focus:ring-1 focus:ring-white/30
-                                    ${(preferences.dietaryRestrictions || []).includes(restriction)
-                                        ? `${isDark ? 'bg-dark-text text-dark-bg border-dark-text' : 'bg-braun-dark text-white border-braun-dark'} shadow-sm` 
-                                        : `${isDark ? 'text-dark-text-muted border-dark-border hover:bg-white/10 hover:text-white' : 'text-braun-text-muted border-braun-border hover:bg-white/50 hover:text-braun-dark'}`
-                                    }
-                                `}
-                            >
-                                {restriction}
                             </button>
                         ))}
                     </div>
@@ -532,11 +527,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <div className="col-span-12 md:col-span-4 p-4 sm:p-8 flex">
                 <button
                     onClick={() => { Sounds.firmClick(); onCalculate(); }}
-                    disabled={(!mockMode && !preferences.lat) || (!preferences.vibe && !preferences.freestylePrompt)}
+                    disabled={!mockMode && !preferences.lat}
                     aria-busy={(appState as AppState) === AppState.PROCESSING}
                     className={`
                         w-full h-full min-h-[56px] sm:min-h-[60px] relative transition-all duration-200 ease-out rounded-sm flex items-center justify-center group overflow-hidden focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/30
-                        ${((!mockMode && !preferences.lat) || (!preferences.vibe && !preferences.freestylePrompt))
+                        ${(!mockMode && !preferences.lat)
                             ? `${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'} cursor-not-allowed opacity-60` 
                             : 'bg-braun-orange border border-braun-orange shadow-braun-deep hover:shadow-[0_0_20px_rgba(255,68,0,0.4)] hover:scale-[1.02] active:scale-[0.98]'
                         }
@@ -549,10 +544,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                              {(!mockMode && !preferences.lat) ? (
                                  <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div>
                              ) : (
-                                 <div className={`w-2 h-2 rounded-full ${(!preferences.vibe && !preferences.freestylePrompt) ? 'bg-braun-text-muted' : 'bg-white animate-pulse shadow-[0_0_5px_rgba(255,255,255,0.8)]'}`}></div>
+                                 <div className="w-2 h-2 rounded-full bg-white animate-pulse shadow-[0_0_5px_rgba(255,255,255,0.8)]"></div>
                              )}
-                             <span className={`font-sans font-bold text-sm tracking-widest uppercase ${((!mockMode && !preferences.lat) || (!preferences.vibe && !preferences.freestylePrompt)) ? (isDark ? 'text-dark-text-muted' : 'text-braun-text-muted') : 'text-white'}`}>
-                                 {mockMode ? ((!preferences.vibe && !preferences.freestylePrompt) ? 'SELECT VIBE' : 'TEST MODE') : ((!preferences.vibe && !preferences.freestylePrompt) ? 'SELECT VIBE' : 'INITIALIZE')}
+                             <span className={`font-sans font-bold text-sm tracking-widest uppercase ${(!mockMode && !preferences.lat) ? (isDark ? 'text-dark-text-muted' : 'text-braun-text-muted') : 'text-white'}`}>
+                                 {mockMode ? 'TEST MODE' : 'INITIALIZE'}
                              </span>
                         </div>
                     </div>

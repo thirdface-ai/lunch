@@ -10,7 +10,7 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isDark = theme === ThemeMode.DARK;
 
-  const lastUpdated = '2025-06-12';
+  const lastUpdated = '2025-12-06';
 
   return (
     <div className={`min-h-screen flex items-center justify-center p-2 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
@@ -65,7 +65,7 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
               {/* Header */}
               <div className="mb-6">
                 <div className="text-braun-orange font-bold text-sm sm:text-base mb-1">
-                  {'>'} LUNCH DECIDER PRIVACY POLICY
+                  {'>'} FOOD DECIDER PRIVACY POLICY
                 </div>
                 <div className="text-braun-orange/60 text-[10px]">
                   LAST_UPDATED: {lastUpdated}
@@ -75,7 +75,7 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
               {/* Section 1 */}
               <Section title="1. OVERVIEW">
                 <p>
-                  Lunch Decider helps you find nearby restaurants based on your preferences. 
+                  Food Decider helps you find nearby restaurants based on your preferences. 
                   This policy explains what data we collect, why we collect it, and how it's used.
                 </p>
                 <p className="mt-2">
@@ -89,15 +89,17 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
                 <SubSection title="2.1 LOCAL BROWSER STORAGE">
                   <p>Stored on your device only, never transmitted to our servers:</p>
                   <ul className="list-none mt-2 space-y-1">
+                    <li>• Last used address and coordinates (for convenience)</li>
                     <li>• Transport mode preference (walk/delivery)</li>
-                    <li>• Vibe selection (grab & go, hearty, etc.)</li>
                     <li>• Price preference</li>
                     <li>• Walk time limit</li>
                     <li>• Theme setting (light/dark/system)</li>
                     <li>• Dietary restrictions</li>
+                    <li>• Filter preferences (fresh drops, cashless)</li>
                   </ul>
                   <p className="mt-2 text-braun-orange/60">
-                    NOTE: Your address and coordinates are NOT stored locally.
+                    NOTE: Your address is stored locally for convenience and can be cleared 
+                    by clearing browser data.
                   </p>
                 </SubSection>
 
@@ -211,7 +213,7 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
               {/* Section 7 */}
               <Section title="7. NO ACCOUNTS">
                 <p>
-                  Lunch Decider does not require user accounts or authentication. 
+                  Food Decider does not require user accounts or authentication. 
                   All data is associated with anonymous session identifiers, not 
                   personal identities.
                 </p>
