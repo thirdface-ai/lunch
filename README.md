@@ -12,7 +12,7 @@ Every lunch recommendation app does the same thing: here's a list of places, sor
 
 Lunch Decider does something different. Instead of asking "what cuisine do you want?" (you don't know, that's the whole problem), we ask "what's your vibe?" Feeling efficient? Grab & Go. Need comfort? Hearty & Rich. Want to wake up? Spicy & Bold.
 
-Then our AI reads through hundreds of reviews to find the actual gems - not just "this place is good" but "get the Tonkotsu Ramen, it's legendary." Specific dish recommendations from real people who bothered to write about them.
+Then Claude AI reads through hundreds of reviews to find the actual gems - not just "this place is good" but "get the Tonkotsu Ramen, it's legendary." Specific dish recommendations from real people who bothered to write about them.
 
 ---
 
@@ -65,22 +65,42 @@ Pick your mental state, not your cuisine:
 
 Or just type what you want. "Schnitzel" works too.
 
+### Custom Search with AI Translation
+
+Type anything in the freestyle input:
+- "newest hottest places" → AI activates Fresh Drops + Trending filters
+- "fancy date night" → searches fine dining, upscale restaurants
+- "cheap eats under €10" → focuses on budget-friendly spots
+- "hidden gems" → prioritizes local favorites, underrated spots
+
+The AI translates vague requests into concrete Google Places searches.
+
 ### AI That Actually Reads Reviews
 
-OpenRouter AI (with auto model selection) digs through reviews to:
+Claude AI (Opus 4.5 for analysis, Sonnet 4.5 for quick tasks) digs through reviews to:
 - Extract specific dish recommendations ("the Duck Confit is legendary")
 - Identify quality signals ("hidden gem", "locals' favorite")
 - Detect red flags ("went downhill", "used to be better")
 - Catch cash-only warnings - even in German ("nur Barzahlung")
+- Provide backup dish recommendations and caveats
 
 You get 3 recommendations with actual reasoning, not a ranked list of 50.
+
+### Smart Filters
+
+| Filter | What It Does |
+|--------|-------------|
+| **Fresh Drops** | Prioritize newly opened restaurants (<80 reviews, <6 months old) |
+| **No Cash** | Exclude cash-only establishments |
+| **Trending** | Focus on places with high recent review activity |
 
 ### Budget Tiers With Personality
 
 | Tier | Translation |
 |------|------------|
-| **Paying Myself** | You're paying, keep it reasonable ($ - $$) |
-| **Company Card** | Someone else is paying, live a little ($$$ - $$$$) |
+| **Any** | Show me everything |
+| **Personal** | You're paying, keep it reasonable ($ - $$) |
+| **Company** | Someone else is paying, live a little ($$$ - $$$$) |
 
 ### Walk Time Preferences
 
@@ -88,7 +108,7 @@ You get 3 recommendations with actual reasoning, not a ranked list of 50.
 |--------|--------|
 | **5 min** | ~1km radius |
 | **15 min** | ~2.5km radius |
-| **Doesn't Matter** | ~5km radius (30 min walk) |
+| **30 min** | ~5km radius |
 
 ### Dietary Restrictions
 
@@ -97,31 +117,41 @@ Filter results by dietary needs:
 - Vegan
 - Vegetarian
 
+### Variety Tracking
+
+The app remembers what restaurants you've seen and prioritizes fresh options in future searches. No more "why does it keep showing me the same 3 places?"
+
 ### The Terminal UI
 
-Yes, it looks like a piece of Braun equipment from 1968. That's intentional. The loading screen has scanlines, generates contextual jokes while it thinks, and makes satisfying click sounds. We're not trying to look like every other food app.
+Yes, it looks like a piece of Braun equipment from 1968. That's intentional. The loading screen has scanlines, generates contextual jokes while it thinks (AI-generated based on your location and search), and makes satisfying click sounds. We're not trying to look like every other food app.
 
 ---
 
 ## Architecture
 
 ```
-Frontend (React + Vite)
+Frontend (React + Vite + TailwindCSS)
     |
     v
 Services Layer
     |
     +---> Google Maps Platform (Places API, Distance Matrix)
-    +---> Supabase Edge Function ---> OpenRouter AI (auto model selection)
-    +---> Supabase PostgreSQL (search history, favorites, logs)
+    +---> Supabase Edge Function ---> OpenRouter AI (Claude Opus 4.5 / Sonnet 4.5)
+    +---> Supabase PostgreSQL (search history, favorites, places cache, logs)
+    +---> Two-Tier Cache (L1: In-memory, L2: Supabase)
 ```
 
 ### Data Flow
 
 1. User picks location + vibe + constraints
-2. Google Places API returns ~20 candidates
-3. OpenRouter AI analyzes reviews, extracts dish mentions, scores vibe match
-4. You get 3 recommendations with specific dishes and honest explanations
+2. AI translates freestyle prompts into Google Places search queries
+3. Google Places API returns ~20-30 candidates
+4. Places and distances are cached (L1 in-memory + L2 Supabase) to reduce API costs
+5. Claude Opus 4.5 analyzes reviews, extracts dish mentions, scores vibe match
+6. You get 3 recommendations with specific dishes and honest explanations
+7. Results are tracked for variety in future searches
+
+### API Key Security
 
 The OpenRouter API key stays server-side in an Edge Function. Google Maps key uses HTTP referrer restrictions. Your API bills are protected.
 
@@ -167,7 +197,9 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key
 supabase functions deploy openrouter-proxy
 ```
 
-Get your API key from [OpenRouter](https://openrouter.ai/). The app uses `openrouter/auto` for automatic model selection.
+Get your API key from [OpenRouter](https://openrouter.ai/). The app uses:
+- **Claude Opus 4.5** (`anthropic/claude-opus-4.5`) for complex restaurant analysis
+- **Claude Sonnet 4.5** (`anthropic/claude-sonnet-4.5`) for search translation and loading messages
 
 ---
 
@@ -218,7 +250,7 @@ create table if not exists app_logs (
   metadata jsonb
 );
 
--- Recommended Places (tracks AI recommendations per session)
+-- Recommended Places (tracks AI recommendations per session for variety)
 create table if not exists recommended_places (
   id uuid primary key default gen_random_uuid(),
   session_id text not null,
@@ -227,32 +259,44 @@ create table if not exists recommended_places (
   created_at timestamptz default now()
 );
 
--- User API Keys (optional: for users bringing their own keys)
-create table if not exists user_api_keys (
-  id uuid primary key default gen_random_uuid(),
-  session_id text not null,
-  service text not null check (service in ('gemini', 'openai', 'anthropic', 'custom')),
-  encrypted_key text not null,
-  key_hint text,
-  is_active boolean default true,
+-- Places Cache (L2 cache - shared across users, 7-day TTL)
+create table if not exists places_cache (
+  place_id text primary key,
+  data jsonb not null,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
-comment on table user_api_keys is 'Stores encrypted user API keys for external services. Keys are encrypted client-side before storage.';
+
+-- Distance Cache (L2 cache for walking times)
+create table if not exists distance_cache (
+  id text primary key, -- format: "lat,lng:place_id"
+  origin_lat float not null,
+  origin_lng float not null,
+  place_id text not null,
+  distance_text text not null,
+  distance_value int not null, -- seconds
+  created_at timestamptz default now()
+);
 
 -- Enable RLS
 alter table search_history enable row level security;
 alter table favorites enable row level security;
 alter table app_logs enable row level security;
 alter table recommended_places enable row level security;
-alter table user_api_keys enable row level security;
+alter table places_cache enable row level security;
+alter table distance_cache enable row level security;
 
 -- Policies (permissive for anonymous users)
 create policy "Users can insert search history" on search_history for insert with check (true);
 create policy "Users can manage favorites" on favorites for all using (true);
 create policy "Anyone can insert logs" on app_logs for insert with check (true);
 create policy "Users can manage recommended places" on recommended_places for all using (true);
-create policy "Users can manage their API keys" on user_api_keys for all using (true);
+create policy "Anyone can read/write places cache" on places_cache for all using (true);
+create policy "Anyone can read/write distance cache" on distance_cache for all using (true);
+
+-- Auto-cleanup old cache entries (run as scheduled job)
+-- DELETE FROM places_cache WHERE updated_at < now() - interval '7 days';
+-- DELETE FROM distance_cache WHERE created_at < now() - interval '7 days';
 ```
 
 ---
@@ -263,24 +307,26 @@ create policy "Users can manage their API keys" on user_api_keys for all using (
 lunch-decider/
 ├── src/
 │   ├── components/
-│   │   ├── ControlPanel.tsx      # Input form, vibe selection
-│   │   ├── TerminalLog.tsx       # The loading screen with jokes
+│   │   ├── ControlPanel.tsx      # Input form, vibe selection, filters
+│   │   ├── TerminalLog.tsx       # The loading screen with AI jokes
 │   │   ├── ResultsView.tsx       # Results + map
 │   │   ├── MapComponent.tsx      # Google Maps wrapper
 │   │   ├── Footer.tsx            # Global footer
+│   │   ├── PrivacyPolicy.tsx     # Privacy policy viewer
 │   │   └── ErrorBoundary.tsx     # Error handling wrapper
 │   ├── hooks/
 │   │   ├── useGooglePlaces.ts    # Places API integration
 │   │   ├── useDistanceMatrix.ts  # Walking times calculation
-│   │   ├── useLunchDecision.ts   # Main orchestration
+│   │   ├── useLunchDecision.ts   # Main orchestration (including mock mode)
 │   │   ├── usePreferences.ts     # User prefs with localStorage
 │   │   ├── useTerminalLogs.ts    # Terminal log management
 │   │   └── index.ts              # Hook exports
 │   ├── services/
-│   │   ├── aiService.ts          # AI logic (OpenRouter)
-│   │   └── supabaseService.ts    # Database operations
+│   │   ├── aiService.ts          # AI logic (Claude via OpenRouter)
+│   │   └── supabaseService.ts    # Database operations + cache
 │   ├── lib/
 │   │   ├── supabase.ts           # Supabase client
+│   │   ├── placesCache.ts        # Two-tier caching system
 │   │   └── database.types.ts     # Database type definitions
 │   ├── utils/
 │   │   ├── lunchAlgorithm.ts     # Scoring logic
@@ -319,10 +365,24 @@ Not just "highest rated wins." We factor in:
 - **Proximity** - closer is better (weighted by walk time preference)
 - **Price match** - respects your budget setting
 - **Hidden gems** - 4.3+ rating with 50-750 reviews gets a boost
-- **Fresh drops** - new places (<50 reviews) with 4.0+ rating get highlighted
+- **Fresh drops** - new places (<80 reviews, oldest review <6 months) with 4.0+ rating get highlighted
+- **Trending** - places with 10%+ of reviews from the last month are flagged as hot
 - **Will it be open?** - prioritizes places open by the time you'd arrive
 
-Then OpenRouter AI picks the best 3 from the top 15 candidates.
+Then Claude AI picks the best 3 from the top 25 candidates.
+
+---
+
+## Caching System
+
+Two-tier caching to reduce Google API costs:
+
+| Layer | Scope | TTL | Purpose |
+|-------|-------|-----|---------|
+| **L1** | In-memory | 1 hour | Instant access within session |
+| **L2** | Supabase | 7 days | Shared across all users |
+
+Cache performance is logged per session, including estimated cost savings.
 
 ---
 
@@ -330,48 +390,9 @@ Then OpenRouter AI picks the best 3 from the top 15 candidates.
 
 > Based on [Anthropic's Frontend Design Skill](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md)
 
-This skill guides creation of distinctive, production-grade frontend interfaces that avoid generic "AI slop" aesthetics. Implement real working code with exceptional attention to aesthetic details and creative choices.
+### This Project's Tone: Industrial/Utilitarian with Braun-Inspired Warmth
 
-### Design Thinking
-
-Before coding, understand the context and commit to a BOLD aesthetic direction:
-- **Purpose**: What problem does this interface solve? Who uses it?
-- **Tone**: Pick an extreme: brutally minimal, maximalist chaos, retro-futuristic, organic/natural, luxury/refined, playful/toy-like, editorial/magazine, brutalist/raw, art deco/geometric, soft/pastel, industrial/utilitarian, etc. There are so many flavors to choose from. Use these for inspiration but design one that is true to the aesthetic direction.
-- **Constraints**: Technical requirements (framework, performance, accessibility).
-- **Differentiation**: What makes this UNFORGETTABLE? What's the one thing someone will remember?
-
-**CRITICAL**: Choose a clear conceptual direction and execute it with precision. Bold maximalism and refined minimalism both work - the key is intentionality, not intensity.
-
-Then implement working code (HTML/CSS/JS, React, Vue, etc.) that is:
-- Production-grade and functional
-- Visually striking and memorable
-- Cohesive with a clear aesthetic point-of-view
-- Meticulously refined in every detail
-
-### Frontend Aesthetics Guidelines
-
-Focus on:
-- **Typography**: Choose fonts that are beautiful, unique, and interesting. Avoid generic fonts like Arial and Inter; opt instead for distinctive choices that elevate the frontend's aesthetics; unexpected, characterful font choices. Pair a distinctive display font with a refined body font.
-- **Color & Theme**: Commit to a cohesive aesthetic. Use CSS variables for consistency. Dominant colors with sharp accents outperform timid, evenly-distributed palettes.
-- **Motion**: Use animations for effects and micro-interactions. Prioritize CSS-only solutions for HTML. Use Motion library for React when available. Focus on high-impact moments: one well-orchestrated page load with staggered reveals (animation-delay) creates more delight than scattered micro-interactions. Use scroll-triggering and hover states that surprise.
-- **Spatial Composition**: Unexpected layouts. Asymmetry. Overlap. Diagonal flow. Grid-breaking elements. Generous negative space OR controlled density.
-- **Backgrounds & Visual Details**: Create atmosphere and depth rather than defaulting to solid colors. Add contextual effects and textures that match the overall aesthetic. Apply creative forms like gradient meshes, noise textures, geometric patterns, layered transparencies, dramatic shadows, decorative borders, custom cursors, and grain overlays.
-
-NEVER use generic AI-generated aesthetics like overused font families (Inter, Roboto, Arial, system fonts), cliched color schemes (particularly purple gradients on white backgrounds), predictable layouts and component patterns, and cookie-cutter design that lacks context-specific character.
-
-Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. NEVER converge on common choices (Space Grotesk, for example) across generations.
-
-**IMPORTANT**: Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations and effects. Minimalist or refined designs need restraint, precision, and careful attention to spacing, typography, and subtle details. Elegance comes from executing the vision well.
-
-Remember: Claude is capable of extraordinary creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a distinctive vision.
-
----
-
-### Project-Specific Design Guidelines
-
-#### This Project's Tone: Industrial/Utilitarian with Braun-Inspired Warmth
-
-#### Core Design Philosophy: Dieter Rams Inspired
+### Core Design Philosophy: Dieter Rams Inspired
 
 All designs in this project follow **Dieter Rams' 10 Principles of Good Design**:
 
@@ -386,7 +407,7 @@ All designs in this project follow **Dieter Rams' 10 Principles of Good Design**
 9. **Good design is environmentally friendly** - Minimal, efficient code
 10. **Good design is as little design as possible** - Less, but better
 
-#### Color Palette (Braun-Inspired)
+### Color Palette (Braun-Inspired)
 
 ```css
 /* Light Theme */
@@ -403,7 +424,7 @@ All designs in this project follow **Dieter Rams' 10 Principles of Good Design**
 --dark-text-muted: #6B6B6B;    /* Muted text */
 ```
 
-#### Spacing System (4px/8px Base Unit)
+### Spacing System (4px/8px Base Unit)
 
 ```css
 --space-1: 4px;    /* Tight spacing */
@@ -415,30 +436,25 @@ All designs in this project follow **Dieter Rams' 10 Principles of Good Design**
 --space-12: 48px;  /* Section spacing */
 ```
 
-#### Typography
+### Typography
 
 - **Display/Headers**: `'Inter', sans-serif` - Bold, tight tracking
 - **Monospace/Data**: `'Roboto Mono', monospace` - Technical readability
 - **Body**: System fonts for performance
 
-#### Component Patterns
-
-- **Buttons**: Minimal, uppercase labels, subtle hover states
-- **Cards**: Sharp corners or very subtle radius (2-4px), clear hierarchy
-- **Inputs**: Understated borders, focus states with accent color
-- **Icons**: Functional, not decorative - use sparingly
-
-#### Anti-Patterns (NEVER DO)
-
-- ❌ Overused font families (Arial, system fonts only)
-- ❌ Clichéd color schemes (purple gradients on white)
-- ❌ Predictable layouts and component patterns
-- ❌ Cookie-cutter design lacking context-specific character
-- ❌ Inconsistent padding/spacing values
-- ❌ Decorative elements without purpose
-- ❌ Skeuomorphic details that don't add function
-
 The Braun-inspired aesthetic isn't just for looks - it's a statement that a lunch app doesn't need to look like every other app. The terminal screen has actual scanlines because we thought it would be funny.
+
+---
+
+## Privacy
+
+We believe in transparency. See our [Privacy Policy](https://lunch.thirdface.com) (click the footer link) for details on:
+- What data is stored locally vs. server-side
+- How search history and recommendations are tracked
+- Third-party services used (Google Places, OpenRouter, Supabase)
+- Your rights and how to clear your data
+
+**TL;DR:** No accounts required, anonymous session IDs, no tracking cookies, data retention limits (90 days for history, 30 days for logs).
 
 ---
 

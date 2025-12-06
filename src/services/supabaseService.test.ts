@@ -56,7 +56,7 @@ mockUpsert.mockResolvedValue({ error: null });
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
-    from: (table: string) => mockFrom(table),
+    from: mockFrom,
   },
   getSessionId: () => 'test-session-id',
 }));

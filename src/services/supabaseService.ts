@@ -5,6 +5,7 @@ import {
   SearchHistoryRecord,
   GooglePlace
 } from '../types';
+import { Json } from '../lib/database.types';
 import Logger from '../utils/logger';
 
 // Duration type for distance cache
@@ -149,7 +150,7 @@ export const SupabaseService = {
 
       const result = new Map<string, GooglePlace>();
       (data || []).forEach(row => {
-        result.set(row.place_id, row.data as GooglePlace);
+        result.set(row.place_id, row.data as unknown as GooglePlace);
       });
 
       if (result.size > 0) {
@@ -180,7 +181,7 @@ export const SupabaseService = {
       const records = places.map(p => ({
         place_id: p.place_id,
         name: p.name,
-        data: p,
+        data: p as unknown as Json,
         lat: p.geometry?.location ? 
           (typeof p.geometry.location.lat === 'function' ? p.geometry.location.lat() : p.geometry.location.lat) : null,
         lng: p.geometry?.location ? 
