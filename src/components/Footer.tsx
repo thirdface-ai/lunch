@@ -124,7 +124,7 @@ const Footer: React.FC<FooterProps> = ({ isDark, onPrivacyClick }) => {
       <footer 
         className={`
           sm:hidden
-          py-6 text-center font-mono uppercase tracking-wider text-[9px]
+          py-4 text-center font-mono uppercase tracking-wider text-[9px]
           ${isDark ? 'text-dark-text-muted/50 bg-dark-bg' : 'text-braun-text-muted/50 bg-braun-bg'}
         `}
       >
@@ -142,9 +142,9 @@ const Footer: React.FC<FooterProps> = ({ isDark, onPrivacyClick }) => {
           
           <button 
             onClick={onPrivacyClick}
-            className="hover:text-braun-orange transition-colors"
+            className="hover:text-braun-orange transition-colors uppercase"
           >
-            Privacy
+            PRIVACY
           </button>
         </div>
       </footer>

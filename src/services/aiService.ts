@@ -376,17 +376,30 @@ Return EXACTLY 3 recommendations as a JSON array. For each:
 - place_id: The restaurant's ID from the data
 - recommended_dish: A SPECIFIC dish name found in reviews (never generic)
 - backup_dish: An alternative dish recommendation (optional, if found)
-- ai_reason: 2-3 sentences explaining why this matches + evidence from reviews
+- ai_reason: 2 concise sentences: (1) Why this place stands out + quote from reviews, (2) Why chosen over a specific alternative from the list
 - vibe_match_score: 1-10 how well it matches the user's vibe/request
 - caveat: Brief warning if relevant (e.g., "Can get busy at lunch", "Service can be slow")
 - is_cash_only: Boolean
 - is_new_opening: True if <50 reviews and "just opened" mentions
 
+=== AI_REASON RULES ===
+
+NEVER include in ai_reason (these are shown separately in UI):
+- Star ratings (e.g., "4.6★", "4.5 stars")
+- Review counts (e.g., "340 reviews", "highly reviewed")
+- Walking time (e.g., "4 min away", "just around the corner")
+
+ALWAYS include:
+- A specific quote or detail from reviews
+- Name of ONE alternative restaurant and why this one beats it
+
 === AI_REASON EXAMPLES ===
 
-BAD: "Great restaurant with good food."
+BAD: "Great restaurant with good food. 4.6★ with 340 reviews, 4 min away."
+BAD: "Highly rated spot with quick service."
 
-GOOD: "Their Duck Confit is legendary - multiple 5-star reviews call it 'perfectly crispy' and 'best in Mitte'. At 4.6 stars with 340 reviews, this French bistro delivers consistent quality. Just 4 minutes away."
+GOOD: "Reviewers call the Duck Confit 'perfectly crispy with incredible sauce'. Chosen over Café Michel which has slower service during lunch rush."
+GOOD: "Known for 'generous portions' of authentic Schnitzel that locals swear by. Picked over Gasthaus Weber which recent reviews say 'went downhill'."
 
 === CRITICAL: NO DUPLICATES ===
 - NEVER recommend the same restaurant twice

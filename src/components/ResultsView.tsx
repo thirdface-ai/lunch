@@ -229,7 +229,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   if (appState !== AppState.RESULTS) return null;
 
   return (
-    <div className={`min-h-screen flex items-start justify-center p-3 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
+    <div className={`min-h-screen flex justify-center p-3 sm:p-4 sm:pt-8 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
       {/* Main Chassis */}
       <div className={`w-full max-w-7xl border shadow-braun-deep flex flex-col transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
         
@@ -277,7 +277,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                     </div>
                     
                     {/* Content column */}
-                    <div className="flex-1 min-w-0 space-y-2 sm:space-y-4">
+                    <div className="flex-1 min-w-0 space-y-1 sm:space-y-4">
                       {/* Name row */}
                       <div className="flex flex-wrap items-center gap-2">
                         <a 
