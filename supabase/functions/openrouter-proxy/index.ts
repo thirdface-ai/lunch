@@ -86,9 +86,13 @@ Deno.serve(async (req: Request) => {
       model, 
       contentsLength: contents?.length,
       hasSystemInstruction: !!config?.systemInstruction,
+      systemInstructionLength: config?.systemInstruction?.length,
       temperature: config?.temperature,
       responseMimeType: config?.responseMimeType
     });
+    
+    // Log model being used for debugging
+    console.log(`[OpenRouter] MODEL REQUESTED: ${model}`);
 
     if (!model || !contents) {
       console.error("[OpenRouter] Missing required parameters");
@@ -183,10 +187,8 @@ Deno.serve(async (req: Request) => {
       console.log("[OpenRouter] Success! Response preview:", text.substring(0, 200));
     }
 
-    // Log which model was actually used (useful for openrouter/auto)
-    if (data.model) {
-      console.log(`[OpenRouter] Model used: ${data.model}`);
-    }
+    // Log which model was actually used (useful for debugging)
+    console.log(`[OpenRouter] MODEL REQUESTED: ${model} | MODEL USED: ${data.model || 'unknown'}`);
 
     return new Response(
       JSON.stringify({ text }),
