@@ -2,6 +2,8 @@
 
 **Stop scrolling through 50 mediocre restaurants. Tell us your vibe, we'll tell you what to order.**
 
+**[Try it live at lunch.thirdface.com](https://lunch.thirdface.com)**
+
 ---
 
 ## The Problem
@@ -15,6 +17,8 @@ Then our AI reads through hundreds of reviews to find the actual gems - not just
 ---
 
 ## Quick Start
+
+**Requirements:** Node.js 24.x
 
 ```bash
 git clone https://github.com/thirdface/lunch-decider.git
@@ -60,8 +64,23 @@ You get 3 recommendations with actual reasoning, not a ranked list of 50.
 
 | Tier | Translation |
 |------|------------|
-| **Personal** | You're paying, keep it reasonable ($ - $$) |
-| **Company** | Someone else is paying, live a little ($$$ - $$$$) |
+| **Paying Myself** | You're paying, keep it reasonable ($ - $$) |
+| **Company Card** | Someone else is paying, live a little ($$$ - $$$$) |
+
+### Walk Time Preferences
+
+| Option | Radius |
+|--------|--------|
+| **5 min** | ~1km radius |
+| **15 min** | ~2.5km radius |
+| **Doesn't Matter** | ~5km radius (30 min walk) |
+
+### Dietary Restrictions
+
+Filter results by dietary needs:
+- Gluten-Free
+- Vegan
+- Vegetarian
 
 ### The Terminal UI
 
@@ -78,8 +97,8 @@ Frontend (React + Vite)
 Services Layer
     |
     +---> Google Maps Platform (Places API, Distance Matrix)
-    +---> Supabase Edge Function ---> OpenRouter AI
-    +---> Supabase PostgreSQL (search history, favorites)
+    +---> Supabase Edge Function ---> OpenRouter AI (auto model selection)
+    +---> Supabase PostgreSQL (search history, favorites, logs)
 ```
 
 ### Data Flow
@@ -90,6 +109,10 @@ Services Layer
 4. You get 3 recommendations with specific dishes and honest explanations
 
 The OpenRouter API key stays server-side in an Edge Function. Google Maps key uses HTTP referrer restrictions. Your API bills are protected.
+
+### Deployment
+
+Production is deployed on **Vercel** at [lunch.thirdface.com](https://lunch.thirdface.com).
 
 ---
 
@@ -149,10 +172,10 @@ create table if not exists search_history (
   vibe text,
   price text,
   walk_limit text not null,
-  no_cash boolean,
-  dietary_restrictions text[],
+  no_cash boolean default false,
+  dietary_restrictions text[] default '{}',
   freestyle_prompt text,
-  result_count int
+  result_count int default 0
 );
 
 -- Favorites
@@ -167,28 +190,54 @@ create table if not exists favorites (
   ai_reason text,
   recommended_dish text,
   walking_time_text text,
-  metadata jsonb
+  metadata jsonb default '{}'
 );
 
 -- App Logs
 create table if not exists app_logs (
   id bigserial primary key,
-  created_at timestamptz default now(),
+  created_at timestamptz default timezone('utc', now()),
   level text not null,
   category text not null,
   message text not null,
   metadata jsonb
 );
 
+-- Recommended Places (tracks AI recommendations per session)
+create table if not exists recommended_places (
+  id uuid primary key default gen_random_uuid(),
+  session_id text not null,
+  place_id text not null,
+  place_name text,
+  created_at timestamptz default now()
+);
+
+-- User API Keys (optional: for users bringing their own keys)
+create table if not exists user_api_keys (
+  id uuid primary key default gen_random_uuid(),
+  session_id text not null,
+  service text not null check (service in ('gemini', 'openai', 'anthropic', 'custom')),
+  encrypted_key text not null,
+  key_hint text,
+  is_active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+comment on table user_api_keys is 'Stores encrypted user API keys for external services. Keys are encrypted client-side before storage.';
+
 -- Enable RLS
 alter table search_history enable row level security;
 alter table favorites enable row level security;
 alter table app_logs enable row level security;
+alter table recommended_places enable row level security;
+alter table user_api_keys enable row level security;
 
 -- Policies (permissive for anonymous users)
 create policy "Users can insert search history" on search_history for insert with check (true);
 create policy "Users can manage favorites" on favorites for all using (true);
 create policy "Anyone can insert logs" on app_logs for insert with check (true);
+create policy "Users can manage recommended places" on recommended_places for all using (true);
+create policy "Users can manage their API keys" on user_api_keys for all using (true);
 ```
 
 ---
@@ -202,20 +251,32 @@ lunch-decider/
 │   │   ├── ControlPanel.tsx      # Input form, vibe selection
 │   │   ├── TerminalLog.tsx       # The loading screen with jokes
 │   │   ├── ResultsView.tsx       # Results + map
-│   │   └── MapComponent.tsx      # Google Maps wrapper
+│   │   ├── MapComponent.tsx      # Google Maps wrapper
+│   │   ├── Footer.tsx            # Global footer
+│   │   └── ErrorBoundary.tsx     # Error handling wrapper
 │   ├── hooks/
-│   │   ├── useGooglePlaces.ts    # Places API
-│   │   ├── useDistanceMatrix.ts  # Walking times
-│   │   └── useLunchDecision.ts   # Main orchestration
+│   │   ├── useGooglePlaces.ts    # Places API integration
+│   │   ├── useDistanceMatrix.ts  # Walking times calculation
+│   │   ├── useLunchDecision.ts   # Main orchestration
+│   │   ├── usePreferences.ts     # User prefs with localStorage
+│   │   ├── useTerminalLogs.ts    # Terminal log management
+│   │   └── index.ts              # Hook exports
 │   ├── services/
 │   │   ├── aiService.ts          # AI logic (OpenRouter)
-│   │   └── supabaseService.ts    # Database ops
-│   └── utils/
-│       ├── lunchAlgorithm.ts     # Scoring logic
-│       └── sounds.ts             # Click sounds
-└── supabase/
-    └── functions/
-        └── openrouter-proxy/     # Edge Function
+│   │   └── supabaseService.ts    # Database operations
+│   ├── lib/
+│   │   ├── supabase.ts           # Supabase client
+│   │   └── database.types.ts     # Database type definitions
+│   ├── utils/
+│   │   ├── lunchAlgorithm.ts     # Scoring logic
+│   │   ├── logger.ts             # Logging utility
+│   │   └── sounds.ts             # Click sounds
+│   └── types.ts                  # TypeScript types
+├── supabase/
+│   └── functions/
+│       └── openrouter-proxy/     # Edge Function for AI calls
+├── vercel.json                   # Vercel deployment config
+└── vite.config.ts                # Vite configuration
 ```
 
 ---
@@ -224,9 +285,12 @@ lunch-decider/
 
 | Command | What it does |
 |---------|-------------|
-| `npm run dev` | Start dev server |
+| `npm run dev` | Start dev server (port 5173) |
 | `npm run build` | Build for production |
+| `npm run preview` | Preview production build locally |
+| `npm start` | Run production server |
 | `npm test` | Run tests |
+| `npm run test:ui` | Run tests with interactive UI |
 | `npm run test:coverage` | Coverage report |
 
 ---
@@ -239,7 +303,7 @@ Not just "highest rated wins." We factor in:
 - **Price match** - respects your budget setting
 - **Hidden gems** - 4.3+ rating with 50-750 reviews gets a boost
 - **Fresh drops** - new places (<50 reviews) with 4.0+ rating get highlighted
-- **Will it be open?** - filters out places closed by the time you'd arrive
+- **Will it be open?** - prioritizes places open by the time you'd arrive
 
 Then OpenRouter AI picks the best 3 from the top 15 candidates.
 
