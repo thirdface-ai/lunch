@@ -24,27 +24,44 @@ export type AnalysisLogCallback = (message: string) => void;
 const callOpenRouterProxy = async (model: string, contents: string, config: Record<string, unknown>): Promise<string> => {
   const startTime = performance.now();
   Logger.aiRequest(model, contents.substring(0, 500) + '...');
+  
+  console.log('[OpenRouter] Calling edge function with model:', model);
+  console.log('[OpenRouter] Config:', JSON.stringify(config, null, 2));
 
   try {
     const { data, error } = await supabase.functions.invoke('openrouter-proxy', {
       body: { model, contents, config },
     });
 
+    console.log('[OpenRouter] Raw response:', { data, error });
+
     if (error) {
+      console.error('[OpenRouter] Edge function error:', error);
       throw new Error(error.message || 'Edge Function invocation failed');
     }
 
-    if (!data?.text) {
-      throw new Error('Invalid response from OpenRouter proxy');
+    if (!data) {
+      console.error('[OpenRouter] No data returned from edge function');
+      throw new Error('No data returned from OpenRouter proxy');
+    }
+
+    if (!data.text) {
+      console.error('[OpenRouter] Response missing text field:', data);
+      throw new Error(`Invalid response from OpenRouter proxy: ${JSON.stringify(data)}`);
     }
 
     const duration = Math.round(performance.now() - startTime);
     const estimatedTokens = data.text ? Math.ceil(data.text.length / 4) : 0;
+    
+    console.log('[OpenRouter] Success! Duration:', duration, 'ms, Response length:', data.text.length);
+    console.log('[OpenRouter] Response preview:', data.text.substring(0, 500));
+    
     Logger.aiResponse(model, duration, true, estimatedTokens);
 
     return data.text;
   } catch (error) {
     const duration = Math.round(performance.now() - startTime);
+    console.error('[OpenRouter] Call failed after', duration, 'ms:', error);
     Logger.error('AI', `OpenRouter Proxy Call Failed (${duration}ms)`, error);
     throw error;
   }
@@ -289,7 +306,41 @@ Return a JSON array with exactly 3 recommendations.`;
       }
     );
 
-    const results = JSON.parse(text) as Omit<GeminiRecommendation, 'cash_warning_msg'>[];
+    console.log('[decideLunch] Raw AI response:', text);
+    console.log('[decideLunch] Response length:', text?.length);
+
+    if (!text || text.trim() === '') {
+      console.error('[decideLunch] Empty response from AI');
+      throw new Error('Empty response from AI');
+    }
+
+    // Try to extract JSON from the response (it might be wrapped in markdown code blocks)
+    let jsonText = text.trim();
+    
+    // Remove markdown code blocks if present
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.slice(7);
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.slice(3);
+    }
+    if (jsonText.endsWith('```')) {
+      jsonText = jsonText.slice(0, -3);
+    }
+    jsonText = jsonText.trim();
+
+    console.log('[decideLunch] Cleaned JSON:', jsonText.substring(0, 500));
+
+    let results: Omit<GeminiRecommendation, 'cash_warning_msg'>[];
+    try {
+      results = JSON.parse(jsonText);
+    } catch (parseError) {
+      console.error('[decideLunch] JSON parse error:', parseError);
+      console.error('[decideLunch] Failed to parse:', jsonText);
+      throw new Error(`Failed to parse AI response as JSON: ${parseError}`);
+    }
+
+    console.log('[decideLunch] Parsed results:', results);
+    console.log('[decideLunch] Number of recommendations:', results?.length);
     
     // CRITICAL: Deduplicate by place_id - never show the same restaurant twice
     const seenPlaceIds = new Set<string>();

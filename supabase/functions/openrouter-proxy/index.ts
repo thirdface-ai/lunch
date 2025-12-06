@@ -81,8 +81,17 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { model, contents, config } = await req.json();
+    
+    console.log("[OpenRouter] Request received:", { 
+      model, 
+      contentsLength: contents?.length,
+      hasSystemInstruction: !!config?.systemInstruction,
+      temperature: config?.temperature,
+      responseMimeType: config?.responseMimeType
+    });
 
     if (!model || !contents) {
+      console.error("[OpenRouter] Missing required parameters");
       return new Response(
         JSON.stringify({ error: "Missing required parameters: model, contents" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -122,6 +131,14 @@ Deno.serve(async (req: Request) => {
       requestBody.response_format = { type: "json_object" };
     }
 
+    console.log("[OpenRouter] Sending request to API...");
+    console.log("[OpenRouter] Request body (truncated):", {
+      model: requestBody.model,
+      messageCount: messages.length,
+      temperature: requestBody.temperature,
+      response_format: requestBody.response_format,
+    });
+
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -133,26 +150,42 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify(requestBody),
     });
 
+    console.log("[OpenRouter] Response status:", response.status);
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("OpenRouter API Error:", errorText);
+      console.error("[OpenRouter] API Error Response:", errorText);
       return new Response(
         JSON.stringify({
           error: "AI Processing Failed",
-          details: `OpenRouter API returned ${response.status}`,
+          details: `OpenRouter API returned ${response.status}: ${errorText}`,
         }),
         { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const data = await response.json();
+    
+    console.log("[OpenRouter] Response received:", {
+      model: data.model,
+      hasChoices: !!data.choices,
+      choicesCount: data.choices?.length,
+      finishReason: data.choices?.[0]?.finish_reason,
+      contentLength: data.choices?.[0]?.message?.content?.length,
+    });
 
     // Extract text from OpenRouter response (OpenAI format)
     const text = data.choices?.[0]?.message?.content || "";
 
+    if (!text) {
+      console.error("[OpenRouter] Empty response content. Full response:", JSON.stringify(data, null, 2));
+    } else {
+      console.log("[OpenRouter] Success! Response preview:", text.substring(0, 200));
+    }
+
     // Log which model was actually used (useful for openrouter/auto)
     if (data.model) {
-      console.log(`OpenRouter used model: ${data.model}`);
+      console.log(`[OpenRouter] Model used: ${data.model}`);
     }
 
     return new Response(
@@ -160,7 +193,7 @@ Deno.serve(async (req: Request) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("OpenRouter API Proxy Error:", error);
+    console.error("[OpenRouter] Proxy Error:", error);
     return new Response(
       JSON.stringify({
         error: "AI Processing Failed",
