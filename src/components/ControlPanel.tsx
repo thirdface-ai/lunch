@@ -191,6 +191,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const isDark = effectiveTheme === 'dark';
   const darkMuted = 'text-[#999]';
   const lightMuted = 'text-braun-text-muted';
+  
+  // Check if we're in mock mode (allows testing without API keys)
+  const isMockMode = () => {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const hasGoogle = !!(window as any).google?.maps;
+    const forceMock = new URLSearchParams(window.location.search).get('mock') === 'true';
+    return forceMock || (isLocalhost && !hasGoogle);
+  };
+  const mockMode = isMockMode();
 
   return (
     <div className={`min-h-screen flex items-center justify-center p-3 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
@@ -206,8 +215,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* Branding Header */}
         <div className={`pt-4 pb-4 px-4 sm:pt-6 sm:pb-6 sm:px-8 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-end border-b transition-colors duration-300 ${isDark ? 'border-dark-border bg-dark-surface' : 'border-braun-border bg-[#F4F4F0]'}`}>
             <div>
-                <h1 className={`font-sans font-bold text-lg sm:text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>THIRDFACE LUNCH DECIDER</h1>
-                <p className={`font-mono text-[9px] tracking-[0.2em] mt-1 ${isDark ? darkMuted : lightMuted}`}>UNIT 01 / MK.III</p>
+                <div className="flex items-center gap-2">
+                    <h1 className={`font-sans font-bold text-lg sm:text-xl tracking-tight leading-none ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}>THIRDFACE LUNCH DECIDER</h1>
+                    {mockMode && (
+                        <span className="font-mono text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-blue-500 text-white rounded-[1px]">
+                            MOCK
+                        </span>
+                    )}
+                </div>
+                <p className={`font-mono text-[9px] tracking-[0.2em] mt-1 ${isDark ? darkMuted : lightMuted}`}>{mockMode ? 'TEST MODE / NO API KEYS' : 'UNIT 01 / MK.III'}</p>
             </div>
             <div className="flex flex-col items-start sm:items-end gap-2">
                 <button 
@@ -495,11 +511,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <div className="col-span-12 md:col-span-4 p-4 sm:p-8 flex">
                 <button
                     onClick={() => { Sounds.firmClick(); onCalculate(); }}
-                    disabled={!preferences.lat || (!preferences.vibe && !preferences.freestylePrompt)}
+                    disabled={(!mockMode && !preferences.lat) || (!preferences.vibe && !preferences.freestylePrompt)}
                     aria-busy={(appState as AppState) === AppState.PROCESSING}
                     className={`
                         w-full h-full min-h-[56px] sm:min-h-[60px] relative transition-all duration-200 ease-out rounded-sm flex items-center justify-center group overflow-hidden focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/30
-                        ${(!preferences.lat || (!preferences.vibe && !preferences.freestylePrompt))
+                        ${((!mockMode && !preferences.lat) || (!preferences.vibe && !preferences.freestylePrompt))
                             ? `${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'} cursor-not-allowed opacity-60` 
                             : 'bg-braun-orange border border-braun-orange shadow-braun-deep hover:shadow-[0_0_20px_rgba(255,68,0,0.4)] hover:scale-[1.02] active:scale-[0.98]'
                         }
@@ -509,13 +525,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
                     <div className="flex flex-col items-center gap-1 z-10">
                         <div className="flex items-center gap-2">
-                             {!preferences.lat ? (
+                             {(!mockMode && !preferences.lat) ? (
                                  <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-dark-text-muted' : 'bg-braun-text-muted'}`}></div>
                              ) : (
                                  <div className={`w-2 h-2 rounded-full ${(!preferences.vibe && !preferences.freestylePrompt) ? 'bg-braun-text-muted' : 'bg-white animate-pulse shadow-[0_0_5px_rgba(255,255,255,0.8)]'}`}></div>
                              )}
-                             <span className={`font-sans font-bold text-sm tracking-widest uppercase ${(!preferences.lat || (!preferences.vibe && !preferences.freestylePrompt)) ? (isDark ? 'text-dark-text-muted' : 'text-braun-text-muted') : 'text-white'}`}>
-                                 {(!preferences.vibe && !preferences.freestylePrompt) ? 'SELECT VIBE' : 'INITIALIZE'}
+                             <span className={`font-sans font-bold text-sm tracking-widest uppercase ${((!mockMode && !preferences.lat) || (!preferences.vibe && !preferences.freestylePrompt)) ? (isDark ? 'text-dark-text-muted' : 'text-braun-text-muted') : 'text-white'}`}>
+                                 {mockMode ? ((!preferences.vibe && !preferences.freestylePrompt) ? 'SELECT VIBE' : 'TEST MODE') : ((!preferences.vibe && !preferences.freestylePrompt) ? 'SELECT VIBE' : 'INITIALIZE')}
                              </span>
                         </div>
                     </div>

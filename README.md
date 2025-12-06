@@ -31,6 +31,21 @@ npm run dev
 
 Open http://localhost:5173 and find lunch.
 
+### Mock Mode (No API Keys Required)
+
+Want to test the UI without setting up API keys? Use mock mode:
+
+```bash
+npm run dev
+# Open http://localhost:5173/?mock=true
+```
+
+This gives you:
+- Full UI flow (input → loading → results)
+- 5 sample Berlin restaurants with realistic data
+- No Google Maps or OpenRouter API calls
+- Perfect for UI development and testing
+
 ---
 
 ## What Makes This Different
@@ -293,6 +308,8 @@ lunch-decider/
 | `npm run test:ui` | Run tests with interactive UI |
 | `npm run test:coverage` | Coverage report |
 
+**Tip:** Add `?mock=true` to any localhost URL to test without API keys.
+
 ---
 
 ## The Scoring Algorithm
@@ -311,9 +328,117 @@ Then OpenRouter AI picks the best 3 from the top 15 candidates.
 
 ## Design Philosophy
 
-The UI follows Dieter Rams' principles: less but better, nothing arbitrary, every element earns its place. The Braun-inspired aesthetic isn't just for looks - it's a statement that a lunch app doesn't need to look like every other app.
+> Based on [Anthropic's Frontend Design Skill](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md)
 
-Light mode uses warm off-whites (#F5F5F0). Dark mode uses deep blacks (#0A0A0A). The accent orange (#FF4400) is used sparingly. The terminal screen has actual scanlines because we thought it would be funny.
+This skill guides creation of distinctive, production-grade frontend interfaces that avoid generic "AI slop" aesthetics. Implement real working code with exceptional attention to aesthetic details and creative choices.
+
+### Design Thinking
+
+Before coding, understand the context and commit to a BOLD aesthetic direction:
+- **Purpose**: What problem does this interface solve? Who uses it?
+- **Tone**: Pick an extreme: brutally minimal, maximalist chaos, retro-futuristic, organic/natural, luxury/refined, playful/toy-like, editorial/magazine, brutalist/raw, art deco/geometric, soft/pastel, industrial/utilitarian, etc. There are so many flavors to choose from. Use these for inspiration but design one that is true to the aesthetic direction.
+- **Constraints**: Technical requirements (framework, performance, accessibility).
+- **Differentiation**: What makes this UNFORGETTABLE? What's the one thing someone will remember?
+
+**CRITICAL**: Choose a clear conceptual direction and execute it with precision. Bold maximalism and refined minimalism both work - the key is intentionality, not intensity.
+
+Then implement working code (HTML/CSS/JS, React, Vue, etc.) that is:
+- Production-grade and functional
+- Visually striking and memorable
+- Cohesive with a clear aesthetic point-of-view
+- Meticulously refined in every detail
+
+### Frontend Aesthetics Guidelines
+
+Focus on:
+- **Typography**: Choose fonts that are beautiful, unique, and interesting. Avoid generic fonts like Arial and Inter; opt instead for distinctive choices that elevate the frontend's aesthetics; unexpected, characterful font choices. Pair a distinctive display font with a refined body font.
+- **Color & Theme**: Commit to a cohesive aesthetic. Use CSS variables for consistency. Dominant colors with sharp accents outperform timid, evenly-distributed palettes.
+- **Motion**: Use animations for effects and micro-interactions. Prioritize CSS-only solutions for HTML. Use Motion library for React when available. Focus on high-impact moments: one well-orchestrated page load with staggered reveals (animation-delay) creates more delight than scattered micro-interactions. Use scroll-triggering and hover states that surprise.
+- **Spatial Composition**: Unexpected layouts. Asymmetry. Overlap. Diagonal flow. Grid-breaking elements. Generous negative space OR controlled density.
+- **Backgrounds & Visual Details**: Create atmosphere and depth rather than defaulting to solid colors. Add contextual effects and textures that match the overall aesthetic. Apply creative forms like gradient meshes, noise textures, geometric patterns, layered transparencies, dramatic shadows, decorative borders, custom cursors, and grain overlays.
+
+NEVER use generic AI-generated aesthetics like overused font families (Inter, Roboto, Arial, system fonts), cliched color schemes (particularly purple gradients on white backgrounds), predictable layouts and component patterns, and cookie-cutter design that lacks context-specific character.
+
+Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. NEVER converge on common choices (Space Grotesk, for example) across generations.
+
+**IMPORTANT**: Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations and effects. Minimalist or refined designs need restraint, precision, and careful attention to spacing, typography, and subtle details. Elegance comes from executing the vision well.
+
+Remember: Claude is capable of extraordinary creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a distinctive vision.
+
+---
+
+### Project-Specific Design Guidelines
+
+#### This Project's Tone: Industrial/Utilitarian with Braun-Inspired Warmth
+
+#### Core Design Philosophy: Dieter Rams Inspired
+
+All designs in this project follow **Dieter Rams' 10 Principles of Good Design**:
+
+1. **Good design is innovative** - Push boundaries while solving real problems
+2. **Good design makes a product useful** - Form follows function
+3. **Good design is aesthetic** - Visual quality is integral to usefulness
+4. **Good design makes a product understandable** - Self-explanatory interfaces
+5. **Good design is unobtrusive** - Products should be neutral and restrained
+6. **Good design is honest** - No manipulation or false promises
+7. **Good design is long-lasting** - Avoid trends, aim for timelessness
+8. **Good design is thorough down to the last detail** - Nothing is arbitrary
+9. **Good design is environmentally friendly** - Minimal, efficient code
+10. **Good design is as little design as possible** - Less, but better
+
+#### Color Palette (Braun-Inspired)
+
+```css
+/* Light Theme */
+--braun-bg: #F5F5F0;           /* Warm off-white */
+--braun-dark: #1A1A1A;         /* Near-black */
+--braun-border: #C4C4B8;       /* Warm gray */
+--braun-text-muted: #707070;   /* Muted text */
+--braun-orange: #FF4400;       /* Accent - Warm orange */
+
+/* Dark Theme */
+--dark-bg: #0F0F0F;            /* Deep black */
+--dark-text: #E8E8E8;          /* Off-white text */
+--dark-border: #2A2A2A;        /* Subtle border */
+--dark-text-muted: #6B6B6B;    /* Muted text */
+```
+
+#### Spacing System (4px/8px Base Unit)
+
+```css
+--space-1: 4px;    /* Tight spacing */
+--space-2: 8px;    /* Default small */
+--space-3: 12px;   /* Medium-small */
+--space-4: 16px;   /* Default medium */
+--space-6: 24px;   /* Large */
+--space-8: 32px;   /* XL */
+--space-12: 48px;  /* Section spacing */
+```
+
+#### Typography
+
+- **Display/Headers**: `'Inter', sans-serif` - Bold, tight tracking
+- **Monospace/Data**: `'Roboto Mono', monospace` - Technical readability
+- **Body**: System fonts for performance
+
+#### Component Patterns
+
+- **Buttons**: Minimal, uppercase labels, subtle hover states
+- **Cards**: Sharp corners or very subtle radius (2-4px), clear hierarchy
+- **Inputs**: Understated borders, focus states with accent color
+- **Icons**: Functional, not decorative - use sparingly
+
+#### Anti-Patterns (NEVER DO)
+
+- ❌ Overused font families (Arial, system fonts only)
+- ❌ Clichéd color schemes (purple gradients on white)
+- ❌ Predictable layouts and component patterns
+- ❌ Cookie-cutter design lacking context-specific character
+- ❌ Inconsistent padding/spacing values
+- ❌ Decorative elements without purpose
+- ❌ Skeuomorphic details that don't add function
+
+The Braun-inspired aesthetic isn't just for looks - it's a statement that a lunch app doesn't need to look like every other app. The terminal screen has actual scanlines because we thought it would be funny.
 
 ---
 

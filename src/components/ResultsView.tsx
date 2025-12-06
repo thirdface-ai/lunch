@@ -229,9 +229,9 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   if (appState !== AppState.RESULTS) return null;
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-2 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
+    <div className={`min-h-screen p-3 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
       {/* Main Chassis */}
-      <div className={`w-full max-w-7xl border shadow-braun-deep flex flex-col transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
+      <div className={`w-full max-w-7xl mx-auto border shadow-braun-deep flex flex-col transition-colors duration-300 ${isDark ? 'bg-dark-bg border-dark-border shadow-dark-deep' : 'bg-braun-bg border-braun-border shadow-braun-deep'}`}>
         
         {/* Header */}
         <div className={`px-4 py-3 sm:p-8 flex justify-between items-center sm:items-end border-b transition-colors duration-300 ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
@@ -251,7 +251,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
         <div className={`flex flex-col lg:flex-row transition-colors duration-300 ${isDark ? 'bg-[#151515]' : 'bg-[#F9F9F7]'}`}>
           
           {/* List Column */}
-          <div className="flex-1 overflow-y-auto max-h-[75vh] sm:max-h-[80vh]">
+          <div className="flex-1 overflow-y-auto">
             {results.map((place, idx) => {
               // Find today's hours by matching the day name in the weekday_text strings
               // Use the browser's locale to match Google Places API's weekdayDescriptions language
@@ -271,7 +271,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                   <div className="flex gap-3 lg:gap-6">
                     {/* Fixed-width number column */}
                     <div className="flex-shrink-0 w-6 lg:w-8">
-                      <span className="font-mono text-braun-orange text-xs lg:text-sm font-bold tabular-nums">
+                      <span className="font-mono text-braun-orange text-sm lg:text-sm font-bold tabular-nums leading-tight">
                         {(idx + 1).toString().padStart(2, '0')}
                       </span>
                     </div>
