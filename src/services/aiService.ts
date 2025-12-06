@@ -14,18 +14,19 @@ export enum Type {
   NULL = 'NULL',
 }
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
+// Using OpenRouter's auto model selection for optimal results
+const AI_MODEL = 'openrouter/auto';
 
 // Callback type for real-time logging during analysis
 export type AnalysisLogCallback = (message: string) => void;
 
 // Internal helper to call the Supabase Edge Function
-const callGeminiProxy = async (model: string, contents: string, config: Record<string, unknown>): Promise<string> => {
+const callOpenRouterProxy = async (model: string, contents: string, config: Record<string, unknown>): Promise<string> => {
   const startTime = performance.now();
   Logger.aiRequest(model, contents.substring(0, 500) + '...');
 
   try {
-    const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+    const { data, error } = await supabase.functions.invoke('openrouter-proxy', {
       body: { model, contents, config },
     });
 
@@ -34,7 +35,7 @@ const callGeminiProxy = async (model: string, contents: string, config: Record<s
     }
 
     if (!data?.text) {
-      throw new Error('Invalid response from Gemini proxy');
+      throw new Error('Invalid response from OpenRouter proxy');
     }
 
     const duration = Math.round(performance.now() - startTime);
@@ -44,7 +45,7 @@ const callGeminiProxy = async (model: string, contents: string, config: Record<s
     return data.text;
   } catch (error) {
     const duration = Math.round(performance.now() - startTime);
-    Logger.error('AI', `Gemini Proxy Call Failed (${duration}ms)`, error);
+    Logger.error('AI', `OpenRouter Proxy Call Failed (${duration}ms)`, error);
     throw error;
   }
 };
@@ -87,16 +88,12 @@ export const generateLoadingLogs = async (vibe: HungerVibe | null, address: stri
   `;
 
   try {
-    const text = await callGeminiProxy(
-      GEMINI_MODEL,
+    const text = await callOpenRouterProxy(
+      AI_MODEL,
       prompt,
       {
         temperature: 0.9, // Higher temp for more creative/varied responses
         responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING }
-        }
       }
     );
     
@@ -229,7 +226,7 @@ ${noCash ? 'USER REQUIRES CARD PAYMENT - exclude cash-only places' : ''}
 
 === OUTPUT REQUIREMENTS ===
 
-Return EXACTLY 3 recommendations. For each:
+Return EXACTLY 3 recommendations as a JSON array. For each:
 
 - place_id: The restaurant's ID from the data
 - recommended_dish: A SPECIFIC dish name found in reviews (never generic)
@@ -282,27 +279,13 @@ Return a JSON array with exactly 3 recommendations.`;
   try {
     onLog?.(`RANKING TOP CANDIDATES...`);
     
-    const text = await callGeminiProxy(
-      GEMINI_MODEL,
+    const text = await callOpenRouterProxy(
+      AI_MODEL,
       prompt,
       {
         systemInstruction,
         temperature: 0.5,
         responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              place_id: { type: Type.STRING },
-              recommended_dish: { type: Type.STRING },
-              ai_reason: { type: Type.STRING },
-              is_cash_only: { type: Type.BOOLEAN },
-              is_new_opening: { type: Type.BOOLEAN },
-            },
-            required: ['place_id', 'recommended_dish', 'ai_reason', 'is_cash_only'],
-          },
-        },
       }
     );
 

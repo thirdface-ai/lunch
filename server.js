@@ -1,14 +1,13 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-const API_KEY = process.env.GEMINI_API_KEY;
+const API_KEY = process.env.OPENROUTER_API_KEY;
 
 // -----------------------------------------------------------------------------
 // RATE LIMITER (In-Memory)
@@ -53,9 +52,9 @@ app.use(express.static(path.join(__dirname, 'dist')));
 // API ROUTES
 // -----------------------------------------------------------------------------
 
-app.post('/api/gemini/generate', limiter, async (req, res) => {
+app.post('/api/ai/generate', limiter, async (req, res) => {
   if (!API_KEY) {
-    console.error('GEMINI_API_KEY is missing in server environment variables.');
+    console.error('OPENROUTER_API_KEY is missing in server environment variables.');
     return res.status(500).json({ error: 'Server configuration error.' });
   }
 
@@ -66,17 +65,73 @@ app.post('/api/gemini/generate', limiter, async (req, res) => {
       return res.status(400).json({ error: 'Missing required parameters: model, contents' });
     }
 
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const genModel = genAI.getGenerativeModel({ model: model });
-    
-    const result = await genModel.generateContent(contents);
-    const response = result.response;
-    const text = response.text();
+    // Build messages array for OpenRouter (OpenAI-compatible format)
+    const messages = [];
+
+    // Add system instruction if provided
+    if (config?.systemInstruction) {
+      messages.push({
+        role: 'system',
+        content: config.systemInstruction,
+      });
+    }
+
+    // Add user message
+    messages.push({
+      role: 'user',
+      content: contents,
+    });
+
+    // Build request body for OpenRouter
+    const requestBody = {
+      model,
+      messages,
+    };
+
+    // Add temperature if provided
+    if (config?.temperature !== undefined) {
+      requestBody.temperature = config.temperature;
+    }
+
+    // Add JSON response format if requested
+    if (config?.responseMimeType === 'application/json') {
+      requestBody.response_format = { type: 'json_object' };
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://lunch-decider.app',
+        'X-Title': 'Lunch Decider',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenRouter API Error:', errorText);
+      return res.status(response.status).json({
+        error: 'AI Processing Failed',
+        details: `OpenRouter API returned ${response.status}`,
+      });
+    }
+
+    const data = await response.json();
+
+    // Extract text from OpenRouter response (OpenAI format)
+    const text = data.choices?.[0]?.message?.content || '';
+
+    // Log which model was actually used (useful for openrouter/auto)
+    if (data.model) {
+      console.log(`OpenRouter used model: ${data.model}`);
+    }
 
     res.json({ text });
 
   } catch (error) {
-    console.error('Gemini API Proxy Error:', error);
+    console.error('OpenRouter API Proxy Error:', error);
     res.status(500).json({ 
       error: 'AI Processing Failed', 
       details: error instanceof Error ? error.message : 'Unknown error' 

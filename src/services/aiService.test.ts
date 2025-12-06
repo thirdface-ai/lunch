@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateLoadingLogs, decideLunch, Type } from './geminiService';
+import { generateLoadingLogs, decideLunch, Type } from './aiService';
 import { HungerVibe, PricePoint, DietaryRestriction, GooglePlace, PlaceReview } from '../types';
 
 // Mock the supabase functions invoke
@@ -44,7 +44,11 @@ describe('generateLoadingLogs', () => {
       'PARSING BERLIN SECTOR GRID...',
       'ISOLATING RESTAURANTS...',
       'CALCULATING ROUTES...',
-      'FINALIZING SELECTION...'
+      'FINALIZING SELECTION...',
+      'CHECKING REVIEWS...',
+      'ANALYZING VIBES...',
+      'RANKING OPTIONS...',
+      'ALMOST DONE...'
     ];
 
     mockInvoke.mockResolvedValueOnce({
@@ -55,7 +59,7 @@ describe('generateLoadingLogs', () => {
     const result = await generateLoadingLogs(HungerVibe.GRAB_AND_GO, 'Berlin, Germany');
     
     expect(result).toEqual(mockLogs);
-    expect(mockInvoke).toHaveBeenCalledWith('gemini-proxy', expect.any(Object));
+    expect(mockInvoke).toHaveBeenCalledWith('openrouter-proxy', expect.any(Object));
   });
 
   it('returns fallback logs when API fails', async () => {
@@ -66,9 +70,9 @@ describe('generateLoadingLogs', () => {
 
     const result = await generateLoadingLogs(HungerVibe.LIGHT_AND_CLEAN, 'Test Address');
     
-    expect(result).toContain('OPTIMIZING SEARCH...');
-    expect(result).toContain('READING MENUS...');
-    expect(result).toContain('CALCULATING ROUTES...');
+    expect(result).toContain('SNIFFING OUT THE GOOD STUFF...');
+    expect(result).toContain('JUDGING RESTAURANTS BY THEIR FONTS...');
+    expect(result).toContain('CALCULATING FOOD COMA PROBABILITY...');
   });
 
   it('returns fallback logs when API returns empty text', async () => {
@@ -80,9 +84,9 @@ describe('generateLoadingLogs', () => {
     const result = await generateLoadingLogs(null, 'Address');
     
     // When API returns empty text, it triggers error handling which returns fallback logs
-    expect(result).toContain('OPTIMIZING SEARCH...');
-    expect(result).toContain('READING MENUS...');
-    expect(result).toContain('CALCULATING ROUTES...');
+    expect(result).toContain('SNIFFING OUT THE GOOD STUFF...');
+    expect(result).toContain('JUDGING RESTAURANTS BY THEIR FONTS...');
+    expect(result).toContain('CALCULATING FOOD COMA PROBABILITY...');
   });
 
   it('handles null vibe gracefully', async () => {
@@ -105,7 +109,7 @@ describe('generateLoadingLogs', () => {
     await generateLoadingLogs(HungerVibe.HEARTY_AND_RICH, 'Address');
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.model).toBe('gemini-2.5-flash');
+    expect(callBody.model).toBe('openrouter/auto');
   });
 });
 
@@ -248,9 +252,9 @@ describe('decideLunch', () => {
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.contents).toContain('DIETARY NEEDS');
-    expect(callBody.contents).toContain('Vegan');
-    expect(callBody.contents).toContain('Gluten-Free');
+    expect(callBody.config.systemInstruction).toContain('DIETARY REQUIREMENTS');
+    expect(callBody.config.systemInstruction).toContain('Vegan');
+    expect(callBody.config.systemInstruction).toContain('Gluten-Free');
   });
 
   it('includes freestyle prompt in request when provided', async () => {
@@ -270,7 +274,7 @@ describe('decideLunch', () => {
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.contents).toContain('I want the best ramen in town');
+    expect(callBody.config.systemInstruction).toContain('I want the best ramen in town');
   });
 
   it('passes noCash constraint to API', async () => {
@@ -290,7 +294,7 @@ describe('decideLunch', () => {
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.contents).toContain('USER REQUIRES CASHLESS: true');
+    expect(callBody.config.systemInstruction).toContain('USER REQUIRES CARD PAYMENT');
   });
 
   it('processes candidate data with reviews correctly for API payload', async () => {
@@ -391,7 +395,6 @@ describe('decideLunch', () => {
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.model).toBe('gemini-2.5-flash');
+    expect(callBody.model).toBe('openrouter/auto');
   });
 });
-

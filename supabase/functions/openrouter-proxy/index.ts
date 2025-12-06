@@ -34,9 +34,10 @@ const corsHeaders = {
 };
 
 /**
- * Gemini API Proxy Edge Function
+ * OpenRouter API Proxy Edge Function
  *
- * Proxies requests to the Google Gemini API to keep the API key secure.
+ * Proxies requests to the OpenRouter API to keep the API key secure.
+ * Uses openrouter/auto for automatic model selection.
  */
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
@@ -68,10 +69,10 @@ Deno.serve(async (req: Request) => {
   }
 
   // Get API key from environment
-  const API_KEY = Deno.env.get("GEMINI_API_KEY");
+  const API_KEY = Deno.env.get("OPENROUTER_API_KEY");
 
   if (!API_KEY) {
-    console.error("GEMINI_API_KEY is missing in environment variables.");
+    console.error("OPENROUTER_API_KEY is missing in environment variables.");
     return new Response(
       JSON.stringify({ error: "Server configuration error." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -88,54 +89,57 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Build the request to Gemini API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
+    // Build messages array for OpenRouter (OpenAI-compatible format)
+    const messages: Array<{ role: string; content: string }> = [];
 
-    const requestBody: Record<string, unknown> = {
-      contents: [{ parts: [{ text: contents }] }],
-    };
-
-    // Add generation config if provided
-    if (config) {
-      const generationConfig: Record<string, unknown> = {};
-
-      if (config.temperature !== undefined) {
-        generationConfig.temperature = config.temperature;
-      }
-      if (config.responseMimeType) {
-        generationConfig.responseMimeType = config.responseMimeType;
-      }
-      if (config.responseSchema) {
-        generationConfig.responseSchema = config.responseSchema;
-      }
-
-      if (Object.keys(generationConfig).length > 0) {
-        requestBody.generationConfig = generationConfig;
-      }
-
-      // Add system instruction if provided
-      if (config.systemInstruction) {
-        requestBody.systemInstruction = {
-          parts: [{ text: config.systemInstruction }],
-        };
-      }
+    // Add system instruction if provided
+    if (config?.systemInstruction) {
+      messages.push({
+        role: "system",
+        content: config.systemInstruction,
+      });
     }
 
-    const response = await fetch(geminiUrl, {
+    // Add user message
+    messages.push({
+      role: "user",
+      content: contents,
+    });
+
+    // Build request body for OpenRouter
+    const requestBody: Record<string, unknown> = {
+      model,
+      messages,
+    };
+
+    // Add temperature if provided
+    if (config?.temperature !== undefined) {
+      requestBody.temperature = config.temperature;
+    }
+
+    // Add JSON response format if requested
+    if (config?.responseMimeType === "application/json") {
+      requestBody.response_format = { type: "json_object" };
+    }
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
+        "Authorization": `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://lunch-decider.app",
+        "X-Title": "Lunch Decider",
       },
       body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Gemini API Error:", errorText);
+      console.error("OpenRouter API Error:", errorText);
       return new Response(
         JSON.stringify({
           error: "AI Processing Failed",
-          details: `Gemini API returned ${response.status}`,
+          details: `OpenRouter API returned ${response.status}`,
         }),
         { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -143,15 +147,20 @@ Deno.serve(async (req: Request) => {
 
     const data = await response.json();
 
-    // Extract text from Gemini response
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    // Extract text from OpenRouter response (OpenAI format)
+    const text = data.choices?.[0]?.message?.content || "";
+
+    // Log which model was actually used (useful for openrouter/auto)
+    if (data.model) {
+      console.log(`OpenRouter used model: ${data.model}`);
+    }
 
     return new Response(
       JSON.stringify({ text }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Gemini API Proxy Error:", error);
+    console.error("OpenRouter API Proxy Error:", error);
     return new Response(
       JSON.stringify({
         error: "AI Processing Failed",

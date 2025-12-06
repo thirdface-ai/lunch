@@ -134,7 +134,7 @@ Use descriptive branch names:
 feature/add-cuisine-filter
 fix/map-marker-clustering
 docs/api-reference
-refactor/gemini-service
+refactor/ai-service
 ```
 
 ### Running Tests
@@ -272,7 +272,7 @@ docs(readme): add deployment instructions
 
 refactor(hooks): extract distance calculation logic
 
-test(gemini): add unit tests for decideLunch
+test(ai): add unit tests for decideLunch
 ```
 
 ## Pull Request Process
