@@ -119,7 +119,7 @@ describe('generateLoadingLogs', () => {
     await generateLoadingLogs(HungerVibe.HEARTY_AND_RICH, 'Address');
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.model).toBe('openrouter/auto');
+    expect(callBody.model).toBe('anthropic/claude-opus-4.5');
   });
 });
 
@@ -415,6 +415,6 @@ describe('decideLunch', () => {
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.model).toBe('openrouter/auto');
+    expect(callBody.model).toBe('anthropic/claude-opus-4.5');
   });
 });

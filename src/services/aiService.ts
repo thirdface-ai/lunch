@@ -15,8 +15,9 @@ export enum Type {
   NULL = 'NULL',
 }
 
-// Using OpenRouter's auto model selection for optimal results
-const AI_MODEL = 'openrouter/auto';
+// Using Claude Opus 4.5 for superior reasoning and recommendation quality
+// https://openrouter.ai/anthropic/claude-opus-4.5
+const AI_MODEL = 'anthropic/claude-opus-4.5';
 
 // Callback type for real-time logging during analysis
 export type AnalysisLogCallback = (message: string) => void;
