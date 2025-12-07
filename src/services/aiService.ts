@@ -109,28 +109,31 @@ export const translateSearchIntent = async (
 
 INPUT: "${trimmedPrompt}"${vibe ? ` | VIBE: ${vibe}` : ''}
 
-CRITICAL: Generate 3 DIVERSE search queries that MAXIMIZE coverage. Each query MUST target DIFFERENT types of places:
+CRITICAL RULES:
+1. Generate exactly 3 DIVERSE search queries
+2. NEVER include generic words: "restaurant", "food", "near", "nearby", "me", "delivery", "takeout"
+3. Focus on CUISINE TYPE and DISH NAMES that distinguish places
 
-STRATEGY - For any food request, create 3 distinct angles:
-1. SPECIFIC: The exact dish/cuisine name (e.g., "schnitzel", "ramen", "tacos")
-2. VENUE TYPE: The establishment type (e.g., "german restaurant", "ramen shop", "taqueria") 
-3. BROADER CATEGORY: Related cuisine or style (e.g., "austrian restaurant", "japanese noodles", "mexican food")
+STRATEGY - Create 3 distinct angles:
+1. SPECIFIC DISH: The exact food item (e.g., "schnitzel", "ramen", "kebab")
+2. CUISINE TYPE: The cuisine category (e.g., "german", "japanese", "turkish") 
+3. RELATED STYLE: Related cuisine or cooking style (e.g., "austrian", "noodle bar", "mediterranean grill")
 
 EXAMPLES:
+- "turkish food" → ["turkish", "kebab", "mediterranean grill"]
 - "steak" → ["steak", "steakhouse", "american grill"]
-- "pizza" → ["pizza", "pizzeria", "italian restaurant"]
-- "sushi" → ["sushi", "sushi bar", "japanese restaurant"]
-- "cheap eats" → ["budget restaurant", "casual dining", "street food"]
-- "fancy dinner" → ["fine dining", "upscale restaurant", "gourmet restaurant"]
-- "schnitzel" → ["schnitzel", "german restaurant", "austrian restaurant"]
+- "pizza" → ["pizza", "pizzeria", "italian"]
+- "sushi" → ["sushi", "sushi bar", "japanese"]
+- "healthy food" → ["salad bar", "poke bowl", "mediterranean"]
+- "schnitzel" → ["schnitzel", "german", "austrian"]
 
-BAD (too similar): ["steak restaurant", "steak place", "steak house"] ❌
-GOOD (diverse): ["steak", "steakhouse", "american grill"] ✅
+BAD: ["turkish restaurant near me", "turkish food delivery"] ❌ (generic words)
+GOOD: ["turkish", "kebab", "mediterranean grill"] ✅ (specific & diverse)
 
 OUTPUT JSON:
-{"searchQueries":["specific","venue_type","broader"],"newlyOpenedOnly":bool|null,"popularOnly":bool|null,"cuisineType":"cuisine|null"}
+{"searchQueries":["dish","cuisine","style"],"newlyOpenedOnly":bool|null,"popularOnly":bool|null,"cuisineType":"cuisine|null"}
 
-Generate exactly 3 DIVERSE queries. Never use user's vague words directly.`;
+Generate exactly 3 SPECIFIC queries. No generic words.`;
 
   try {
     const text = await callOpenRouterProxy(
@@ -219,7 +222,22 @@ export const filterPlacesByQuery = async (
   
   // Extract keywords from query for quick matching
   // This handles queries like "I want really good schnitzel with gravy" → ["schnitzel", "gravy"]
-  const stopWords = new Set(['i', 'want', 'really', 'good', 'the', 'a', 'an', 'some', 'with', 'and', 'or', 'for', 'in', 'to', 'of', 'that', 'is', 'it', 'my', 'me', 'best', 'great', 'nice', 'please', 'something', 'like', 'looking', 'find', 'get', 'give', 'need', 'show', 'recommend', 'suggestion']);
+  // IMPORTANT: Generic words like "restaurant", "food", "near" must be filtered out
+  // or they will match almost everything in the cache
+  const stopWords = new Set([
+    // Common request words
+    'i', 'want', 'really', 'good', 'the', 'a', 'an', 'some', 'with', 'and', 'or', 'for', 'in', 'to', 'of', 
+    'that', 'is', 'it', 'my', 'me', 'best', 'great', 'nice', 'please', 'something', 'like', 'looking', 
+    'find', 'get', 'give', 'need', 'show', 'recommend', 'suggestion', 'should', 'must', 'can', 'would',
+    // Location words (too generic)
+    'near', 'nearby', 'around', 'close', 'here', 'local', 'area', 'place', 'places',
+    // Generic food/restaurant words (match everything)
+    'restaurant', 'restaurants', 'food', 'foods', 'eat', 'eating', 'meal', 'meals', 'cuisine',
+    'dining', 'eatery', 'cafe', 'bistro', 'diner', 'spot', 'spots', 'joint', 'delivery', 'takeout',
+    // Quality descriptors (not searchable)
+    'healthy', 'tasty', 'delicious', 'fresh', 'authentic', 'traditional', 'modern', 'best', 'top',
+    'quality', 'amazing', 'excellent', 'fantastic', 'wonderful', 'perfect', 'favorite', 'popular'
+  ]);
   const queryWords = trimmedQuery
     .split(/\s+/)
     .filter(w => w.length >= 3 && !stopWords.has(w));
@@ -250,19 +268,26 @@ export const filterPlacesByQuery = async (
     }
   }
   
-  // If we found enough quick matches for specific cuisines, return them
-  // (e.g., user searched "ramen" and we found 15 places with "ramen" in name/types)
-  if (quickMatches.length >= 10) {
-    Logger.info('AI', `Quick filter found ${quickMatches.length} matches for "${trimmedQuery}"`, {
-      total: places.length,
-      quickMatches: quickMatches.length
-    });
-    return quickMatches;
+  // Log quick match results
+  Logger.info('AI', `Quick filter found ${quickMatches.length} keyword matches for "${trimmedQuery}"`, {
+    total: places.length,
+    quickMatches: quickMatches.length,
+    keywords: queryWords
+  });
+  
+  // If no meaningful keywords were extracted (all stop words), return empty
+  // This prevents matching everything when query is too generic
+  if (queryWords.length === 0) {
+    Logger.warn('AI', 'No meaningful keywords extracted from query - using all places for AI analysis');
+    // Fall through to AI analysis with limited candidates
   }
   
-  // For vague queries or not enough quick matches, use AI to analyze
-  // Combine quick matches with maybes for AI to rank
-  const candidatesForAI = [...quickMatches, ...maybeMatches].slice(0, 50);
+  // ALWAYS use AI to verify matches for cuisine-specific queries
+  // The quick filter is just a pre-filter to reduce candidates, not a final answer
+  // Prioritize quick matches but include some maybes for diversity
+  const candidatesForAI = quickMatches.length > 0 
+    ? [...quickMatches.slice(0, 40), ...maybeMatches.slice(0, 10)]  // Prioritize keyword matches
+    : maybeMatches.slice(0, 50);  // No keywords? Let AI analyze all
   
   if (candidatesForAI.length === 0) {
     return [];
@@ -276,30 +301,39 @@ export const filterPlacesByQuery = async (
     summary: p.editorial_summary?.overview?.slice(0, 100) || '',
   }));
 
-  const prompt = `You are filtering restaurants for a user's search. Be GENEROUS in matching.
+  const prompt = `Filter restaurants that ACTUALLY match the user's cuisine search. Be STRICT about cuisine type.
 
 SEARCH: "${trimmedQuery}"${vibe ? ` | VIBE: ${vibe}` : ''}
 
 RESTAURANTS:
 ${placeSummaries.map(p => `[${p.idx}] ${p.name} | ${p.types} | ${p.summary}`).join('\n')}
 
-MATCHING RULES (include if ANY apply):
-1. NAME MATCH: Query word appears in restaurant name (e.g., "schnitzel" → "Schnitzelei")
-2. CUISINE MATCH: Restaurant type serves the food (e.g., "schnitzel" → german_restaurant, austrian_restaurant)
-3. LIKELY SERVES: Restaurant cuisine typically serves the dish:
-   - Schnitzel → German, Austrian, European restaurants
-   - Ramen → Japanese, ramen_restaurant
-   - Pizza → Italian, pizzeria
-   - Burger → American, fast_food, burger joints
-   - Curry → Indian, Thai, Japanese curry houses
-4. SUMMARY MATCH: Description mentions the food/cuisine
-5. VIBE MATCH: If vibe specified, prioritize matching atmosphere
+STRICT MATCHING RULES - Include ONLY if:
+1. EXACT CUISINE: Restaurant type/name matches the searched cuisine
+   - "turkish" → ONLY turkish_restaurant, kebab, döner, turkish in name
+   - "japanese" → ONLY japanese_restaurant, sushi, ramen, izakaya
+   - "italian" → ONLY italian_restaurant, pizzeria, trattoria
+   - "german" → ONLY german_restaurant, bratwurst, schnitzel places
+   
+2. RELATED CUISINE (close match):
+   - Turkish → Mediterranean, Middle Eastern, Lebanese (similar region)
+   - Japanese → Poke (Hawaii-Japanese), Korean (East Asian)
+   - Italian → Mediterranean
+   - German → Austrian, Swiss, European
 
-BE GENEROUS: When uncertain, INCLUDE the restaurant. Better to have false positives than miss good matches.
-Example: "schnitzel" query → include German restaurants even without "schnitzel" in name.
+3. DISH-SPECIFIC: If searching for a dish, include places that serve it:
+   - "kebab" → Turkish, Middle Eastern, Greek
+   - "schnitzel" → German, Austrian, European
+   - "ramen" → Japanese, noodle bars
 
-OUTPUT ONLY valid JSON: {"matches":[0,1,5,12]}
-No explanation. No markdown. Just the JSON object.`;
+DO NOT INCLUDE:
+- Generic restaurants without clear cuisine match
+- Thai restaurant for Turkish search (completely different cuisine!)
+- Random food trucks unless they match the cuisine
+
+OUTPUT: {"matches":[indices of MATCHING restaurants only]}
+If no matches, return: {"matches":[]}`;
+
 
   try {
     const text = await callOpenRouterProxy(
