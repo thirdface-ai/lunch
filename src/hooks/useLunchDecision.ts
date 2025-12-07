@@ -17,6 +17,7 @@ import {
   UserPreferences,
   FinalResult,
   TransportMode,
+  DietaryRestriction,
 } from '../types';
 
 // Get meal type based on current time of day
@@ -338,8 +339,9 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
       const userSelectedNewlyOpened = preferences.newlyOpenedOnly;
       const userSelectedPopular = preferences.popularOnly;
       const needsCardOnly = preferences.noCash; // Filtering out cash-only places reduces pool
-      const needsExpandedPool = userSelectedNewlyOpened || userSelectedPopular || needsCardOnly;
-      const poolSize = needsExpandedPool ? 60 : 30; // Double pool for explicit user filters
+      const isShortWalk = preferences.walkLimit === '5 min'; // Short walks have 50% under-3 results rate
+      const needsExpandedPool = userSelectedNewlyOpened || userSelectedPopular || needsCardOnly || isShortWalk;
+      const poolSize = needsExpandedPool ? 60 : 30; // Double pool for explicit user filters or short walks
       
       // Effective filters for AI recommendation (includes AI-detected intent)
       const effectiveNewlyOpened = preferences.newlyOpenedOnly || aiDetectedNewlyOpened;
@@ -545,7 +547,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
       });
 
       // Build final results with initial walking times
-      const finalResults: FinalResult[] = [];
+      let finalResults: FinalResult[] = [];
       finalSelection.forEach((rec) => {
         const original = candidatesForGemini.find(p => p.place_id === rec.place_id);
         if (original) {
@@ -558,6 +560,28 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
           });
         }
       });
+
+      // SAFETY: Dietary restriction validation
+      // "Gluten free pasta" returning bagels could harm someone with celiac disease
+      const GLUTEN_CONTAINING_TYPES = ['bagel', 'bakery', 'bread', 'pastry'];
+      const wantsGlutenFree = preferences.freestylePrompt?.toLowerCase()?.includes('gluten') || 
+                              preferences.dietaryRestrictions.includes('Gluten-Free' as DietaryRestriction);
+      
+      if (wantsGlutenFree && finalResults.length > 0) {
+        const beforeFilter = finalResults.length;
+        finalResults = finalResults.filter(r => {
+          const types = (r.types || []).join(' ').toLowerCase();
+          const name = r.name.toLowerCase();
+          const isGlutenPlace = GLUTEN_CONTAINING_TYPES.some(g => types.includes(g) || name.includes(g));
+          if (isGlutenPlace) {
+            Logger.warn('SYSTEM', `Filtered out gluten-containing place for gluten-free search: ${r.name}`);
+          }
+          return !isGlutenPlace;
+        });
+        if (beforeFilter !== finalResults.length) {
+          Logger.info('SYSTEM', `Dietary safety filter: removed ${beforeFilter - finalResults.length} gluten-containing places`);
+        }
+      }
 
       // Walking times from Distance Matrix are accurate enough for 5-20 min walks
       // Removed Directions API verification to reduce API costs

@@ -322,38 +322,21 @@ export const filterPlacesByQuery = async (
     summary: p.editorial_summary?.overview?.slice(0, 100) || '',
   }));
 
-  const prompt = `Filter restaurants that ACTUALLY match the user's cuisine search. Be STRICT about cuisine type.
+  // CRITICAL: This prompt must be SHORT and STRICT about JSON output
+  // The AI was returning verbose analysis text instead of JSON, causing 58% parse failures
+  const prompt = `OUTPUT ONLY JSON. No text before or after. No explanations.
 
-SEARCH: "${trimmedQuery}"${vibe ? ` | VIBE: ${vibe}` : ''}
+TASK: Return indices of restaurants that serve "${trimmedQuery}"
 
-RESTAURANTS:
-${placeSummaries.map(p => `[${p.idx}] ${p.name} | ${p.types} | ${p.summary}`).join('\n')}
+${placeSummaries.map(p => `${p.idx}: ${p.name} (${p.types})`).join('\n')}
 
-STRICT MATCHING RULES - Include ONLY if:
-1. EXACT CUISINE: Restaurant type/name matches the searched cuisine
-   - "turkish" → ONLY turkish_restaurant, kebab, döner, turkish in name
-   - "japanese" → ONLY japanese_restaurant, sushi, ramen, izakaya
-   - "italian" → ONLY italian_restaurant, pizzeria, trattoria
-   - "german" → ONLY german_restaurant, bratwurst, schnitzel places
-   
-2. RELATED CUISINE (close match):
-   - Turkish → Mediterranean, Middle Eastern, Lebanese (similar region)
-   - Japanese → Poke (Hawaii-Japanese), Korean (East Asian)
-   - Italian → Mediterranean
-   - German → Austrian, Swiss, European
+RULES:
+- Match cuisine/dish type: "${trimmedQuery}"
+- Include related cuisines (e.g., schnitzel→german/austrian, ramen→japanese, kebab→turkish)
+- EXCLUDE completely unrelated cuisines
 
-3. DISH-SPECIFIC: If searching for a dish, include places that serve it:
-   - "kebab" → Turkish, Middle Eastern, Greek
-   - "schnitzel" → German, Austrian, European
-   - "ramen" → Japanese, noodle bars
-
-DO NOT INCLUDE:
-- Generic restaurants without clear cuisine match
-- Thai restaurant for Turkish search (completely different cuisine!)
-- Random food trucks unless they match the cuisine
-
-OUTPUT: {"matches":[indices of MATCHING restaurants only]}
-If no matches, return: {"matches":[]}`;
+FORMAT: {"matches":[0,2,5]}
+EMPTY: {"matches":[]}`;
 
 
   try {
@@ -368,7 +351,13 @@ If no matches, return: {"matches":[]}`;
 
     if (!text || text.trim() === '') {
       Logger.warn('AI', 'Empty response from place filter');
-      return quickMatches.length > 0 ? quickMatches : candidatesForAI.slice(0, 10);
+      // CRITICAL: Only return keyword matches, NEVER generic results
+      // Generic fallback caused wrong-cuisine results (schnitzel→currywurst)
+      if (quickMatches.length > 0) {
+        Logger.info('AI', `Empty response fallback to ${quickMatches.length} keyword matches`);
+        return quickMatches;
+      }
+      return [];
     }
 
     // Parse JSON response - handle markdown blocks and extra text
@@ -401,14 +390,25 @@ If no matches, return: {"matches":[]}`;
         cleanedJson: jsonText.substring(0, 200),
         parseError: String(parseError)
       });
-      // Fall back to keyword matches
-      return quickMatches.length > 0 ? quickMatches : candidatesForAI.slice(0, 10);
+      // CRITICAL: Only return keyword matches, NEVER generic results
+      // Returning candidatesForAI.slice(0, 10) caused schnitzel→currywurst bugs
+      if (quickMatches.length > 0) {
+        Logger.info('AI', `Fallback to ${quickMatches.length} keyword matches for "${trimmedQuery}"`);
+        return quickMatches;
+      }
+      // No keyword matches = return empty, let caller handle with proper messaging
+      Logger.warn('AI', `No cuisine matches found for "${trimmedQuery}" - returning empty`);
+      return [];
     }
     
     // Handle null/undefined result (AI sometimes returns just "null")
     if (!result || typeof result !== 'object') {
       Logger.warn('AI', 'Invalid result from place filter (not an object)', { result });
-      return quickMatches.length > 0 ? quickMatches : candidatesForAI.slice(0, 10);
+      // Same logic: only keyword matches, never generic results
+      if (quickMatches.length > 0) {
+        return quickMatches;
+      }
+      return [];
     }
     
     const matchingIndices: number[] = result.matches || [];
@@ -428,8 +428,14 @@ If no matches, return: {"matches":[]}`;
 
   } catch (error) {
     Logger.error('AI', 'Place filtering failed', error);
-    // Fallback: return quick matches or first 10 candidates
-    return quickMatches.length > 0 ? quickMatches : candidatesForAI.slice(0, 10);
+    // CRITICAL: Only return keyword matches, NEVER generic results
+    // Generic fallback caused wrong-cuisine results (schnitzel→currywurst)
+    if (quickMatches.length > 0) {
+      Logger.info('AI', `Error fallback to ${quickMatches.length} keyword matches`);
+      return quickMatches;
+    }
+    // Return empty and let caller handle - better than wrong cuisines
+    return [];
   }
 };
 
