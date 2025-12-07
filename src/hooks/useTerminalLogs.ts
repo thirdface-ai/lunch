@@ -36,12 +36,22 @@ export const useTerminalLogs = (
   const { autoProgress = true, maxAutoProgress = 99 } = options;
   
   const [logs, setLogs] = useState<TerminalLog[]>([]);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgressInternal] = useState(0);
   const [dynamicMessages, setDynamicMessages] = useState<string[]>([]);
   const [isComplete, setIsComplete] = useState(false); // Track when DONE is logged
   const logIdCounter = useRef(0);
   const messageIndexRef = useRef(0);
   const messageIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Wrapper to ensure progress never goes backwards (except when reset to 0)
+  const setProgress = useCallback((value: number | ((prev: number) => number)) => {
+    setProgressInternal(prev => {
+      const newValue = typeof value === 'function' ? value(prev) : value;
+      // Allow reset to 0, otherwise only increase
+      if (newValue === 0) return 0;
+      return Math.max(prev, newValue);
+    });
+  }, []);
 
   // Add a new log entry
   const addLog = useCallback((text: string) => {
@@ -141,9 +151,9 @@ export const useTerminalLogs = (
     logIdCounter.current = 0;
   }, []);
 
-  // Reset progress to 0
+  // Reset progress to 0 (bypasses the "never decrease" guard)
   const resetProgress = useCallback(() => {
-    setProgress(0);
+    setProgressInternal(0);
   }, []);
 
   // Auto-progress animation when processing
