@@ -127,7 +127,7 @@ export const trackRestaurantClicked = (params: {
 /**
  * Track when user resets to start over
  */
-export const trackSearchReset = (fromState: 'results' | 'processing' | 'error') => {
+export const trackSearchReset = (fromState: 'results' | 'processing' | 'no_results' | 'error') => {
   track('search_reset', {
     from_state: fromState,
   });

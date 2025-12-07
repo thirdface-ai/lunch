@@ -49,7 +49,9 @@ const AppContent: React.FC = () => {
   // Handle reset with tracking
   const handleReset = () => {
     const fromState = appState === AppState.RESULTS ? 'results' 
-      : appState === AppState.PROCESSING ? 'processing' : 'error';
+      : appState === AppState.PROCESSING ? 'processing'
+      : appState === AppState.NO_RESULTS ? 'no_results'
+      : 'error';
     trackSearchReset(fromState);
     reset();
   };

@@ -276,7 +276,8 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   userLng,
   onReset,
   theme,
-  transportMode
+  transportMode,
+  userAddress = ''
 }) => {
   const isDark = theme === ThemeMode.DARK;
   
@@ -365,6 +366,13 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                           href={getPlaceUrl(place.name, place.vicinity, place.place_id)}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={() => trackRestaurantClicked({
+                            placeName: place.name,
+                            placeId: place.place_id,
+                            rating: place.rating,
+                            rank: idx + 1,
+                            city: userAddress
+                          })}
                           className={`font-sans font-bold text-lg lg:text-xl leading-tight group-hover:text-braun-orange transition-colors ${isDark ? 'text-dark-text' : 'text-braun-dark'}`}
                         >
                           {place.name}
