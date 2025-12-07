@@ -5,6 +5,51 @@ import Sounds from '../utils/sounds';
 
 
 /**
+ * Estimate timezone offset (in minutes from UTC) based on longitude.
+ * This is approximate but works for most locations.
+ * Each 15° of longitude ≈ 1 hour offset.
+ */
+const estimateTimezoneOffsetFromLng = (lng: number): number => {
+  // Each 15 degrees of longitude = 1 hour (60 minutes)
+  // Positive longitude = east of UTC = positive offset
+  // Negative longitude = west of UTC = negative offset
+  return Math.round(lng / 15) * 60;
+};
+
+/**
+ * Get current minutes since midnight at a specific location.
+ * Uses longitude to estimate the local time at that location.
+ * 
+ * @param lng Longitude of the location (-180 to 180)
+ * @returns Minutes since midnight at that location
+ */
+const getCurrentMinutesAtLocation = (lng: number | undefined): number => {
+  const now = new Date();
+  
+  if (lng === undefined) {
+    // No location data, fall back to user's local time
+    return now.getHours() * 60 + now.getMinutes();
+  }
+  
+  // Get UTC time
+  const utcHours = now.getUTCHours();
+  const utcMinutes = now.getUTCMinutes();
+  const utcTotalMinutes = utcHours * 60 + utcMinutes;
+  
+  // Estimate location's offset from UTC
+  const locationOffset = estimateTimezoneOffsetFromLng(lng);
+  
+  // Calculate local time at location
+  let localMinutes = utcTotalMinutes + locationOffset;
+  
+  // Handle day wraparound
+  if (localMinutes < 0) localMinutes += 24 * 60;
+  if (localMinutes >= 24 * 60) localMinutes -= 24 * 60;
+  
+  return localMinutes;
+};
+
+/**
  * Parse time string like "11:00 am", "2:30 pm", "14:00" into minutes since midnight
  */
 const parseTimeToMinutes = (timeStr: string): number | null => {
@@ -37,8 +82,11 @@ const parseTimeToMinutes = (timeStr: string): number | null => {
 /**
  * Check if current time falls within a single time range
  * Returns true if open, false if closed, null if can't parse
+ * 
+ * @param rangeStr Time range string like "8:00 am – 4:00 pm"
+ * @param lng Optional longitude to calculate local time at restaurant
  */
-const isWithinTimeRange = (rangeStr: string): boolean | null => {
+const isWithinTimeRange = (rangeStr: string, lng?: number): boolean | null => {
   // Split by common separators: "–", "-", "to"
   const parts = rangeStr.split(/\s*[–\-]\s*|\s+to\s+/i);
   if (parts.length !== 2) return null;
@@ -48,8 +96,8 @@ const isWithinTimeRange = (rangeStr: string): boolean | null => {
   
   if (openTime === null || closeTime === null) return null;
   
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  // Get current time at the restaurant's location (not user's local time)
+  const currentMinutes = getCurrentMinutesAtLocation(lng);
   
   // Handle overnight hours (e.g., 6pm - 2am)
   if (closeTime < openTime) {
@@ -76,18 +124,30 @@ const extractOpeningTime = (rangeStr: string): string | null => {
 };
 
 /**
+ * Check if a place is explicitly closed all day (no opening hours at all)
+ */
+const isClosedAllDay = (todaysHours: string | null | undefined): boolean => {
+  if (!todaysHours) return false; // Unknown, not explicitly closed
+  const cleaned = todaysHours.trim().toLowerCase();
+  return cleaned === 'closed';
+};
+
+/**
  * Get the next opening time from today's hours string
  * Returns formatted time like "11:00 AM" or null if closed all day or can't determine
+ * 
+ * @param todaysHours Today's hours string
+ * @param lng Optional longitude to calculate local time at restaurant
  */
-const getNextOpeningTime = (todaysHours: string | null | undefined): string | null => {
+const getNextOpeningTime = (todaysHours: string | null | undefined, lng?: number): string | null => {
   if (!todaysHours) return null;
   
   const cleaned = todaysHours.trim().toLowerCase();
   if (cleaned === 'closed') return null; // Closed all day
   if (cleaned === 'open 24 hours') return null; // Always open
   
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  // Get current time at the restaurant's location
+  const currentMinutes = getCurrentMinutesAtLocation(lng);
   
   // Split by comma to handle multiple time ranges (e.g., lunch and dinner)
   const timeRanges = todaysHours.split(/\s*,\s*/);
@@ -113,8 +173,11 @@ const getNextOpeningTime = (todaysHours: string | null | undefined): string | nu
 /**
  * Check if a place is currently open based on today's hours string
  * Returns: { isOpen: boolean | null, nextOpenTime: string | null }
+ * 
+ * @param todaysHours Today's hours string
+ * @param lng Optional longitude to calculate local time at restaurant (timezone-aware)
  */
-const getOpenStatus = (todaysHours: string | null | undefined): { isOpen: boolean | null; nextOpenTime: string | null } => {
+const getOpenStatus = (todaysHours: string | null | undefined, lng?: number): { isOpen: boolean | null; nextOpenTime: string | null } => {
   if (!todaysHours) return { isOpen: null, nextOpenTime: null };
   
   const cleaned = todaysHours.trim().toLowerCase();
@@ -125,17 +188,18 @@ const getOpenStatus = (todaysHours: string | null | undefined): { isOpen: boolea
   const timeRanges = todaysHours.split(/\s*,\s*/);
   
   for (const range of timeRanges) {
-    const isOpen = isWithinTimeRange(range.trim());
+    // Pass longitude for timezone-aware time comparison
+    const isOpen = isWithinTimeRange(range.trim(), lng);
     if (isOpen === true) {
       return { isOpen: true, nextOpenTime: null };
     }
   }
   
-  // Not currently open - find next opening time
-  const nextOpenTime = getNextOpeningTime(todaysHours);
+  // Not currently open - find next opening time (timezone-aware)
+  const nextOpenTime = getNextOpeningTime(todaysHours, lng);
   
   // If we parsed at least one range and none matched, it's closed
-  const parsedAny = timeRanges.some(range => isWithinTimeRange(range.trim()) !== null);
+  const parsedAny = timeRanges.some(range => isWithinTimeRange(range.trim(), lng) !== null);
   return { 
     isOpen: parsedAny ? false : null, 
     nextOpenTime 
@@ -268,6 +332,14 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                 text => text.toLowerCase().startsWith(todayName.toLowerCase())
               );
               const todaysHours = todaysHoursRaw ? todaysHoursRaw.substring(todaysHoursRaw.indexOf(':') + 2) : null;
+              
+              // Get restaurant's longitude for timezone-aware time calculations
+              // This ensures we compare against the restaurant's local time, not the user's
+              const restaurantLng = place.geometry?.location 
+                ? (typeof place.geometry.location.lng === 'function' 
+                    ? place.geometry.location.lng() 
+                    : place.geometry.location.lng)
+                : undefined;
 
               return (
                 <article 
@@ -325,15 +397,21 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                             <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>HOURS:</span>
                             {place.opening_hours ? (
                               (() => {
-                                const status = getOpenStatus(todaysHours);
+                                // Pass restaurant's longitude for timezone-aware status
+                                const status = getOpenStatus(todaysHours, restaurantLng);
                                 if (status.isOpen === true) {
                                   return <span className="text-green-500 font-bold">OPEN</span>;
                                 } else if (status.isOpen === false) {
-                                  // Show next opening time if available, otherwise just say closed today
+                                  // Show next opening time if available
                                   if (status.nextOpenTime) {
                                     return <span className="text-red-500 font-bold">OPENS {status.nextOpenTime}</span>;
                                   }
-                                  return <span className="text-red-500 font-bold">CLOSED TODAY</span>;
+                                  // Distinguish between "never opens today" vs "already closed for the day"
+                                  if (isClosedAllDay(todaysHours)) {
+                                    return <span className="text-red-500 font-bold">CLOSED TODAY</span>;
+                                  }
+                                  // Had hours today but now closed - just say CLOSED
+                                  return <span className="text-red-500 font-bold">CLOSED</span>;
                                 }
                                 // Fallback to API's open_now status
                                 return place.opening_hours?.open_now 
