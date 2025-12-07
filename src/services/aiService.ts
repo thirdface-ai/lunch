@@ -109,17 +109,28 @@ export const translateSearchIntent = async (
 
 INPUT: "${trimmedPrompt}"${vibe ? ` | VIBE: ${vibe}` : ''}
 
-TRANSLATION MAP:
-- "newest/hottest" → newlyOpenedOnly:true, popularOnly:true, queries: ["new restaurant", "popular restaurant", "trending restaurant"]
-- "fancy/date night" → queries: ["fine dining", "upscale restaurant", "romantic restaurant"]
-- "cheap eats" → queries: ["budget restaurant", "casual dining", "cheap eats"]
-- "hidden gems" → queries: ["local favorite", "highly rated", "underrated restaurant"]
-- Specific cuisine (pizza/ramen/etc) → include cuisine name in all queries
+CRITICAL: Generate 3 DIVERSE search queries that MAXIMIZE coverage. Each query MUST target DIFFERENT types of places:
+
+STRATEGY - For any food request, create 3 distinct angles:
+1. SPECIFIC: The exact dish/cuisine name (e.g., "schnitzel", "ramen", "tacos")
+2. VENUE TYPE: The establishment type (e.g., "german restaurant", "ramen shop", "taqueria") 
+3. BROADER CATEGORY: Related cuisine or style (e.g., "austrian restaurant", "japanese noodles", "mexican food")
+
+EXAMPLES:
+- "steak" → ["steak", "steakhouse", "american grill"]
+- "pizza" → ["pizza", "pizzeria", "italian restaurant"]
+- "sushi" → ["sushi", "sushi bar", "japanese restaurant"]
+- "cheap eats" → ["budget restaurant", "casual dining", "street food"]
+- "fancy dinner" → ["fine dining", "upscale restaurant", "gourmet restaurant"]
+- "schnitzel" → ["schnitzel", "german restaurant", "austrian restaurant"]
+
+BAD (too similar): ["steak restaurant", "steak place", "steak house"] ❌
+GOOD (diverse): ["steak", "steakhouse", "american grill"] ✅
 
 OUTPUT JSON:
-{"searchQueries":["query1","query2","query3"],"newlyOpenedOnly":bool|null,"popularOnly":bool|null,"cuisineType":"cuisine|null"}
+{"searchQueries":["specific","venue_type","broader"],"newlyOpenedOnly":bool|null,"popularOnly":bool|null,"cuisineType":"cuisine|null"}
 
-Generate 3-5 CONCRETE search terms Google Places understands. Never use user's vague words directly.`;
+Generate exactly 3 DIVERSE queries. Never use user's vague words directly.`;
 
   try {
     const text = await callOpenRouterProxy(
