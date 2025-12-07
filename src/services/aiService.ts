@@ -54,6 +54,36 @@ const cleanJsonResponse = (jsonText: string): string => {
 };
 
 /**
+ * Extract JSON from AI response that may contain extra text before/after.
+ * AI sometimes adds commentary around the JSON we need.
+ */
+const extractJsonFromResponse = (text: string): string => {
+  // Find the first occurrence of [ or {
+  const firstBracket = text.indexOf('[');
+  const firstBrace = text.indexOf('{');
+  
+  // Determine if we're looking for an array or object based on what comes first
+  const isArray = firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace);
+  
+  if (isArray) {
+    // Extract array [...] (prioritize array if it comes first)
+    const arrayMatch = text.match(/\[[\s\S]*\]/);
+    if (arrayMatch) {
+      return arrayMatch[0];
+    }
+  } else if (firstBrace !== -1) {
+    // Extract object {...}
+    const objectMatch = text.match(/\{[\s\S]*\}/);
+    if (objectMatch) {
+      return objectMatch[0];
+    }
+  }
+  
+  // No JSON found, return original
+  return text;
+};
+
+/**
  * AI-powered translation of freestyle prompts into Google Places search queries
  * 
  * Handles vague requests like "newest hottest places" by understanding intent
@@ -109,7 +139,7 @@ Generate 3-5 CONCRETE search terms Google Places understands. Never use user's v
       };
     }
 
-    // Parse JSON response
+    // Parse JSON response - handle markdown blocks and extra text
     let jsonText = text.trim();
     if (jsonText.startsWith('```json')) {
       jsonText = jsonText.slice(7);
@@ -121,7 +151,8 @@ Generate 3-5 CONCRETE search terms Google Places understands. Never use user's v
     }
     jsonText = jsonText.trim();
     
-    // Fix common JSON issues from AI responses
+    // Extract JSON from potentially messy response and fix common issues
+    jsonText = extractJsonFromResponse(jsonText);
     jsonText = cleanJsonResponse(jsonText);
 
     const result = JSON.parse(jsonText);
@@ -175,8 +206,15 @@ export const filterPlacesByQuery = async (
 
   const trimmedQuery = query.trim().toLowerCase();
   
+  // Extract keywords from query for quick matching
+  // This handles queries like "I want really good schnitzel with gravy" → ["schnitzel", "gravy"]
+  const stopWords = new Set(['i', 'want', 'really', 'good', 'the', 'a', 'an', 'some', 'with', 'and', 'or', 'for', 'in', 'to', 'of', 'that', 'is', 'it', 'my', 'me', 'best', 'great', 'nice', 'please', 'something', 'like', 'looking', 'find', 'get', 'give', 'need', 'show', 'recommend', 'suggestion']);
+  const queryWords = trimmedQuery
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !stopWords.has(w));
+  
   // First pass: fast local filtering for obvious matches
-  // This catches specific cuisine searches like "ramen", "sushi", "pizza"
+  // This catches specific cuisine searches like "ramen", "sushi", "pizza", "schnitzel"
   const quickMatches: GooglePlace[] = [];
   const maybeMatches: GooglePlace[] = [];
   
@@ -184,16 +222,18 @@ export const filterPlacesByQuery = async (
     const nameLower = place.name.toLowerCase();
     const typesStr = (place.types || []).join(' ').toLowerCase();
     const summary = (place.editorial_summary?.overview || '').toLowerCase();
+    const searchableText = `${nameLower} ${typesStr} ${summary}`;
     
-    // Direct match in name or types
-    if (nameLower.includes(trimmedQuery) || typesStr.includes(trimmedQuery)) {
-      quickMatches.push(place);
-    } 
-    // Partial match or related terms in summary
-    else if (summary.includes(trimmedQuery)) {
+    // Check if ANY keyword from query matches the place
+    const hasKeywordMatch = queryWords.some(keyword => 
+      searchableText.includes(keyword)
+    );
+    
+    // Direct match - keyword found in name, types, or summary
+    if (hasKeywordMatch) {
       quickMatches.push(place);
     }
-    // For generic/vibe queries, include all for AI analysis
+    // For generic/vibe queries (no specific keywords found), include all for AI analysis
     else {
       maybeMatches.push(place);
     }
@@ -225,20 +265,30 @@ export const filterPlacesByQuery = async (
     summary: p.editorial_summary?.overview?.slice(0, 100) || '',
   }));
 
-  const prompt = `Filter restaurants that match user's search.
+  const prompt = `You are filtering restaurants for a user's search. Be GENEROUS in matching.
 
-USER QUERY: "${trimmedQuery}"${vibe ? ` (vibe: ${vibe})` : ''}
+SEARCH: "${trimmedQuery}"${vibe ? ` | VIBE: ${vibe}` : ''}
 
 RESTAURANTS:
 ${placeSummaries.map(p => `[${p.idx}] ${p.name} | ${p.types} | ${p.summary}`).join('\n')}
 
-Return JSON array of matching restaurant indices. Include places that:
-- Match the cuisine/food type
-- Fit the vibe/mood if specified
-- Are relevant to the query intent
+MATCHING RULES (include if ANY apply):
+1. NAME MATCH: Query word appears in restaurant name (e.g., "schnitzel" → "Schnitzelei")
+2. CUISINE MATCH: Restaurant type serves the food (e.g., "schnitzel" → german_restaurant, austrian_restaurant)
+3. LIKELY SERVES: Restaurant cuisine typically serves the dish:
+   - Schnitzel → German, Austrian, European restaurants
+   - Ramen → Japanese, ramen_restaurant
+   - Pizza → Italian, pizzeria
+   - Burger → American, fast_food, burger joints
+   - Curry → Indian, Thai, Japanese curry houses
+4. SUMMARY MATCH: Description mentions the food/cuisine
+5. VIBE MATCH: If vibe specified, prioritize matching atmosphere
 
-OUTPUT: {"matches":[0,1,5,12,...]} (indices of matching restaurants)
-Return empty array if none match.`;
+BE GENEROUS: When uncertain, INCLUDE the restaurant. Better to have false positives than miss good matches.
+Example: "schnitzel" query → include German restaurants even without "schnitzel" in name.
+
+OUTPUT ONLY valid JSON: {"matches":[0,1,5,12]}
+No explanation. No markdown. Just the JSON object.`;
 
   try {
     const text = await callOpenRouterProxy(
@@ -255,7 +305,7 @@ Return empty array if none match.`;
       return quickMatches.length > 0 ? quickMatches : candidatesForAI.slice(0, 10);
     }
 
-    // Parse JSON response
+    // Parse JSON response - handle markdown blocks and extra text
     let jsonText = text.trim();
     if (jsonText.startsWith('```json')) {
       jsonText = jsonText.slice(7);
@@ -265,7 +315,11 @@ Return empty array if none match.`;
     if (jsonText.endsWith('```')) {
       jsonText = jsonText.slice(0, -3);
     }
-    jsonText = cleanJsonResponse(jsonText.trim());
+    jsonText = jsonText.trim();
+    
+    // Extract JSON from potentially messy response (AI sometimes adds extra text)
+    jsonText = extractJsonFromResponse(jsonText);
+    jsonText = cleanJsonResponse(jsonText);
 
     const result = JSON.parse(jsonText);
     const matchingIndices: number[] = result.matches || [];
@@ -366,7 +420,7 @@ Return ONLY a valid JSON array of 15 strings. No trailing commas. Example: ["MSG
       return getDefaultLoadingMessages();
     }
     
-    // Extract JSON from response (handle markdown code blocks)
+    // Extract JSON from response (handle markdown code blocks and extra text)
     let jsonText = text.trim();
     if (jsonText.startsWith('```json')) {
       jsonText = jsonText.slice(7);
@@ -378,7 +432,8 @@ Return ONLY a valid JSON array of 15 strings. No trailing commas. Example: ["MSG
     }
     jsonText = jsonText.trim();
     
-    // Fix common JSON issues from AI responses
+    // Extract JSON from potentially messy response and fix common issues
+    jsonText = extractJsonFromResponse(jsonText);
     jsonText = cleanJsonResponse(jsonText);
     
     const messages = JSON.parse(jsonText) as string[];
@@ -651,7 +706,7 @@ Return a JSON array with exactly 3 recommendations.`;
       throw new Error('Empty response from AI');
     }
 
-    // Try to extract JSON from the response (it might be wrapped in markdown code blocks)
+    // Try to extract JSON from the response (it might be wrapped in markdown code blocks or have extra text)
     let jsonText = text.trim();
     
     // Remove markdown code blocks if present
@@ -665,7 +720,8 @@ Return a JSON array with exactly 3 recommendations.`;
     }
     jsonText = jsonText.trim();
     
-    // Fix common JSON issues from AI responses
+    // Extract JSON from potentially messy response and fix common issues
+    jsonText = extractJsonFromResponse(jsonText);
     jsonText = cleanJsonResponse(jsonText);
 
     let results: Omit<GeminiRecommendation, 'cash_warning_msg'>[];

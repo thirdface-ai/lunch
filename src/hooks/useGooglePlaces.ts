@@ -237,8 +237,14 @@ export const useGooglePlaces = () => {
     // Deduplicate and limit queries
     const uniqueQueries = [...new Set(searchQueries)].slice(0, 3);
     
-    // Determine the query string for filtering (freestyle prompt or first search query)
-    const filterQuery = freestylePrompt?.trim() || uniqueQueries[0] || '';
+    // Use AI-translated queries for filtering (not the raw freestyle prompt)
+    // Priority: first search query > cuisineType > raw prompt
+    // e.g., "I want schnitzel with gravy" → AI returns ["schnitzel restaurant", ...]
+    // We use "schnitzel restaurant" which will match "Schnitzelei Mitte"
+    const filterQuery = uniqueQueries[0] 
+      || translatedIntent?.cuisineType 
+      || freestylePrompt?.trim() 
+      || '';
     
     // Convert radius to km for location query (radius is in meters)
     const radiusKm = Math.max(radius / 1000, 1); // At least 1km

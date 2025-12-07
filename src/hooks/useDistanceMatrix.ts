@@ -4,7 +4,7 @@ import { DistanceCache } from '../lib/placesCache';
 import Logger from '../utils/logger';
 
 const BATCH_SIZE = 25;
-const MATRIX_TIMEOUT_MS = 10000; // 10 second timeout per batch
+const MATRIX_TIMEOUT_MS = 15000; // 15 second timeout per batch (increased from 10s)
 
 export interface PlaceDuration {
   text: string;
