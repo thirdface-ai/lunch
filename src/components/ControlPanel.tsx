@@ -23,11 +23,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const [showPredictions, setShowPredictions] = useState(false);
   
   const [locating, setLocating] = useState(false);
-  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Session token for Autocomplete API - bundles multiple autocomplete requests into one billing session
   // This reduces costs by ~60% by grouping autocomplete requests with the subsequent Place Details call
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
+  // Store the AutocompleteSuggestion class reference
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const autocompleteSuggestionRef = useRef<any>(null);
 
   /**
    * Get or create a session token for Autocomplete API
@@ -41,13 +43,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     return sessionTokenRef.current;
   };
 
-  // Initialize AutocompleteService (much cheaper than Text Search API)
+  // Initialize Places library for AutocompleteSuggestion (new API, replaces deprecated AutocompleteService)
   useEffect(() => {
     const initAutocomplete = async () => {
         try {
             if ((window as any).google && (window as any).google.maps) {
-                await (window as any).google.maps.importLibrary("places");
-                autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
+                // Import the places library and get AutocompleteSuggestion class
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const placesLib = await (window as any).google.maps.importLibrary("places") as any;
+                autocompleteSuggestionRef.current = placesLib.AutocompleteSuggestion;
             }
         } catch (error) {
             console.error("Failed to load Maps Places library", error);
@@ -77,27 +81,41 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       clearTimeout(debounceTimerRef.current);
     }
     
-    if (value && value.length > 2 && autocompleteServiceRef.current) {
+    if (value && value.length > 2 && autocompleteSuggestionRef.current) {
       // Debounce: wait 300ms after user stops typing before making API call
-      debounceTimerRef.current = setTimeout(() => {
-        autocompleteServiceRef.current!.getPlacePredictions(
-          { 
+      debounceTimerRef.current = setTimeout(async () => {
+        try {
+          // Use new AutocompleteSuggestion API (replaces deprecated AutocompleteService)
+          const request = {
             input: value,
-            types: ['geocode', 'establishment'],
+            includedPrimaryTypes: ['geocode', 'establishment'],
             // Session token bundles all autocomplete requests + subsequent Place Details into one billing session
             // This reduces API costs by ~60% for address input
             sessionToken: getSessionToken()
-          },
-          (results, status) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-              setPredictions(results);
-              setShowPredictions(true);
-            } else {
-              setPredictions([]);
-              setShowPredictions(false);
-            }
+          };
+          
+          const { suggestions } = await autocompleteSuggestionRef.current.fetchAutocompleteSuggestions(request);
+          
+          if (suggestions && suggestions.length > 0) {
+            // Map new API response format to match the format we use in the UI
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const mappedPredictions = suggestions.map((suggestion: any) => ({
+              place_id: suggestion.placePrediction.placeId,
+              description: suggestion.placePrediction.text.toString(),
+              // Store the placePrediction for later use in handlePredictionSelect
+              _placePrediction: suggestion.placePrediction
+            }));
+            setPredictions(mappedPredictions);
+            setShowPredictions(true);
+          } else {
+            setPredictions([]);
+            setShowPredictions(false);
           }
-        );
+        } catch (error) {
+          console.error('Autocomplete suggestion failed:', error);
+          setPredictions([]);
+          setShowPredictions(false);
+        }
       }, 300);
     } else {
       setPredictions([]);

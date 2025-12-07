@@ -131,10 +131,11 @@ export const useDistanceMatrix = () => {
 
             // Create the RouteMatrix request
             // fields array is required - specifies which fields to return in the response
+            // travelMode uses google.maps.TravelMode enum (WALKING, DRIVING, etc.)
             const request = {
               origins: [{ location: { lat: origin.lat, lng: origin.lng } }],
               destinations,
-              travelMode: travelMode === google.maps.TravelMode.WALKING ? 'WALK' : 'DRIVE',
+              travelMode: travelMode,
               fields: ['durationMillis', 'distanceMeters', 'condition'],
             };
 
