@@ -332,8 +332,15 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('NO FOOD ESTABLISHMENTS FOUND. TRY A DIFFERENT LOCATION OR VIBE.');
       }
 
-      // Calculate walking distances - limit to 30 candidates (AI analyzes top 25)
-      const candidatePool = shuffleArray([...places]).slice(0, 30);
+      // When special filters are selected, we need a larger pool to find rare places
+      const effectiveNewlyOpened = preferences.newlyOpenedOnly || aiDetectedNewlyOpened;
+      const effectivePopular = preferences.popularOnly || aiDetectedPopular;
+      const needsCardOnly = preferences.noCash; // Filtering out cash-only places reduces pool
+      const needsExpandedPool = effectiveNewlyOpened || effectivePopular || needsCardOnly;
+      const poolSize = needsExpandedPool ? 60 : 30; // Double pool for special filters
+      
+      // Calculate walking distances - limit candidates (AI analyzes top 25)
+      const candidatePool = shuffleArray([...places]).slice(0, poolSize);
       setProgress(35);
 
       // Convert TransportMode to google.maps.TravelMode
@@ -360,8 +367,19 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('NO VIABLE CANDIDATES FOUND AFTER PROXIMITY ANALYSIS.');
       }
 
+      // When special filters are selected, we need MORE candidates to filter from
+      // because these filters reduce the pool - expand the distance threshold
+      const effectiveNewlyOpenedOnly = preferences.newlyOpenedOnly || aiDetectedNewlyOpened;
+      const effectivePopularOnly = preferences.popularOnly || aiDetectedPopular;
+      const needsCardOnly = preferences.noCash;
+      
+      // Calculate how much to expand based on number of filters
+      const filterCount = [effectiveNewlyOpenedOnly, effectivePopularOnly, needsCardOnly].filter(Boolean).length;
+      const distanceMultiplier = filterCount > 0 ? Math.min(2 + filterCount, 4) : 1; // 3x for 1 filter, 4x for 2+
+      const effectiveMaxDuration = maxDurationSeconds * distanceMultiplier;
+
       // Adaptive filtering logic - filter by distance only, not by open status
-      let candidatesWithinRange = filterByDuration(allMeasuredCandidates, durations, maxDurationSeconds);
+      let candidatesWithinRange = filterByDuration(allMeasuredCandidates, durations, effectiveMaxDuration);
       
       // Analyze open status silently (but don't filter)
       let openCount = 0;
@@ -371,7 +389,27 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         if (status === 'open' || status === 'opens_soon') openCount++;
       });
       
-      addLog(`${candidatesWithinRange.length} PLACES WITHIN ${preferences.walkLimit}...`);
+      // Log appropriate message based on active filters
+      const activeFilters: string[] = [];
+      if (effectiveNewlyOpenedOnly) activeFilters.push('FRESH DROPS');
+      if (effectivePopularOnly) activeFilters.push('TRENDING');
+      if (needsCardOnly) activeFilters.push('CARD-ONLY');
+      
+      if (activeFilters.length > 0) {
+        const filterMsg = activeFilters.length > 1 
+          ? `HUNTING FOR ${activeFilters.join(' + ')} SPOTS...`
+          : `SCANNING FOR ${activeFilters[0]} SPOTS...`;
+        addLog(filterMsg);
+        Logger.info('SYSTEM', 'Special filters active - expanded distance filter', {
+          filters: activeFilters,
+          originalMax: maxDurationSeconds,
+          expandedMax: effectiveMaxDuration,
+          distanceMultiplier,
+          candidatesFound: candidatesWithinRange.length
+        });
+      } else {
+        addLog(`${candidatesWithinRange.length} PLACES WITHIN ${preferences.walkLimit}...`);
+      }
       setProgress(55);
 
       if (candidatesWithinRange.length === 0) {
