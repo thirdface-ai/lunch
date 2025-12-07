@@ -28,11 +28,30 @@ const DEFAULT_PREFERENCES: UserPreferences = {
 };
 
 /**
+ * Check if the device is mobile or tablet
+ * Uses screen width as primary indicator (< 1024px = mobile/tablet)
+ */
+const isMobileOrTablet = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return window.innerWidth < 1024 || 'ontouchstart' in window;
+};
+
+/**
  * Get the effective theme (light or dark) based on user preference and system setting
+ * On mobile/tablet devices, defaults to dark mode since system preference detection
+ * is unreliable on those platforms
  */
 const getEffectiveTheme = (theme: ThemeMode): 'light' | 'dark' => {
   if (theme === ThemeMode.SYSTEM) {
     if (typeof window === 'undefined') return 'light';
+    
+    // On mobile/tablet, default to dark mode since system preference detection
+    // doesn't work reliably on most mobile browsers
+    if (isMobileOrTablet()) {
+      return 'dark';
+    }
+    
+    // On desktop, respect system preference
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
   return theme;

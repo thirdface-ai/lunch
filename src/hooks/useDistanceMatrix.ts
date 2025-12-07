@@ -150,9 +150,10 @@ export const useDistanceMatrix = () => {
               fields: ['durationMillis', 'distanceMeters', 'condition'],
             };
 
-            // Set up timeout
+            // Set up timeout with cleanup
+            let timeoutId: ReturnType<typeof setTimeout>;
             const timeoutPromise = new Promise<null>((resolve) => {
-              setTimeout(() => {
+              timeoutId = setTimeout(() => {
                 console.warn('Route matrix request timed out for batch');
                 resolve(null);
               }, MATRIX_TIMEOUT_MS);
@@ -163,6 +164,9 @@ export const useDistanceMatrix = () => {
               RouteMatrix!.computeRouteMatrix(request),
               timeoutPromise
             ]);
+
+            // Clear timeout if API responded before timeout
+            clearTimeout(timeoutId!);
 
             if (!response) {
               Logger.info('SYSTEM', 'Routes API returned null/undefined (likely timeout)');

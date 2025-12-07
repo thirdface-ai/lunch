@@ -440,7 +440,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         <div className={`grid grid-cols-12 border-b ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
             
             {/* Top Left: Vibes Matrix (8 cols) */}
-            <div className={`col-span-12 md:col-span-8 p-4 sm:p-8 border-r border-b md:border-b-0 ${isDark ? 'bg-[#151515] border-dark-border' : 'bg-[#F9F9F7] border-braun-border'}`}>
+            <div className={`col-span-12 md:col-span-8 p-4 sm:p-8 md:border-r border-b md:border-b-0 ${isDark ? 'bg-[#151515] border-dark-border' : 'bg-[#F9F9F7] border-braun-border'}`}>
                 <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Select Mental State</label>
                 
                 <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 mb-4" role="radiogroup" aria-label="Mental State">
@@ -662,7 +662,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         <div className={`grid grid-cols-12 ${isDark ? 'bg-dark-bg' : 'bg-[#F4F4F0]'}`}>
             
             {/* Bottom Left: Budget (8 cols) */}
-            <div className={`col-span-12 md:col-span-8 p-4 sm:p-8 border-r border-b md:border-b-0 flex flex-col justify-center ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
+            <div className={`col-span-12 md:col-span-8 p-4 sm:p-8 md:border-r border-b md:border-b-0 flex flex-col justify-center ${isDark ? 'border-dark-border' : 'border-braun-border'}`}>
                 <div className="flex justify-between items-center mb-3 sm:mb-4">
                     <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest ${isDark ? darkMuted : lightMuted}`}>Budget Protocol</label>
                 </div>
