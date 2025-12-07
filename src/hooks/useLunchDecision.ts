@@ -332,12 +332,18 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('NO FOOD ESTABLISHMENTS FOUND. TRY A DIFFERENT LOCATION OR VIBE.');
       }
 
-      // When special filters are selected, we need a larger pool to find rare places
+      // When special filters are EXPLICITLY selected by user, we need a larger pool to find rare places
+      // NOTE: AI-detected intent (aiDetectedNewlyOpened, aiDetectedPopular) should NOT expand pool
+      // or distance - only explicit user selections should change the search parameters
+      const userSelectedNewlyOpened = preferences.newlyOpenedOnly;
+      const userSelectedPopular = preferences.popularOnly;
+      const needsCardOnly = preferences.noCash; // Filtering out cash-only places reduces pool
+      const needsExpandedPool = userSelectedNewlyOpened || userSelectedPopular || needsCardOnly;
+      const poolSize = needsExpandedPool ? 60 : 30; // Double pool for explicit user filters
+      
+      // Effective filters for AI recommendation (includes AI-detected intent)
       const effectiveNewlyOpened = preferences.newlyOpenedOnly || aiDetectedNewlyOpened;
       const effectivePopular = preferences.popularOnly || aiDetectedPopular;
-      const needsCardOnly = preferences.noCash; // Filtering out cash-only places reduces pool
-      const needsExpandedPool = effectiveNewlyOpened || effectivePopular || needsCardOnly;
-      const poolSize = needsExpandedPool ? 60 : 30; // Double pool for special filters
       
       // Calculate walking distances - limit candidates (AI analyzes top 25)
       const candidatePool = shuffleArray([...places]).slice(0, poolSize);
@@ -367,13 +373,14 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('NO VIABLE CANDIDATES FOUND AFTER PROXIMITY ANALYSIS.');
       }
 
-      // When special filters are selected, we need MORE candidates to filter from
-      // because these filters reduce the pool - expand the distance threshold
-      // (reusing effectiveNewlyOpened, effectivePopular, needsCardOnly from above)
+      // When special filters are EXPLICITLY selected by user, we expand the distance threshold
+      // to help find rare places (e.g., newly opened spots are uncommon)
+      // IMPORTANT: AI-detected intent should NOT expand distance - user's walk limit is sacred
+      // Only user-selected filters (userSelectedNewlyOpened, userSelectedPopular, needsCardOnly) trigger expansion
       
-      // Calculate how much to expand based on number of filters
-      const filterCount = [effectiveNewlyOpened, effectivePopular, needsCardOnly].filter(Boolean).length;
-      const distanceMultiplier = filterCount > 0 ? Math.min(2 + filterCount, 4) : 1; // 3x for 1 filter, 4x for 2+
+      // Calculate how much to expand based on number of USER-SELECTED filters
+      const userFilterCount = [userSelectedNewlyOpened, userSelectedPopular, needsCardOnly].filter(Boolean).length;
+      const distanceMultiplier = userFilterCount > 0 ? Math.min(2 + userFilterCount, 4) : 1; // 3x for 1 filter, 4x for 2+
       const effectiveMaxDuration = maxDurationSeconds * distanceMultiplier;
 
       // Adaptive filtering logic - filter by distance only, not by open status
@@ -387,19 +394,19 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         if (status === 'open' || status === 'opens_soon') openCount++;
       });
       
-      // Log appropriate message based on active filters
-      const activeFilters: string[] = [];
-      if (effectiveNewlyOpened) activeFilters.push('FRESH DROPS');
-      if (effectivePopular) activeFilters.push('TRENDING');
-      if (needsCardOnly) activeFilters.push('CARD-ONLY');
+      // Log appropriate message based on USER-SELECTED filters (which actually expand distance)
+      const userSelectedFilters: string[] = [];
+      if (userSelectedNewlyOpened) userSelectedFilters.push('FRESH DROPS');
+      if (userSelectedPopular) userSelectedFilters.push('TRENDING');
+      if (needsCardOnly) userSelectedFilters.push('CARD-ONLY');
       
-      if (activeFilters.length > 0) {
-        const filterMsg = activeFilters.length > 1 
-          ? `HUNTING FOR ${activeFilters.join(' + ')} SPOTS...`
-          : `SCANNING FOR ${activeFilters[0]} SPOTS...`;
+      if (userSelectedFilters.length > 0) {
+        const filterMsg = userSelectedFilters.length > 1 
+          ? `HUNTING FOR ${userSelectedFilters.join(' + ')} SPOTS...`
+          : `SCANNING FOR ${userSelectedFilters[0]} SPOTS...`;
         addLog(filterMsg);
-        Logger.info('SYSTEM', 'Special filters active - expanded distance filter', {
-          filters: activeFilters,
+        Logger.info('SYSTEM', 'User-selected filters active - expanded distance filter', {
+          filters: userSelectedFilters,
           originalMax: maxDurationSeconds,
           expandedMax: effectiveMaxDuration,
           distanceMultiplier,
@@ -407,6 +414,15 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         });
       } else {
         addLog(`${candidatesWithinRange.length} PLACES WITHIN ${preferences.walkLimit}...`);
+      }
+      
+      // Log AI-detected intent separately (doesn't affect distance, only AI recommendations)
+      if (aiDetectedNewlyOpened || aiDetectedPopular) {
+        Logger.info('SYSTEM', 'AI-detected intent (no distance expansion)', {
+          aiDetectedNewlyOpened,
+          aiDetectedPopular,
+          note: 'AI intent affects recommendations but not walking distance filter'
+        });
       }
       setProgress(55);
 
