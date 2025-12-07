@@ -691,7 +691,7 @@ export const decideLunch = async (
     return parseRecencyMonths(relativeTime);
   };
   
-  // Helper to check if a place is a "fresh drop" (newly opened or under-the-radar)
+  // Helper to check if a place is a "fresh drop" (newly opened)
   const isFreshDropCandidate = (p: GooglePlace): boolean => {
     const allReviews = (p.reviews || []).filter((r: PlaceReview) => r.text && r.text.length > 0);
     const reviewCount = p.user_ratings_total || 0;
@@ -701,15 +701,10 @@ export const decideLunch = async (
       ? Math.max(...allReviews.map((r: PlaceReview) => parseRecencyMonths(r.relativeTime)))
       : 999;
     
-    // A place qualifies as "fresh drop" if ANY of these are true:
-    // 1. Very new: < 50 reviews (definitely new/under-the-radar)
-    // 2. New-ish with recent reviews: < 150 reviews AND oldest review < 18 months
-    // 3. Recently opened: oldest review < 9 months (regardless of review count up to 200)
-    const isVeryNew = reviewCount < 50;
-    const isUnderRadar = reviewCount < 150 && oldestReviewMonths < 18;
-    const isRecentlyOpened = reviewCount < 200 && oldestReviewMonths < 9;
-    
-    return isVeryNew || isUnderRadar || isRecentlyOpened;
+    // A place is "freshly opened" if:
+    // 1. Under 100 reviews (main signal) AND
+    // 2. Oldest review is less than 6 months old
+    return reviewCount < 100 && oldestReviewMonths < 6;
   };
   
   // Helper to check if a place is "trending" (popular)
