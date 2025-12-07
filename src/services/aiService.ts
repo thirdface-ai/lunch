@@ -718,17 +718,22 @@ export const decideLunch = async (
   
   // PRE-FILTER: Apply hard filters for Fresh Drops and Trending modes
   let filteredCandidates = candidates.slice(0, 40); // Start with more candidates to filter from
+  let foundFreshDrops = false; // Track if we successfully filtered to fresh drops only
+  let foundTrending = false; // Track if we successfully filtered to trending only
   
   if (newlyOpenedOnly) {
     const freshDrops = filteredCandidates.filter(isFreshDropCandidate);
-    Logger.info('AI', `Fresh Drops filter: ${freshDrops.length}/${filteredCandidates.length} places qualify`);
+    Logger.info('AI', `Fresh Drops filter: ${freshDrops.length}/${filteredCandidates.length} places qualify`, {
+      candidates: freshDrops.map(p => ({ name: p.name, reviews: p.user_ratings_total }))
+    });
     
     if (freshDrops.length > 0) {
       filteredCandidates = freshDrops;
+      foundFreshDrops = true;
       onLog?.(`FOUND ${freshDrops.length} FRESH DROPS IN AREA...`);
     } else {
       // No fresh drops found - inform user and continue with all candidates
-      onLog?.(`NO NEW OPENINGS DETECTED - SHOWING BEST MATCHES...`);
+      onLog?.(`NO NEW OPENINGS DETECTED IN LISBON - SHOWING BEST MATCHES...`);
       Logger.warn('AI', 'No fresh drops found, falling back to all candidates');
     }
   }
@@ -739,6 +744,7 @@ export const decideLunch = async (
     
     if (trending.length > 0) {
       filteredCandidates = trending;
+      foundTrending = true;
       onLog?.(`FOUND ${trending.length} TRENDING SPOTS...`);
     } else {
       onLog?.(`NO TRENDING SPOTS DETECTED - SHOWING BEST MATCHES...`);
@@ -964,6 +970,8 @@ Return JSON array with exactly 3 recommendations.`;
     return finalResults.map(rec => ({
       ...rec,
       cash_warning_msg: rec.is_cash_only ? 'Note: This location may be cash-only.' : null,
+      // Force is_new_opening when we successfully pre-filtered to fresh drops only
+      is_new_opening: foundFreshDrops ? true : rec.is_new_opening,
     }));
 
   } catch (error) {

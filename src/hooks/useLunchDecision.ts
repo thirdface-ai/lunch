@@ -19,6 +19,15 @@ import {
   TransportMode,
 } from '../types';
 
+// Get meal type based on current time of day
+const getMealType = (): string => {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 11) return 'breakfast spots';
+  if (hour >= 11 && hour < 15) return 'lunch spots';
+  if (hour >= 15 && hour < 21) return 'dinner spots';
+  return 'late night eats';
+};
+
 // Check if we're in mock mode (localhost without Google Maps loaded)
 const isMockMode = () => {
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -199,7 +208,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
     setProgress(5);
 
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-    const searchTarget = preferences.freestylePrompt || preferences.vibe || 'lunch spots';
+    const searchTarget = preferences.freestylePrompt || preferences.vibe || getMealType();
 
     addLog(`[MOCK MODE] SEARCHING FOR ${String(searchTarget).toUpperCase()}...`);
     await delay(600);
@@ -271,7 +280,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
     startDynamicMessages(preferences.vibe, preferences.address, preferences.freestylePrompt);
 
     // Initial log - short and punchy
-    const searchTarget = preferences.freestylePrompt || preferences.vibe || 'lunch spots';
+    const searchTarget = preferences.freestylePrompt || preferences.vibe || getMealType();
     addLog(`SEARCHING FOR ${String(searchTarget).toUpperCase()}...`);
 
     try {
