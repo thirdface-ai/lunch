@@ -475,7 +475,11 @@ const callOpenRouterProxy = async (
           errorMessage.includes('Service Unavailable') ||
           errorMessage.includes('CORS') ||
           errorMessage.includes('Failed to fetch') ||
-          errorMessage.includes('NetworkError');
+          errorMessage.includes('NetworkError') ||
+          errorMessage.includes('ERR_CONNECTION') ||
+          errorMessage.includes('net::') ||
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('aborted');
         
         if (isRetryable && attempt < maxRetries - 1) {
           Logger.warn('AI', `Retryable error on attempt ${attempt + 1}: ${errorMessage}`);
@@ -515,7 +519,11 @@ const callOpenRouterProxy = async (
         errorMessage.includes('Service Unavailable') ||
         errorMessage.includes('CORS') ||
         errorMessage.includes('Failed to fetch') ||
-        errorMessage.includes('NetworkError');
+        errorMessage.includes('NetworkError') ||
+        errorMessage.includes('ERR_CONNECTION') ||
+        errorMessage.includes('net::') ||
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('aborted');
       
       if (isRetryable && attempt < maxRetries - 1) {
         Logger.warn('AI', `Retryable exception on attempt ${attempt + 1}: ${errorMessage}`);
