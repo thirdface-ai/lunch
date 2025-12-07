@@ -134,7 +134,7 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
     onClose();
   };
 
-  const lastUpdated = '2025-12-06';
+  const lastUpdated = '2025-12-07';
 
   return (
     <div className={`min-h-screen flex items-center justify-center p-2 sm:p-4 transition-colors duration-300 ${isDark ? 'bg-dark-bg' : 'bg-braun-bg'}`}>
@@ -214,9 +214,9 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
                   <p>Stored on your device only, never transmitted to our servers:</p>
                   <ul className="list-none mt-2 space-y-1">
                     <li>• Last used address and coordinates (for convenience)</li>
-                    <li>• Transport mode preference (walk/delivery)</li>
+                    <li>• Transport mode preference (walk/drive/transit)</li>
                     <li>• Price preference</li>
-                    <li>• Walk time limit</li>
+                    <li>• Walk/travel time limit</li>
                     <li>• Theme setting (light/dark/system)</li>
                     <li>• Dietary restrictions</li>
                     <li>• Filter preferences (fresh drops, cashless)</li>
@@ -259,11 +259,27 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
                   </p>
                 </SubSection>
 
-                <SubSection title="2.5 APPLICATION LOGS">
+                <SubSection title="2.5 USAGE ANALYTICS">
+                  <p>We collect anonymized usage data to improve the app:</p>
+                  <ul className="list-none mt-2 space-y-1">
+                    <li>• Page views and visitor counts</li>
+                    <li>• Feature usage (which vibes are popular, transport modes)</li>
+                    <li>• Search patterns (city-level only, not exact addresses)</li>
+                    <li>• Error rates and performance metrics</li>
+                    <li>• Device type and browser (anonymized)</li>
+                  </ul>
+                  <p className="mt-2 text-braun-orange/60">
+                    NOTE: We extract only the city from your address for analytics. 
+                    Full addresses are never sent to analytics services.
+                  </p>
+                </SubSection>
+
+                <SubSection title="2.6 APPLICATION LOGS">
                   <p>For debugging and monitoring, we log:</p>
                   <ul className="list-none mt-2 space-y-1">
                     <li>• Error messages and system events</li>
-                    <li>• AI request/response metadata</li>
+                    <li>• AI request/response metadata (not content)</li>
+                    <li>• Cache performance statistics</li>
                     <li>• Browser user agent string</li>
                   </ul>
                 </SubSection>
@@ -291,6 +307,7 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
                     <li>• Restaurant names, ratings, and reviews</li>
                     <li>• Your vibe and dietary preferences</li>
                     <li>• Your custom search prompts</li>
+                    <li>• Your general location (city-level)</li>
                   </ul>
                   <p className="mt-2 text-braun-orange/60">
                     Your API key is never exposed; requests are proxied through our 
@@ -298,7 +315,25 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
                   </p>
                 </SubSection>
 
-                <SubSection title="3.3 SUPABASE (DATABASE)">
+                <SubSection title="3.3 VERCEL WEB ANALYTICS">
+                  <p>
+                    We use Vercel Web Analytics to understand how the app is used and 
+                    improve the experience. This privacy-focused service collects:
+                  </p>
+                  <ul className="list-none mt-2 space-y-1">
+                    <li>• Page views and unique visitors</li>
+                    <li>• Referrer URLs (how you found us)</li>
+                    <li>• Country and city (from IP, not stored)</li>
+                    <li>• Device type and browser</li>
+                    <li>• Custom events (feature usage, not personal data)</li>
+                  </ul>
+                  <p className="mt-2 text-braun-orange/60">
+                    Vercel Analytics is GDPR-compliant and does not use cookies for 
+                    tracking. See: vercel.com/docs/analytics/privacy
+                  </p>
+                </SubSection>
+
+                <SubSection title="3.4 SUPABASE (DATABASE)">
                   <p>
                     Search history and logs are stored in Supabase, a secure PostgreSQL 
                     database service. Data is encrypted in transit and at rest.
@@ -321,6 +356,9 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
                   <li>• Search history: 90 days</li>
                   <li>• Recommended places history: 90 days</li>
                   <li>• Application logs: 30 days</li>
+                  <li>• Places cache: 7 days (for faster searches)</li>
+                  <li>• Distance cache: 7 days (reduces API costs)</li>
+                  <li>• Analytics data: Managed by Vercel (aggregated, anonymized)</li>
                 </ul>
               </Section>
 
@@ -344,10 +382,17 @@ const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ theme, onClose }) => {
               </Section>
 
               {/* Section 8 */}
-              <Section title="8. COOKIES">
+              <Section title="8. COOKIES & TRACKING">
                 <p>
-                  We do not use tracking cookies. Local storage and session storage 
-                  are used for functional purposes only.
+                  We do not use tracking cookies for advertising or cross-site tracking.
+                </p>
+                <ul className="list-none mt-2 space-y-1">
+                  <li>• Local storage: Used for your preferences (functional)</li>
+                  <li>• Session storage: Temporary app state (functional)</li>
+                  <li>• Vercel Analytics: Cookie-free, privacy-focused analytics</li>
+                </ul>
+                <p className="mt-2 text-braun-orange/60">
+                  No third-party advertising or tracking pixels are used.
                 </p>
               </Section>
 

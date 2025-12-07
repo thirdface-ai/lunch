@@ -2,6 +2,7 @@ import React from 'react';
 import { AppState, FinalResult, ThemeMode, TransportMode } from '../types';
 import MapComponent from './MapComponent';
 import Sounds from '../utils/sounds';
+import { trackRestaurantClicked } from '../utils/analytics';
 
 
 /**
@@ -214,6 +215,7 @@ interface ResultsViewProps {
   onReset: () => void;
   theme: ThemeMode;
   transportMode: TransportMode;
+  userAddress?: string;
 }
 
 /**

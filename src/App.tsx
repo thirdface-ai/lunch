@@ -8,7 +8,8 @@ import Footer from './components/Footer';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import { usePreferences } from './hooks/usePreferences';
 import { useLunchDecision } from './hooks/useLunchDecision';
-import { ThemeMode } from './types';
+import { AppState, ThemeMode } from './types';
+import { trackSearchInitiated, trackSearchReset } from './utils/analytics';
 
 /**
  * Main application content component
@@ -33,7 +34,24 @@ const AppContent: React.FC = () => {
 
   // Handle calculate button click
   const handleCalculate = () => {
+    // Track search initiation
+    trackSearchInitiated({
+      vibe: preferences.vibe,
+      freestylePrompt: preferences.freestylePrompt || '',
+      transportMode: preferences.mode,
+      pricePoint: preferences.price,
+      address: preferences.address,
+      dietaryRestrictions: preferences.dietaryRestrictions || [],
+    });
     calculate(preferences);
+  };
+  
+  // Handle reset with tracking
+  const handleReset = () => {
+    const fromState = appState === AppState.RESULTS ? 'results' 
+      : appState === AppState.PROCESSING ? 'processing' : 'error';
+    trackSearchReset(fromState);
+    reset();
   };
 
   // Determine if dark mode is active (based on effective theme, not preference)
@@ -71,7 +89,7 @@ const AppContent: React.FC = () => {
           logs={logs} 
           progress={progress}
           theme={effectiveTheme === 'dark' ? ThemeMode.DARK : ThemeMode.LIGHT}
-          onReset={reset}
+          onReset={handleReset}
         />
 
         {/* Results Screen */}
@@ -80,9 +98,10 @@ const AppContent: React.FC = () => {
           results={results}
           userLat={preferences.lat}
           userLng={preferences.lng}
-          onReset={reset}
+          onReset={handleReset}
           theme={effectiveTheme === 'dark' ? ThemeMode.DARK : ThemeMode.LIGHT}
           transportMode={preferences.mode}
+          userAddress={preferences.address}
         />
       </div>
 

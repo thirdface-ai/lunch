@@ -2,6 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppState, TransportMode, HungerVibe, PricePoint, UserPreferences, WalkLimit, ThemeMode, DietaryRestriction } from '../types';
 import Sounds from '../utils/sounds';
 import { Footprints, Car, Train } from 'lucide-react';
+import { 
+  trackVibeSelected, 
+  trackTransportModeChanged, 
+  trackPricePointSelected, 
+  trackDietaryToggled,
+  trackLocationDetected,
+  trackThemeToggled,
+  trackWalkLimitChanged,
+  trackFreestylePromptUsed
+} from '../utils/analytics';
 
 interface ControlPanelProps {
   appState: AppState;
@@ -236,12 +246,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 lat: latitude,
                 lng: longitude
              }));
+             trackLocationDetected(true, results[0].formatted_address);
+          } else {
+             trackLocationDetected(false);
           }
           setLocating(false);
         });
       },
       (error) => {
         console.error("Geolocation failed", error);
+        trackLocationDetected(false);
         setLocating(false);
       }
     );
@@ -249,10 +263,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
   const handleVibeSelect = (vibe: HungerVibe) => {
       Sounds.mediumClick();
+      const previousVibe = preferences.vibe;
+      const newVibe = previousVibe === vibe ? null : vibe;
+      trackVibeSelected(newVibe, previousVibe);
       setPreferences(prev => ({
           ...prev,
           // Toggle: if same vibe is clicked, unselect it (set to null)
-          vibe: prev.vibe === vibe ? null : vibe,
+          vibe: newVibe,
           freestylePrompt: prev.vibe === vibe ? prev.freestylePrompt : '' // Only clear custom prompt when selecting a new preset
       }));
   };
@@ -274,6 +291,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
   const handlePriceSelect = (price: PricePoint | null) => {
       Sounds.mediumClick();
+      trackPricePointSelected(price);
       setPreferences(prev => ({
           ...prev,
           price: price
@@ -295,18 +313,20 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   // Toggle between light and dark
   const toggleTheme = () => {
       const isDarkNow = effectiveTheme === 'dark';
+      const nextTheme = isDarkNow ? 'light' : 'dark';
       Sounds.toggle(!isDarkNow);
+      trackThemeToggled(nextTheme);
       setPreferences(prev => {
           // Switch to the opposite of current effective theme
-          const nextTheme = isDarkNow ? ThemeMode.LIGHT : ThemeMode.DARK;
-          return { ...prev, theme: nextTheme };
+          return { ...prev, theme: isDarkNow ? ThemeMode.LIGHT : ThemeMode.DARK };
       });
   };
 
   const handleDietaryToggle = (restriction: DietaryRestriction) => {
     const currentRestrictions = preferences.dietaryRestrictions || [];
-    const isRemoving = currentRestrictions.includes(restriction);
-    Sounds.toggle(!isRemoving);
+    const isAdding = !currentRestrictions.includes(restriction);
+    Sounds.toggle(isAdding);
+    trackDietaryToggled(restriction, isAdding);
     setPreferences(prev => {
       const currentRestrictions = prev.dietaryRestrictions || [];
       const newRestrictions = currentRestrictions.includes(restriction)
@@ -593,7 +613,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 role="radio"
                                 aria-checked={preferences.mode === TransportMode.WALK}
                                 aria-label="Walk"
-                                onClick={() => { Sounds.lightClick(); setPreferences(prev => ({ ...prev, mode: TransportMode.WALK })); }}
+                                onClick={() => { Sounds.lightClick(); trackTransportModeChanged(TransportMode.WALK); setPreferences(prev => ({ ...prev, mode: TransportMode.WALK })); }}
                                 className={`flex-1 flex items-center justify-center h-10 rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30 transition-all
                                     ${preferences.mode === TransportMode.WALK 
                                         ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md` 
@@ -608,7 +628,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 role="radio"
                                 aria-checked={preferences.mode === TransportMode.DRIVE}
                                 aria-label="Drive"
-                                onClick={() => { Sounds.lightClick(); setPreferences(prev => ({ ...prev, mode: TransportMode.DRIVE })); }}
+                                onClick={() => { Sounds.lightClick(); trackTransportModeChanged(TransportMode.DRIVE); setPreferences(prev => ({ ...prev, mode: TransportMode.DRIVE })); }}
                                 className={`flex-1 flex items-center justify-center h-10 rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30 transition-all
                                     ${preferences.mode === TransportMode.DRIVE 
                                         ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md` 
@@ -623,7 +643,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 role="radio"
                                 aria-checked={preferences.mode === TransportMode.TRANSIT}
                                 aria-label="Public Transit"
-                                onClick={() => { Sounds.lightClick(); setPreferences(prev => ({ ...prev, mode: TransportMode.TRANSIT })); }}
+                                onClick={() => { Sounds.lightClick(); trackTransportModeChanged(TransportMode.TRANSIT); setPreferences(prev => ({ ...prev, mode: TransportMode.TRANSIT })); }}
                                 className={`flex-1 flex items-center justify-center h-10 rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30 transition-all
                                     ${preferences.mode === TransportMode.TRANSIT 
                                         ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md` 
@@ -641,7 +661,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                     key={limit}
                                     role="radio"
                                     aria-checked={preferences.walkLimit === limit}
-                                    onClick={() => { Sounds.lightClick(); setPreferences(prev => ({ ...prev, walkLimit: limit })); }}
+                                    onClick={() => { Sounds.lightClick(); trackWalkLimitChanged(limit); setPreferences(prev => ({ ...prev, walkLimit: limit })); }}
                                     className={`flex-1 flex flex-col items-center justify-center h-10 rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30 transition-all
                                         ${preferences.walkLimit === limit 
                                             ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md` 
