@@ -95,14 +95,17 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             sessionToken: getSessionToken()
           };
           
-          // Add location bias if user has a location set
-          // This prioritizes results near the user's location (e.g., Berlin results first if user is in Berlin)
+          // Add location bias to prioritize nearby results
+          // Note: If no locationBias is set, Google API automatically uses IP-based biasing
+          // So even first-time users get locally relevant results based on their IP address
           if (preferences.lat && preferences.lng) {
+            // Use precise location if user has already set one (from "Locate Me" or previous address)
             request.locationBias = {
               center: { lat: preferences.lat, lng: preferences.lng },
               radius: 50000 // 50km radius bias
             };
           }
+          // Otherwise: API defaults to IP-based location bias automatically
           
           const { suggestions } = await autocompleteSuggestionRef.current.fetchAutocompleteSuggestions(request);
           
