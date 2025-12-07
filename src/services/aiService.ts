@@ -50,37 +50,63 @@ const cleanJsonResponse = (jsonText: string): string => {
   // 2. Remove any control characters that might slip through (except newlines/tabs)
   cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
   
+  // 3. Remove common AI prefixes that break JSON parsing
+  // AI sometimes returns "null{...}" or "None{...}" before valid JSON
+  cleaned = cleaned.replace(/^(null|None|undefined)\s*(?=[{\[])/i, '');
+  
   return cleaned;
 };
 
 /**
  * Extract JSON from AI response that may contain extra text before/after.
  * AI sometimes adds commentary around the JSON we need.
+ * 
+ * Common problematic patterns:
+ * - "null{"matches":[]}" - AI returns null + JSON
+ * - "Here is the result: {...}" - commentary before JSON
+ * - "{...}\n\nLet me know if..." - commentary after JSON
  */
 const extractJsonFromResponse = (text: string): string => {
   // Find the first occurrence of [ or {
   const firstBracket = text.indexOf('[');
   const firstBrace = text.indexOf('{');
   
-  // Determine if we're looking for an array or object based on what comes first
-  const isArray = firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace);
+  // If neither found, return original (will fail on parse, handled by caller)
+  if (firstBracket === -1 && firstBrace === -1) {
+    return text;
+  }
   
-  if (isArray) {
-    // Extract array [...] (prioritize array if it comes first)
-    const arrayMatch = text.match(/\[[\s\S]*\]/);
+  // Determine start position - whichever JSON structure comes first
+  let startPos: number;
+  if (firstBracket === -1) {
+    startPos = firstBrace;
+  } else if (firstBrace === -1) {
+    startPos = firstBracket;
+  } else {
+    startPos = Math.min(firstBracket, firstBrace);
+  }
+  
+  // IMPORTANT: Slice off any prefix before the JSON starts
+  // This handles cases like "null{...}" or "Here: {...}"
+  const jsonPart = text.slice(startPos);
+  
+  // Now extract the complete JSON structure using regex
+  if (jsonPart.startsWith('[')) {
+    // Extract array - match from [ to the last ]
+    const arrayMatch = jsonPart.match(/^\[[\s\S]*\]/);
     if (arrayMatch) {
       return arrayMatch[0];
     }
-  } else if (firstBrace !== -1) {
-    // Extract object {...}
-    const objectMatch = text.match(/\{[\s\S]*\}/);
+  } else if (jsonPart.startsWith('{')) {
+    // Extract object - match from { to the last }
+    const objectMatch = jsonPart.match(/^\{[\s\S]*\}/);
     if (objectMatch) {
       return objectMatch[0];
     }
   }
   
-  // No JSON found, return original
-  return text;
+  // Fallback: return from the JSON start position
+  return jsonPart;
 };
 
 /**
@@ -347,6 +373,10 @@ If no matches, return: {"matches":[]}`;
 
     // Parse JSON response - handle markdown blocks and extra text
     let jsonText = text.trim();
+    
+    // Store original for debugging
+    const originalResponse = jsonText.substring(0, 200);
+    
     if (jsonText.startsWith('```json')) {
       jsonText = jsonText.slice(7);
     } else if (jsonText.startsWith('```')) {
@@ -361,7 +391,26 @@ If no matches, return: {"matches":[]}`;
     jsonText = extractJsonFromResponse(jsonText);
     jsonText = cleanJsonResponse(jsonText);
 
-    const result = JSON.parse(jsonText);
+    let result;
+    try {
+      result = JSON.parse(jsonText);
+    } catch (parseError) {
+      // Log the problematic response for debugging
+      Logger.warn('AI', 'JSON parse failed in place filter', {
+        originalResponse,
+        cleanedJson: jsonText.substring(0, 200),
+        parseError: String(parseError)
+      });
+      // Fall back to keyword matches
+      return quickMatches.length > 0 ? quickMatches : candidatesForAI.slice(0, 10);
+    }
+    
+    // Handle null/undefined result (AI sometimes returns just "null")
+    if (!result || typeof result !== 'object') {
+      Logger.warn('AI', 'Invalid result from place filter (not an object)', { result });
+      return quickMatches.length > 0 ? quickMatches : candidatesForAI.slice(0, 10);
+    }
+    
     const matchingIndices: number[] = result.matches || [];
     
     // Map indices back to places
