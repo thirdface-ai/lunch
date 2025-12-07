@@ -86,13 +86,23 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       debounceTimerRef.current = setTimeout(async () => {
         try {
           // Use new AutocompleteSuggestion API (replaces deprecated AutocompleteService)
-          const request = {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const request: any = {
             input: value,
             includedPrimaryTypes: ['geocode', 'establishment'],
             // Session token bundles all autocomplete requests + subsequent Place Details into one billing session
             // This reduces API costs by ~60% for address input
             sessionToken: getSessionToken()
           };
+          
+          // Add location bias if user has a location set
+          // This prioritizes results near the user's location (e.g., Berlin results first if user is in Berlin)
+          if (preferences.lat && preferences.lng) {
+            request.locationBias = {
+              center: { lat: preferences.lat, lng: preferences.lng },
+              radius: 50000 // 50km radius bias
+            };
+          }
           
           const { suggestions } = await autocompleteSuggestionRef.current.fetchAutocompleteSuggestions(request);
           
