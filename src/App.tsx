@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import ControlPanel from './components/ControlPanel';
 import TerminalLog from './components/TerminalLog';
 import ResultsView from './components/ResultsView';
@@ -98,6 +99,7 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <AppContent />
+      <Analytics />
     </ErrorBoundary>
   );
 };
