@@ -97,14 +97,23 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           const { suggestions } = await autocompleteSuggestionRef.current.fetchAutocompleteSuggestions(request);
           
           if (suggestions && suggestions.length > 0) {
-            // Map new API response format to match the format we use in the UI
+            // Map new API response format to match the format expected by the UI
+            // The new API has placePrediction.mainText and placePrediction.secondaryText
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const mappedPredictions = suggestions.map((suggestion: any) => ({
-              place_id: suggestion.placePrediction.placeId,
-              description: suggestion.placePrediction.text.toString(),
-              // Store the placePrediction for later use in handlePredictionSelect
-              _placePrediction: suggestion.placePrediction
-            }));
+            const mappedPredictions = suggestions.map((suggestion: any) => {
+              const pred = suggestion.placePrediction;
+              return {
+                place_id: pred.placeId,
+                description: pred.text?.toString() || '',
+                // Map to structured_formatting format that the UI expects
+                structured_formatting: {
+                  main_text: pred.mainText?.toString() || pred.text?.toString() || '',
+                  secondary_text: pred.secondaryText?.toString() || ''
+                },
+                // Store the placePrediction for later use in handlePredictionSelect
+                _placePrediction: pred
+              };
+            });
             setPredictions(mappedPredictions);
             setShowPredictions(true);
           } else {
@@ -123,7 +132,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     }
   };
 
-  const handlePredictionSelect = async (prediction: google.maps.places.AutocompletePrediction) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handlePredictionSelect = async (prediction: any) => {
       Sounds.select();
       const address = prediction.description;
       
@@ -134,13 +144,20 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
       // This completes the autocomplete session and bundles all requests into one billing session
       // Saves ~60% on autocomplete costs compared to separate Geocoding call
       try {
-        const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
-        const place = new Place({ id: prediction.place_id });
+        let place;
+        
+        // If we have the new API's placePrediction, use its toPlace() method
+        if (prediction._placePrediction && typeof prediction._placePrediction.toPlace === 'function') {
+          place = prediction._placePrediction.toPlace();
+        } else {
+          // Fallback to creating Place manually (for legacy format)
+          const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
+          place = new Place({ id: prediction.place_id });
+        }
         
         // Fetch only the geometry field we need, using the session token to complete the session
         await place.fetchFields({ 
           fields: ['location'],
-          // @ts-expect-error - sessionToken is valid but TypeScript types may not include it
           sessionToken: sessionTokenRef.current
         });
         
@@ -367,7 +384,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                 role="listbox"
                                 className={`absolute top-full left-0 right-0 mt-2 border shadow-lg z-50 max-h-64 overflow-y-auto rounded-[2px] ${isDark ? 'bg-dark-bg border-dark-border' : 'bg-[#F4F4F0] border-braun-border'}`}
                             >
-                                 {predictions.map((p: google.maps.places.AutocompletePrediction) => (
+                                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                {predictions.map((p: any) => (
                                      <button 
                                          key={p.place_id}
                                          role="option"
