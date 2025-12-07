@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, TransportMode, HungerVibe, PricePoint, UserPreferences, WalkLimit, ThemeMode, DietaryRestriction } from '../types';
 import Sounds from '../utils/sounds';
+import { Footprints, Car, Train } from 'lucide-react';
 
 interface ControlPanelProps {
   appState: AppState;
@@ -450,7 +451,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             aria-checked={preferences.vibe === vibe}
                             onClick={() => handleVibeSelect(vibe)}
                             className={`
-                                relative p-3 sm:p-3 flex flex-col justify-between items-start min-h-[56px] sm:min-h-[68px]
+                                relative p-3 sm:p-4 flex flex-col justify-between items-start min-h-[56px] sm:min-h-[80px]
                                 transition-all duration-75 ease-out rounded-sm text-left group
                                 border focus:outline-none focus:ring-1 focus:ring-white/30
                                 ${preferences.vibe === vibe 
@@ -587,7 +588,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     <div className={`rounded-sm border p-1 ${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'}`}>
                         {/* Travel Mode Icons */}
                         <div className="flex gap-1 mb-1" role="radiogroup" aria-label="Travel Mode">
-                            {/* Walk */}
+                            {/* Walk (default) */}
                             <button
                                 role="radio"
                                 aria-checked={preferences.mode === TransportMode.WALK}
@@ -600,12 +601,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                     }
                                 `}
                             >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="12" cy="5" r="2"/>
-                                    <path d="M10 22l3-9-2-1v-4l-3 3"/>
-                                    <path d="M14 13l2 9"/>
-                                    <path d="M7 10l-2 8"/>
-                                </svg>
+                                <Footprints size={18} strokeWidth={1.5} />
                             </button>
                             {/* Drive */}
                             <button
@@ -620,12 +616,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                     }
                                 `}
                             >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M5 17h14v-5l-2-4H7l-2 4v5z"/>
-                                    <circle cx="7.5" cy="17.5" r="1.5"/>
-                                    <circle cx="16.5" cy="17.5" r="1.5"/>
-                                    <path d="M5 12h14"/>
-                                </svg>
+                                <Car size={18} strokeWidth={1.5} />
                             </button>
                             {/* Transit */}
                             <button
@@ -640,14 +631,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                                     }
                                 `}
                             >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect x="4" y="3" width="16" height="14" rx="2"/>
-                                    <path d="M4 10h16"/>
-                                    <circle cx="8" cy="20" r="1"/>
-                                    <circle cx="16" cy="20" r="1"/>
-                                    <path d="M8 17v3"/>
-                                    <path d="M16 17v3"/>
-                                </svg>
+                                <Train size={18} strokeWidth={1.5} />
                             </button>
                         </div>
                         {/* Time Range */}
