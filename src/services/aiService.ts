@@ -433,39 +433,97 @@ If no matches, return: {"matches":[]}`;
   }
 };
 
-// Internal helper to call the Supabase Edge Function
-const callOpenRouterProxy = async (model: string, contents: string, config: Record<string, unknown>): Promise<string> => {
+// Internal helper to call the Supabase Edge Function with retry logic
+const callOpenRouterProxy = async (
+  model: string, 
+  contents: string, 
+  config: Record<string, unknown>,
+  maxRetries: number = 3
+): Promise<string> => {
   const startTime = performance.now();
   Logger.aiRequest(model, contents.substring(0, 500) + '...');
 
-  try {
-    const { data, error } = await supabase.functions.invoke('openrouter-proxy', {
-      body: { model, contents, config },
-    });
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Add exponential backoff delay for retries (0ms, 1000ms, 2000ms)
+      if (attempt > 0) {
+        const delay = Math.min(1000 * attempt, 3000);
+        Logger.info('AI', `Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms delay`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
 
-    if (error) {
-      throw new Error(error.message || 'Edge Function invocation failed');
+      const { data, error } = await supabase.functions.invoke('openrouter-proxy', {
+        body: { model, contents, config },
+      });
+
+      if (error) {
+        // Check if it's a retryable error (5xx, network errors, CORS from failed requests)
+        const errorMessage = error.message || '';
+        const isRetryable = 
+          errorMessage.includes('502') ||
+          errorMessage.includes('503') ||
+          errorMessage.includes('504') ||
+          errorMessage.includes('Bad Gateway') ||
+          errorMessage.includes('Service Unavailable') ||
+          errorMessage.includes('CORS') ||
+          errorMessage.includes('Failed to fetch') ||
+          errorMessage.includes('NetworkError');
+        
+        if (isRetryable && attempt < maxRetries - 1) {
+          Logger.warn('AI', `Retryable error on attempt ${attempt + 1}: ${errorMessage}`);
+          lastError = new Error(errorMessage || 'Edge Function invocation failed');
+          continue;
+        }
+        throw new Error(errorMessage || 'Edge Function invocation failed');
+      }
+
+      if (!data) {
+        throw new Error('No data returned from OpenRouter proxy');
+      }
+
+      if (!data.text) {
+        throw new Error(`Invalid response from OpenRouter proxy: ${JSON.stringify(data)}`);
+      }
+
+      const duration = Math.round(performance.now() - startTime);
+      const estimatedTokens = data.text ? Math.ceil(data.text.length / 4) : 0;
+      
+      if (attempt > 0) {
+        Logger.info('AI', `Request succeeded on retry attempt ${attempt + 1}`);
+      }
+      Logger.aiResponse(model, duration, true, estimatedTokens);
+
+      return data.text;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Check if we should retry on caught exceptions
+      const errorMessage = lastError.message || '';
+      const isRetryable = 
+        errorMessage.includes('502') ||
+        errorMessage.includes('503') ||
+        errorMessage.includes('504') ||
+        errorMessage.includes('Bad Gateway') ||
+        errorMessage.includes('Service Unavailable') ||
+        errorMessage.includes('CORS') ||
+        errorMessage.includes('Failed to fetch') ||
+        errorMessage.includes('NetworkError');
+      
+      if (isRetryable && attempt < maxRetries - 1) {
+        Logger.warn('AI', `Retryable exception on attempt ${attempt + 1}: ${errorMessage}`);
+        continue;
+      }
+      
+      // Non-retryable error or final attempt
+      break;
     }
-
-    if (!data) {
-      throw new Error('No data returned from OpenRouter proxy');
-    }
-
-    if (!data.text) {
-      throw new Error(`Invalid response from OpenRouter proxy: ${JSON.stringify(data)}`);
-    }
-
-    const duration = Math.round(performance.now() - startTime);
-    const estimatedTokens = data.text ? Math.ceil(data.text.length / 4) : 0;
-    
-    Logger.aiResponse(model, duration, true, estimatedTokens);
-
-    return data.text;
-  } catch (error) {
-    const duration = Math.round(performance.now() - startTime);
-    Logger.error('AI', `OpenRouter Proxy Call Failed (${duration}ms)`, error);
-    throw error;
   }
+
+  const duration = Math.round(performance.now() - startTime);
+  Logger.error('AI', `OpenRouter Proxy Call Failed after ${maxRetries} attempts (${duration}ms)`, lastError);
+  throw lastError || new Error('OpenRouter proxy call failed');
 };
 
 export const generateLoadingLogs = async (
