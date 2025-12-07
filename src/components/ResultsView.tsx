@@ -1,54 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppState, FinalResult, ThemeMode, TransportMode } from '../types';
 import MapComponent from './MapComponent';
 import Sounds from '../utils/sounds';
 import { trackRestaurantClicked } from '../utils/analytics';
+import { getCurrentMinutesAtLocation, prefetchTimezone, fetchTimezoneOffset } from '../lib/timezoneService';
 
-
-/**
- * Estimate timezone offset (in minutes from UTC) based on longitude.
- * This is approximate but works for most locations.
- * Each 15° of longitude ≈ 1 hour offset.
- */
-const estimateTimezoneOffsetFromLng = (lng: number): number => {
-  // Each 15 degrees of longitude = 1 hour (60 minutes)
-  // Positive longitude = east of UTC = positive offset
-  // Negative longitude = west of UTC = negative offset
-  return Math.round(lng / 15) * 60;
-};
-
-/**
- * Get current minutes since midnight at a specific location.
- * Uses longitude to estimate the local time at that location.
- * 
- * @param lng Longitude of the location (-180 to 180)
- * @returns Minutes since midnight at that location
- */
-const getCurrentMinutesAtLocation = (lng: number | undefined): number => {
-  const now = new Date();
-  
-  if (lng === undefined) {
-    // No location data, fall back to user's local time
-    return now.getHours() * 60 + now.getMinutes();
-  }
-  
-  // Get UTC time
-  const utcHours = now.getUTCHours();
-  const utcMinutes = now.getUTCMinutes();
-  const utcTotalMinutes = utcHours * 60 + utcMinutes;
-  
-  // Estimate location's offset from UTC
-  const locationOffset = estimateTimezoneOffsetFromLng(lng);
-  
-  // Calculate local time at location
-  let localMinutes = utcTotalMinutes + locationOffset;
-  
-  // Handle day wraparound
-  if (localMinutes < 0) localMinutes += 24 * 60;
-  if (localMinutes >= 24 * 60) localMinutes -= 24 * 60;
-  
-  return localMinutes;
-};
+// Cache for timezone offsets (by place_id)
+const timezoneOffsetCache = new Map<string, number>();
 
 /**
  * Parse time string like "11:00 am", "2:30 pm", "14:00" into minutes since midnight
@@ -85,9 +43,11 @@ const parseTimeToMinutes = (timeStr: string): number | null => {
  * Returns true if open, false if closed, null if can't parse
  * 
  * @param rangeStr Time range string like "8:00 am – 4:00 pm"
- * @param lng Optional longitude to calculate local time at restaurant
+ * @param lat Latitude of the restaurant
+ * @param lng Longitude of the restaurant
+ * @param timezoneOffset Cached timezone offset in seconds (from Google Time Zone API)
  */
-const isWithinTimeRange = (rangeStr: string, lng?: number): boolean | null => {
+const isWithinTimeRange = (rangeStr: string, lat?: number, lng?: number, timezoneOffset?: number | null): boolean | null => {
   // Split by common separators: "–", "-", "to"
   const parts = rangeStr.split(/\s*[–\-]\s*|\s+to\s+/i);
   if (parts.length !== 2) return null;
@@ -97,8 +57,10 @@ const isWithinTimeRange = (rangeStr: string, lng?: number): boolean | null => {
   
   if (openTime === null || closeTime === null) return null;
   
-  // Get current time at the restaurant's location (not user's local time)
-  const currentMinutes = getCurrentMinutesAtLocation(lng);
+  // Get current time at the restaurant's location (uses Google Time Zone API when available)
+  const currentMinutes = (lat !== undefined && lng !== undefined) 
+    ? getCurrentMinutesAtLocation(lat, lng, timezoneOffset)
+    : new Date().getHours() * 60 + new Date().getMinutes();
   
   // Handle overnight hours (e.g., 6pm - 2am)
   if (closeTime < openTime) {
@@ -138,9 +100,11 @@ const isClosedAllDay = (todaysHours: string | null | undefined): boolean => {
  * Returns formatted time like "11:00 AM" or null if closed all day or can't determine
  * 
  * @param todaysHours Today's hours string
- * @param lng Optional longitude to calculate local time at restaurant
+ * @param lat Latitude of the restaurant
+ * @param lng Longitude of the restaurant
+ * @param timezoneOffset Cached timezone offset in seconds
  */
-const getNextOpeningTime = (todaysHours: string | null | undefined, lng?: number): string | null => {
+const getNextOpeningTime = (todaysHours: string | null | undefined, lat?: number, lng?: number, timezoneOffset?: number | null): string | null => {
   if (!todaysHours) return null;
   
   const cleaned = todaysHours.trim().toLowerCase();
@@ -148,7 +112,9 @@ const getNextOpeningTime = (todaysHours: string | null | undefined, lng?: number
   if (cleaned === 'open 24 hours') return null; // Always open
   
   // Get current time at the restaurant's location
-  const currentMinutes = getCurrentMinutesAtLocation(lng);
+  const currentMinutes = (lat !== undefined && lng !== undefined)
+    ? getCurrentMinutesAtLocation(lat, lng, timezoneOffset)
+    : new Date().getHours() * 60 + new Date().getMinutes();
   
   // Split by comma to handle multiple time ranges (e.g., lunch and dinner)
   const timeRanges = todaysHours.split(/\s*,\s*/);
@@ -176,9 +142,11 @@ const getNextOpeningTime = (todaysHours: string | null | undefined, lng?: number
  * Returns: { isOpen: boolean | null, nextOpenTime: string | null }
  * 
  * @param todaysHours Today's hours string
- * @param lng Optional longitude to calculate local time at restaurant (timezone-aware)
+ * @param lat Latitude of the restaurant
+ * @param lng Longitude of the restaurant
+ * @param timezoneOffset Cached timezone offset in seconds (from Google Time Zone API)
  */
-const getOpenStatus = (todaysHours: string | null | undefined, lng?: number): { isOpen: boolean | null; nextOpenTime: string | null } => {
+const getOpenStatus = (todaysHours: string | null | undefined, lat?: number, lng?: number, timezoneOffset?: number | null): { isOpen: boolean | null; nextOpenTime: string | null } => {
   if (!todaysHours) return { isOpen: null, nextOpenTime: null };
   
   const cleaned = todaysHours.trim().toLowerCase();
@@ -189,18 +157,18 @@ const getOpenStatus = (todaysHours: string | null | undefined, lng?: number): { 
   const timeRanges = todaysHours.split(/\s*,\s*/);
   
   for (const range of timeRanges) {
-    // Pass longitude for timezone-aware time comparison
-    const isOpen = isWithinTimeRange(range.trim(), lng);
+    // Pass coordinates and timezone offset for accurate time comparison
+    const isOpen = isWithinTimeRange(range.trim(), lat, lng, timezoneOffset);
     if (isOpen === true) {
       return { isOpen: true, nextOpenTime: null };
     }
   }
   
   // Not currently open - find next opening time (timezone-aware)
-  const nextOpenTime = getNextOpeningTime(todaysHours, lng);
+  const nextOpenTime = getNextOpeningTime(todaysHours, lat, lng, timezoneOffset);
   
   // If we parsed at least one range and none matched, it's closed
-  const parsedAny = timeRanges.some(range => isWithinTimeRange(range.trim(), lng) !== null);
+  const parsedAny = timeRanges.some(range => isWithinTimeRange(range.trim(), lat, lng, timezoneOffset) !== null);
   return { 
     isOpen: parsedAny ? false : null, 
     nextOpenTime 
@@ -288,6 +256,56 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   // Generate title once per results set using useMemo
   const funnyTitle = React.useMemo(() => generateFunnyTitle(results), [results]);
 
+  // State to track fetched timezone offsets (triggers re-render when loaded)
+  const [timezoneOffsets, setTimezoneOffsets] = useState<Map<string, number>>(new Map());
+
+  // Fetch timezone offsets for all results when they load
+  useEffect(() => {
+    const fetchTimezones = async () => {
+      const newOffsets = new Map<string, number>();
+      
+      for (const place of results) {
+        // Get lat/lng from place geometry
+        const lat = place.geometry?.location 
+          ? (typeof place.geometry.location.lat === 'function' 
+              ? place.geometry.location.lat() 
+              : place.geometry.location.lat)
+          : undefined;
+        const lng = place.geometry?.location 
+          ? (typeof place.geometry.location.lng === 'function' 
+              ? place.geometry.location.lng() 
+              : place.geometry.location.lng)
+          : undefined;
+        
+        if (lat !== undefined && lng !== undefined) {
+          // Check if we already have it cached
+          const cached = timezoneOffsetCache.get(place.place_id);
+          if (cached !== undefined) {
+            newOffsets.set(place.place_id, cached);
+          } else {
+            // Prefetch in background (don't await all at once)
+            prefetchTimezone(lat, lng);
+            
+            // Fetch and cache
+            const offset = await fetchTimezoneOffset(lat, lng);
+            if (offset !== null) {
+              timezoneOffsetCache.set(place.place_id, offset);
+              newOffsets.set(place.place_id, offset);
+            }
+          }
+        }
+      }
+      
+      if (newOffsets.size > 0) {
+        setTimezoneOffsets(new Map(newOffsets));
+      }
+    };
+    
+    if (results.length > 0) {
+      fetchTimezones();
+    }
+  }, [results]);
+
   const handleReset = () => {
     Sounds.firmClick();
     onReset();
@@ -336,13 +354,20 @@ const ResultsView: React.FC<ResultsViewProps> = ({
               );
               const todaysHours = todaysHoursRaw ? todaysHoursRaw.substring(todaysHoursRaw.indexOf(':') + 2) : null;
               
-              // Get restaurant's longitude for timezone-aware time calculations
-              // This ensures we compare against the restaurant's local time, not the user's
+              // Get restaurant's coordinates for timezone-aware time calculations
+              const restaurantLat = place.geometry?.location 
+                ? (typeof place.geometry.location.lat === 'function' 
+                    ? place.geometry.location.lat() 
+                    : place.geometry.location.lat)
+                : undefined;
               const restaurantLng = place.geometry?.location 
                 ? (typeof place.geometry.location.lng === 'function' 
                     ? place.geometry.location.lng() 
                     : place.geometry.location.lng)
                 : undefined;
+              
+              // Get cached timezone offset (from Google Time Zone API)
+              const timezoneOffset = timezoneOffsets.get(place.place_id);
 
               return (
                 <article 
@@ -407,8 +432,8 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                             <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>HOURS:</span>
                             {place.opening_hours ? (
                               (() => {
-                                // Pass restaurant's longitude for timezone-aware status
-                                const status = getOpenStatus(todaysHours, restaurantLng);
+                                // Pass restaurant's coordinates and timezone offset for accurate status
+                                const status = getOpenStatus(todaysHours, restaurantLat, restaurantLng, timezoneOffset);
                                 if (status.isOpen === true) {
                                   return <span className="text-green-500 font-bold">OPEN</span>;
                                 } else if (status.isOpen === false) {
