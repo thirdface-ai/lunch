@@ -1,4 +1,4 @@
-import { GooglePlace, HungerVibe, GeminiRecommendation, PricePoint, DietaryRestriction } from '../types';
+import { GooglePlace, HungerVibe, GeminiRecommendation, PricePoint, DietaryRestriction, PlaceReview } from '../types';
 import Logger from '../utils/logger';
 import { supabase } from '../lib/supabase';
 import { getOpenStatusScore } from '../utils/lunchAlgorithm';
@@ -667,9 +667,6 @@ export const decideLunch = async (
 
   onLog?.(`ANALYZING ${candidates.length} RESTAURANTS...`);
 
-  // Take top 25 candidates - Opus 4.5 has 200K context, we can analyze more
-  const topCandidates = candidates.slice(0, 25);
-  
   // Helper to parse recency from relativeTime string (e.g., "2 weeks ago", "3 months ago")
   // Returns months as a number (0 = less than a month, 1 = 1 month, etc.)
   const parseRecencyMonths = (relativeTime?: string): number => {
@@ -693,6 +690,64 @@ export const decideLunch = async (
   const parseRecencyScore = (relativeTime?: string): number => {
     return parseRecencyMonths(relativeTime);
   };
+  
+  // Helper to check if a place is a "fresh drop" (newly opened)
+  const isFreshDropCandidate = (p: GooglePlace): boolean => {
+    const allReviews = (p.reviews || []).filter((r: PlaceReview) => r.text && r.text.length > 0);
+    const reviewCount = p.user_ratings_total || 0;
+    
+    // Find the oldest review to determine if this is a new place
+    const oldestReviewMonths = allReviews.length > 0
+      ? Math.max(...allReviews.map((r: PlaceReview) => parseRecencyMonths(r.relativeTime)))
+      : 999;
+    
+    // A place is "freshly opened" if:
+    // 1. Under 80 reviews (main signal) AND
+    // 2. Oldest review is less than 6 months old
+    return reviewCount < 80 && oldestReviewMonths < 6;
+  };
+  
+  // Helper to check if a place is "trending" (popular)
+  const isTrendingCandidate = (p: GooglePlace): boolean => {
+    const allReviews = (p.reviews || []).filter((r: PlaceReview) => r.text && r.text.length > 0);
+    const recentReviewCount = allReviews.filter((r: PlaceReview) => parseRecencyMonths(r.relativeTime) <= 1).length;
+    const reviewSampleSize = Math.max(1, allReviews.length);
+    const recentReviewPercent = (recentReviewCount / reviewSampleSize) * 100;
+    return recentReviewPercent >= 10;
+  };
+  
+  // PRE-FILTER: Apply hard filters for Fresh Drops and Trending modes
+  let filteredCandidates = candidates.slice(0, 40); // Start with more candidates to filter from
+  
+  if (newlyOpenedOnly) {
+    const freshDrops = filteredCandidates.filter(isFreshDropCandidate);
+    Logger.info('AI', `Fresh Drops filter: ${freshDrops.length}/${filteredCandidates.length} places qualify`);
+    
+    if (freshDrops.length > 0) {
+      filteredCandidates = freshDrops;
+      onLog?.(`FOUND ${freshDrops.length} FRESH DROPS IN AREA...`);
+    } else {
+      // No fresh drops found - inform user and continue with all candidates
+      onLog?.(`NO NEW OPENINGS DETECTED - SHOWING BEST MATCHES...`);
+      Logger.warn('AI', 'No fresh drops found, falling back to all candidates');
+    }
+  }
+  
+  if (popularOnly) {
+    const trending = filteredCandidates.filter(isTrendingCandidate);
+    Logger.info('AI', `Trending filter: ${trending.length}/${filteredCandidates.length} places qualify`);
+    
+    if (trending.length > 0) {
+      filteredCandidates = trending;
+      onLog?.(`FOUND ${trending.length} TRENDING SPOTS...`);
+    } else {
+      onLog?.(`NO TRENDING SPOTS DETECTED - SHOWING BEST MATCHES...`);
+      Logger.warn('AI', 'No trending places found, falling back to all candidates');
+    }
+  }
+  
+  // Take top 25 candidates for AI analysis
+  const topCandidates = filteredCandidates.slice(0, 25);
   
   // Build payload with reviews per restaurant, sorted by recency
   const payload = topCandidates.map(p => {
