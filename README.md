@@ -6,13 +6,11 @@
 
 ---
 
-## The Problem
+## What It Does
 
-Every lunch recommendation app does the same thing: here's a list of places, sorted by rating, good luck. You scroll for 10 minutes, pick something safe, and wonder why you bothered.
+Pick a vibe (Grab & Go, Spicy & Bold, etc.) or type what you want. Claude AI reads hundreds of reviews and gives you 3 specific recommendations with actual dish suggestions—not a generic list sorted by rating.
 
-Lunch Decider does something different. Instead of asking "what cuisine do you want?" (you don't know, that's the whole problem), we ask "what's your vibe?" Feeling efficient? Grab & Go. Need comfort? Hearty & Rich. Want to wake up? Spicy & Bold.
-
-Then Claude AI reads through hundreds of reviews to find the actual gems - not just "this place is good" but "get the Tonkotsu Ramen, it's legendary." Specific dish recommendations from real people who bothered to write about them.
+That's it. No endless scrolling.
 
 ---
 
@@ -31,99 +29,14 @@ npm run dev
 
 Open http://localhost:5173 and find lunch.
 
-### Mock Mode (No API Keys Required)
-
-Want to test the UI without setting up API keys? Use mock mode:
+### Mock Mode (No API Keys)
 
 ```bash
 npm run dev
 # Open http://localhost:5173/?mock=true
 ```
 
-This gives you:
-- Full UI flow (input → loading → results)
-- 5 sample Berlin restaurants with realistic data
-- No Google Maps or OpenRouter API calls
-- Perfect for UI development and testing
-
----
-
-## What Makes This Different
-
-### Vibe-Based Search
-
-Pick your mental state, not your cuisine:
-
-| Vibe | What You Get |
-|------|-------------|
-| **Grab & Go** | Quick bites, food trucks, bakeries - in and out |
-| **Light & Clean** | Salads, poke, Vietnamese - keep it fresh |
-| **Hearty & Rich** | Ramen, burgers, Italian - comfort mode |
-| **Spicy & Bold** | Thai, Sichuan, Indian - wake up your tastebuds |
-| **View & Vibe** | Rooftops, scenic spots - the Instagram lunch |
-| **Authentic & Classic** | Traditional, time-tested, no gimmicks |
-
-Or just type what you want. "Schnitzel" works too.
-
-### Custom Search with AI Translation
-
-Type anything in the freestyle input:
-- "newest hottest places" → AI activates Fresh Drops + Trending filters
-- "fancy date night" → searches fine dining, upscale restaurants
-- "cheap eats under €10" → focuses on budget-friendly spots
-- "hidden gems" → prioritizes local favorites, underrated spots
-
-The AI translates vague requests into concrete Google Places searches.
-
-### AI That Actually Reads Reviews
-
-Claude AI (Opus 4.5 for analysis, Sonnet 4.5 for quick tasks) digs through reviews to:
-- Extract specific dish recommendations ("the Duck Confit is legendary")
-- Identify quality signals ("hidden gem", "locals' favorite")
-- Detect red flags ("went downhill", "used to be better")
-- Catch cash-only warnings - even in German ("nur Barzahlung")
-- Provide backup dish recommendations and caveats
-
-You get 3 recommendations with actual reasoning, not a ranked list of 50.
-
-### Smart Filters
-
-| Filter | What It Does |
-|--------|-------------|
-| **Fresh Drops** | Prioritize newly opened restaurants (<80 reviews, <6 months old) |
-| **No Cash** | Exclude cash-only establishments |
-| **Trending** | Focus on places with high recent review activity |
-
-### Budget Tiers With Personality
-
-| Tier | Translation |
-|------|------------|
-| **Any** | Show me everything |
-| **Personal** | You're paying, keep it reasonable ($ - $$) |
-| **Company** | Someone else is paying, live a little ($$$ - $$$$) |
-
-### Walk Time Preferences
-
-| Option | Radius |
-|--------|--------|
-| **5 min** | ~1km radius |
-| **15 min** | ~2.5km radius |
-| **30 min** | ~5km radius |
-
-### Dietary Restrictions
-
-Filter results by dietary needs:
-- Gluten-Free
-- Vegan
-- Vegetarian
-
-### Variety Tracking
-
-The app remembers what restaurants you've seen and prioritizes fresh options in future searches. No more "why does it keep showing me the same 3 places?"
-
-### The Terminal UI
-
-Yes, it looks like a piece of Braun equipment from 1968. That's intentional. The loading screen has scanlines, generates contextual jokes while it thinks (AI-generated based on your location and search), and makes satisfying click sounds. We're not trying to look like every other food app.
+Full UI flow with sample data. Perfect for development.
 
 ---
 
@@ -137,23 +50,25 @@ Services Layer
     |
     +---> Google Maps Platform (Places API, Distance Matrix)
     +---> Supabase Edge Function ---> OpenRouter AI (Claude Opus 4.5 / Sonnet 4.5)
-    +---> Supabase PostgreSQL (search history, favorites, places cache, logs)
+    +---> Supabase PostgreSQL (places cache, search history, favorites, logs)
     +---> Two-Tier Cache (L1: In-memory, L2: Supabase)
 ```
 
-### Data Flow
+### Data Flow (Cache-First Strategy)
 
 1. User picks location + vibe + constraints
-2. AI translates freestyle prompts into Google Places search queries
-3. Check L1 → L2 cache for existing search results (see [Caching System](#the-caching-system-this-is-where-it-gets-good))
-4. On cache miss: Google Places API returns ~20-30 candidates, results cached globally
-5. Claude Opus 4.5 analyzes reviews, extracts dish mentions, scores vibe match
-6. You get 3 recommendations with specific dishes and honest explanations
-7. Results are tracked for variety in future searches
+2. **L2 location query**: Fetch ALL cached places within radius from Supabase
+3. **AI filtering**: Claude filters cached places by user's query/vibe
+4. If enough matches (≥10): Skip Google API entirely, use cached data
+5. If insufficient: Make targeted Text Search API calls, cache new results
+6. Claude Opus 4.5 analyzes reviews, extracts dish mentions, scores vibe match
+7. You get 3 recommendations with specific dishes and honest explanations
+
+This cache-first approach dramatically reduces API costs—popular areas often return results without any Google API calls.
 
 ### API Key Security
 
-The OpenRouter API key stays server-side in an Edge Function. Google Maps key uses HTTP referrer restrictions. Your API bills are protected.
+OpenRouter key stays server-side in an Edge Function. Google Maps key uses HTTP referrer restrictions.
 
 ### Deployment
 
@@ -163,11 +78,9 @@ Production is deployed on **Vercel** at [lunch.thirdface.com](https://lunch.thir
 
 ## Environment Setup
 
-You need three things:
-
 ### 1. Supabase Project
 
-Free tier works fine. Get your credentials from the dashboard.
+Free tier works fine.
 
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
@@ -176,13 +89,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 ### 2. Google Cloud APIs
 
-Enable these in Google Cloud Console:
-- Maps JavaScript API
-- Places API (New)
-- Distance Matrix API
-- Geocoding API
-
-Then restrict your key to HTTP referrers (localhost for dev, your domain for prod).
+Enable: Maps JavaScript API, Places API (New), Distance Matrix API, Geocoding API
 
 ```env
 VITE_GOOGLE_MAPS_API_KEY=your-maps-key
@@ -190,22 +97,18 @@ VITE_GOOGLE_MAPS_API_KEY=your-maps-key
 
 ### 3. OpenRouter API Key (Server-Side)
 
-This one stays in Supabase as a secret, not in your frontend:
-
 ```bash
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-key
 supabase functions deploy openrouter-proxy
 ```
 
-Get your API key from [OpenRouter](https://openrouter.ai/). The app uses:
-- **Claude Opus 4.5** (`anthropic/claude-opus-4.5`) for complex restaurant analysis
-- **Claude Sonnet 4.5** (`anthropic/claude-sonnet-4.5`) for search translation and loading messages
+Uses **Claude Opus 4.5** for restaurant analysis, **Claude Sonnet 4.5** for quick tasks.
 
 ---
 
 ## Database Setup
 
-Run these in your Supabase SQL editor:
+Run in Supabase SQL editor:
 
 ```sql
 -- Search History
@@ -260,9 +163,13 @@ create table if not exists recommended_places (
 );
 
 -- Places Cache (L2 cache - shared across users, 7-day TTL)
+-- Includes lat/lng columns for spatial queries
 create table if not exists places_cache (
   place_id text primary key,
   data jsonb not null,
+  lat float,  -- Extracted for spatial queries
+  lng float,  -- Extracted for spatial queries
+  expires_at timestamptz default (now() + interval '7 days'),
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -294,10 +201,90 @@ create policy "Users can manage recommended places" on recommended_places for al
 create policy "Anyone can read/write places cache" on places_cache for all using (true);
 create policy "Anyone can read/write distance cache" on distance_cache for all using (true);
 
+-- Index for spatial queries (critical for cache-first strategy)
+create index if not exists idx_places_cache_location on places_cache (lat, lng);
+create index if not exists idx_places_cache_expires on places_cache (expires_at);
+
 -- Auto-cleanup old cache entries (run as scheduled job)
--- DELETE FROM places_cache WHERE updated_at < now() - interval '7 days';
+-- DELETE FROM places_cache WHERE expires_at < now();
 -- DELETE FROM distance_cache WHERE created_at < now() - interval '7 days';
 ```
+
+---
+
+## The Caching System
+
+Google Maps APIs are expensive. Every text search costs €0.032, every place detail €0.017, every distance calculation €0.005.
+
+We built a two-tier cache with a **cache-first strategy** that shares data globally.
+
+### Cache-First Flow
+
+```
+User searches "ramen near Kreuzberg"
+    |
+    v
+┌─────────────────────────────────────┐
+│ Step 1: Location Query (L2)         │
+│ SELECT * FROM places_cache          │
+│ WHERE lat/lng within radius         │
+│ → Returns 150 cached restaurants    │
+└────────────────┬────────────────────┘
+                 │
+                 v
+┌─────────────────────────────────────┐
+│ Step 2: AI Filtering                │
+│ Claude filters by "ramen" intent    │
+│ → 12 relevant matches               │
+└────────────────┬────────────────────┘
+                 │
+                 │ ≥10 matches? DONE (no API calls)
+                 │ <10 matches? Continue...
+                 v
+┌─────────────────────────────────────┐
+│ Step 3: Text Search API (if needed) │
+│ Fetch new places, cache results     │
+│ → Future searches benefit           │
+└─────────────────────────────────────┘
+```
+
+### Two Caches
+
+| Cache | What It Stores | L1 TTL | L2 TTL | Cost/Hit Saved |
+|-------|---------------|--------|--------|----------------|
+| **Place Details** | Place ID → Full data (with lat/lng) | 1 hr | 7 days | €0.017 |
+| **Distances** | Origin + Place → Walk time | 1 hr | 7 days | €0.005 |
+
+### Why Location-Based Caching?
+
+Previous versions cached by search query ("ramen near X"). Problem: "ramen", "Japanese", and "noodles" are different cache keys for overlapping results.
+
+Now we cache by **location**. One query populates the cache, and ALL future searches in that area benefit—regardless of what cuisine they search for.
+
+### The Smart Bits
+
+**Spatial queries.** Places are cached with lat/lng columns. Finding restaurants in a 1km radius is a simple range query, not a text match.
+
+**AI filtering replaces query matching.** Instead of exact query→result caching, Claude analyzes cached places against the user's intent. "Best lunch spot" and "quick bite" can both draw from the same cached data.
+
+**Session tokens for address input.** Autocomplete requests + Place Details are bundled into one billing session (~60% cost reduction on address lookups).
+
+**Graceful degradation.** Cache miss? We just fetch fresh. No errors, no retries—slightly higher cost that one time, then cached for everyone.
+
+**Session cost tracking.**
+
+```
+=== SESSION CACHE SUMMARY ===
+Places: 47 hits, 8 misses (85.5%) - €0.799 saved
+Distances: 22 hits, 3 misses (88.0%) - €0.110 saved
+────────────────────────────────────────────────────
+Total API calls avoided: 69
+Estimated session savings: €0.909
+```
+
+### The Result
+
+Popular areas often return results with **zero Google API calls**—everything comes from cache + AI filtering. The more people use the app, the better it gets for everyone.
 
 ---
 
@@ -315,15 +302,15 @@ lunch-decider/
 │   │   ├── PrivacyPolicy.tsx     # Privacy policy viewer
 │   │   └── ErrorBoundary.tsx     # Error handling wrapper
 │   ├── hooks/
-│   │   ├── useGooglePlaces.ts    # Places API integration
+│   │   ├── useGooglePlaces.ts    # Places API + cache-first logic
 │   │   ├── useDistanceMatrix.ts  # Walking times calculation
-│   │   ├── useLunchDecision.ts   # Main orchestration (including mock mode)
+│   │   ├── useLunchDecision.ts   # Main orchestration
 │   │   ├── usePreferences.ts     # User prefs with localStorage
 │   │   ├── useTerminalLogs.ts    # Terminal log management
 │   │   └── index.ts              # Hook exports
 │   ├── services/
-│   │   ├── aiService.ts          # AI logic (Claude via OpenRouter)
-│   │   └── supabaseService.ts    # Database operations + cache
+│   │   ├── aiService.ts          # AI logic + place filtering
+│   │   └── supabaseService.ts    # Database + location queries
 │   ├── lib/
 │   │   ├── supabase.ts           # Supabase client
 │   │   ├── placesCache.ts        # Two-tier caching system
@@ -365,152 +352,29 @@ Not just "highest rated wins." We factor in:
 - **Proximity** - closer is better (weighted by walk time preference)
 - **Price match** - respects your budget setting
 - **Hidden gems** - 4.3+ rating with 50-750 reviews gets a boost
-- **Fresh drops** - new places (<80 reviews, oldest review <6 months) with 4.0+ rating get highlighted
-- **Trending** - places with 10%+ of reviews from the last month are flagged as hot
+- **Fresh drops** - new places (<80 reviews, oldest review <6 months) with 4.0+ rating
+- **Trending** - places with 10%+ of reviews from the last month
 - **Will it be open?** - prioritizes places open by the time you'd arrive
 
 Then Claude AI picks the best 3 from the top 25 candidates.
 
 ---
 
-## The Caching System (This Is Where It Gets Good)
-
-Google Maps APIs are expensive. Every text search costs €0.032, every place detail €0.017, every distance calculation €0.005. Do a few searches and you're bleeding money.
-
-So we built a two-tier cache that shares data across all users globally.
-
-### Architecture: L1 + L2
-
-```
-User searches "ramen near Kreuzberg"
-    |
-    v
-┌─────────────────┐
-│ L1: In-Memory   │ ◄── Instant (0ms), per-session
-│ (Browser)       │     30min TTL for searches, 1hr for places
-└────────┬────────┘
-         │ miss?
-         v
-┌─────────────────┐
-│ L2: Supabase    │ ◄── ~50ms, shared globally
-│ (PostgreSQL)    │     24hr TTL for searches, 7 days for places
-└────────┬────────┘
-         │ miss?
-         v
-┌─────────────────┐
-│ Google Maps API │ ◄── €€€, but results cached for everyone
-└─────────────────┘
-```
-
-### Three Caches Working Together
-
-| Cache | What It Stores | L1 TTL | L2 TTL | Cost/Hit Saved |
-|-------|---------------|--------|--------|----------------|
-| **Text Search** | Query → Place IDs | 30 min | 24 hr | €0.032 |
-| **Place Details** | Place ID → Full data | 1 hr | 7 days | €0.017 |
-| **Distances** | Origin + Place → Walk time | 1 hr | 7 days | €0.005 |
-
-### The Smart Bits
-
-**Coordinate rounding for cache key generation.** Text search keys round lat/lng to 3 decimal places (~111m precision). Someone searching from the coffee shop across the street? They hit your cache. Distance keys use 4 decimal places (~11m). Close enough is close enough.
-
-**L2 → L1 promotion.** When L2 hits, results are immediately saved to L1. Subsequent lookups in the same session are instant.
-
-**Non-blocking L2 writes.** L2 saves are async. The UI never waits for Supabase - your search results appear while the cache update happens in the background.
-
-**Batch operations.** When fetching 25 place details, we check all 25 in L1, then fetch remaining from L2 in one query, then hit Google only for true misses. Not 25 sequential lookups.
-
-**Graceful degradation.** If Supabase is down, L1 still works. If both miss, we just fetch fresh. No errors, no retries, just slightly higher API costs.
-
-**Session cost tracking.** Every cache hit logs estimated savings. At the end of a session, you can see exactly how much money the cache saved.
-
-```
-=== SESSION CACHE SUMMARY ===
-Text Search: 4 hits, 2 misses (66.7%) - €0.128 saved
-Places: 47 hits, 8 misses (85.5%) - €0.799 saved
-Distances: 22 hits, 3 misses (88.0%) - €0.110 saved
-────────────────────────────────────────────────────
-Total API calls avoided: 73
-Estimated session savings: €1.037
-```
-
-### Why This Matters
-
-A cold search (no cache) costs roughly €0.50-1.00 in API calls. A warm search (popular area, recent queries) might cost €0.05 or less. The more people use the app, the better the cache gets for everyone.
-
-The cache also makes repeated searches feel instant. Changed your mind about the walk time? Results appear immediately because we already have the place data.
-
----
-
 ## Design Philosophy
 
-> Based on [Anthropic's Frontend Design Skill](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md)
+Braun-inspired industrial aesthetic following **Dieter Rams' 10 Principles of Good Design**.
 
-### This Project's Tone: Industrial/Utilitarian with Braun-Inspired Warmth
+The terminal screen has actual scanlines because we thought it would be funny.
 
-### Core Design Philosophy: Dieter Rams Inspired
-
-All designs in this project follow **Dieter Rams' 10 Principles of Good Design**:
-
-1. **Good design is innovative** - Push boundaries while solving real problems
-2. **Good design makes a product useful** - Form follows function
-3. **Good design is aesthetic** - Visual quality is integral to usefulness
-4. **Good design makes a product understandable** - Self-explanatory interfaces
-5. **Good design is unobtrusive** - Products should be neutral and restrained
-6. **Good design is honest** - No manipulation or false promises
-7. **Good design is long-lasting** - Avoid trends, aim for timelessness
-8. **Good design is thorough down to the last detail** - Nothing is arbitrary
-9. **Good design is environmentally friendly** - Minimal, efficient code
-10. **Good design is as little design as possible** - Less, but better
-
-### Color Palette (Braun-Inspired)
-
-```css
-/* Light Theme */
---braun-bg: #F5F5F0;           /* Warm off-white */
---braun-dark: #1A1A1A;         /* Near-black */
---braun-border: #C4C4B8;       /* Warm gray */
---braun-text-muted: #707070;   /* Muted text */
---braun-orange: #FF4400;       /* Accent - Warm orange */
-
-/* Dark Theme */
---dark-bg: #0F0F0F;            /* Deep black */
---dark-text: #E8E8E8;          /* Off-white text */
---dark-border: #2A2A2A;        /* Subtle border */
---dark-text-muted: #6B6B6B;    /* Muted text */
-```
-
-### Spacing System (4px/8px Base Unit)
-
-```css
---space-1: 4px;    /* Tight spacing */
---space-2: 8px;    /* Default small */
---space-3: 12px;   /* Medium-small */
---space-4: 16px;   /* Default medium */
---space-6: 24px;   /* Large */
---space-8: 32px;   /* XL */
---space-12: 48px;  /* Section spacing */
-```
-
-### Typography
-
-- **Display/Headers**: `'Inter', sans-serif` - Bold, tight tracking
-- **Monospace/Data**: `'Roboto Mono', monospace` - Technical readability
-- **Body**: System fonts for performance
-
-The Braun-inspired aesthetic isn't just for looks - it's a statement that a lunch app doesn't need to look like every other app. The terminal screen has actual scanlines because we thought it would be funny.
+See `.cursorrules` for full design guidelines.
 
 ---
 
 ## Privacy
 
-We believe in transparency. See our [Privacy Policy](https://lunch.thirdface.com) (click the footer link) for details on:
-- What data is stored locally vs. server-side
-- How search history and recommendations are tracked
-- Third-party services used (Google Places, OpenRouter, Supabase)
-- Your rights and how to clear your data
+Anonymous session IDs, no accounts required, no tracking cookies. Data retention: 90 days for history, 30 days for logs.
 
-**TL;DR:** No accounts required, anonymous session IDs, no tracking cookies, data retention limits (90 days for history, 30 days for logs).
+See the [Privacy Policy](https://lunch.thirdface.com) (footer link) for details.
 
 ---
 

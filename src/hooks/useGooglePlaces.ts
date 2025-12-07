@@ -1,9 +1,14 @@
 import { useCallback } from 'react';
 import { GooglePlace, HungerVibe, PlaceReview } from '../types';
 import { getSearchQueriesForVibe, detectCuisineIntent, CuisineIntent } from '../utils/lunchAlgorithm';
-import { translateSearchIntent, TranslatedSearchIntent } from '../services/aiService';
-import { PlacesCache, TextSearchCache } from '../lib/placesCache';
+import { translateSearchIntent, TranslatedSearchIntent, filterPlacesByQuery } from '../services/aiService';
+import { PlacesCache } from '../lib/placesCache';
+import { SupabaseService } from '../services/supabaseService';
 import Logger from '../utils/logger';
+
+// Minimum cached matches required to skip Text Search API
+// If AI finds this many relevant places from cache, we don't need to make new API calls
+const MIN_CACHE_MATCHES = 10;
 
 // Price level mapping from Google Places API enum to numeric value
 const PRICE_LEVEL_MAP: Record<string, number> = {
@@ -229,122 +234,153 @@ export const useGooglePlaces = () => {
       searchQueries = getSearchQueriesForVibe(vibe);
     }
 
-    // Deduplicate and limit queries to reduce API costs
-    // Reduced from 3 to 2 queries to cut text search costs by ~33%
-    // Cache will help maintain coverage across sessions
-    const uniqueQueries = [...new Set(searchQueries)].slice(0, 2);
-    Logger.info('SYSTEM', 'Search queries optimized', {
-      original: searchQueries.length,
-      deduplicated: uniqueQueries.length
-    });
-
-    // Check text search cache first (L1 + L2)
-    const { found: cachedSearches, missing: uncachedQueries } = await TextSearchCache.getManyWithL2(
-      lat, lng, uniqueQueries, radius
-    );
-
-    // Collect place IDs from cached searches
-    const cachedPlaceIds: string[] = [];
-    cachedSearches.forEach(placeIds => {
-      cachedPlaceIds.push(...placeIds);
-    });
-
-    // Only make API calls for uncached queries
-    let fetchedPlaceIds: string[] = [];
-    if (uncachedQueries.length > 0) {
-      const searchIdPromises = uncachedQueries.map(query => {
+    // Deduplicate and limit queries
+    const uniqueQueries = [...new Set(searchQueries)].slice(0, 3);
+    
+    // Determine the query string for filtering (freestyle prompt or first search query)
+    const filterQuery = freestylePrompt?.trim() || uniqueQueries[0] || '';
+    
+    // Convert radius to km for location query (radius is in meters)
+    const radiusKm = Math.max(radius / 1000, 1); // At least 1km
+    
+    // ========================================
+    // CACHE-FIRST STRATEGY
+    // ========================================
+    // Step 1: Query Supabase for all cached places in the area
+    const cachedAreaPlaces = await SupabaseService.getPlacesByLocation(lat, lng, radiusKm);
+    
+    // Step 2: Filter cached places by query using AI
+    let filteredCachePlaces: GooglePlace[] = [];
+    if (cachedAreaPlaces.length > 0) {
+      filteredCachePlaces = await filterPlacesByQuery(cachedAreaPlaces, filterQuery, vibe);
+      
+      Logger.info('SYSTEM', 'Cache-first filter results', {
+        cachedInArea: cachedAreaPlaces.length,
+        matchedQuery: filteredCachePlaces.length,
+        query: filterQuery
+      });
+    }
+    
+    // Get IDs of places we already have from cache
+    const cachedPlaceIds = new Set(filteredCachePlaces.map(p => p.place_id));
+    
+    // Step 3: Decide if we need Text Search API calls
+    let apiPlaces: GooglePlace[] = [];
+    let textSearchApiCalls = 0;
+    let placeDetailApiCalls = 0; // Track actual Google Place Details API calls
+    
+    if (filteredCachePlaces.length < MIN_CACHE_MATCHES) {
+      // Not enough cached matches - need to search for more
+      Logger.info('SYSTEM', 'Insufficient cache matches, calling Text Search API', {
+        cached: filteredCachePlaces.length,
+        threshold: MIN_CACHE_MATCHES,
+        queries: uniqueQueries.slice(0, 2) // Limit to 2 queries
+      });
+      
+      // Make Text Search API calls (limit to 2 queries to control costs)
+      const queriesToSearch = uniqueQueries.slice(0, 2);
+      textSearchApiCalls = queriesToSearch.length;
+      
+      const searchIdPromises = queriesToSearch.map(query => {
         const request = {
           textQuery: query,
           locationBias: { center: location, radius },
           maxResultCount: 20,
           fields: ['id']
         };
-        return Place.searchByText(request).then(result => ({
-          query,
-          placeIds: result.places.map(p => p.id).filter((id): id is string => !!id)
-        }));
+        return Place.searchByText(request).then(result => 
+          result.places.map(p => p.id).filter((id): id is string => !!id)
+        ).catch(() => [] as string[]);
       });
-
-      const searchResults = await Promise.all(searchIdPromises);
       
-      // Cache each search result and collect place IDs
-      for (const { query, placeIds } of searchResults) {
-        fetchedPlaceIds.push(...placeIds);
-        // Save to cache (non-blocking)
-        TextSearchCache.saveToBothLayers(lat, lng, query, radius, placeIds);
+      const searchResults = await Promise.all(searchIdPromises);
+      const allFetchedIds = [...new Set(searchResults.flat())];
+      
+      // Filter out IDs we already have from cache
+      const newPlaceIds = allFetchedIds.filter(id => !cachedPlaceIds.has(id));
+      
+      Logger.info('SYSTEM', 'Text Search API results', {
+        totalFound: allFetchedIds.length,
+        newPlaces: newPlaceIds.length,
+        alreadyCached: allFetchedIds.length - newPlaceIds.length
+      });
+      
+      // Fetch details only for NEW places (not in cache)
+      if (newPlaceIds.length > 0) {
+        // First check if any of these are in the places cache (but not in area)
+        const { found: additionalCached, missing: trulyUncached } = await PlacesCache.getPlacesWithL2(newPlaceIds);
+        
+        // Add cached places to results (these are L1/L2 cache hits, NOT API calls)
+        apiPlaces.push(...additionalCached.values());
+        
+        // Fetch only truly uncached places (these are actual API calls)
+        if (trulyUncached.length > 0) {
+          const detailPromises = trulyUncached.map(id => {
+            const place = new Place({ id });
+            return place.fetchFields({ fields: PLACE_FIELDS as unknown as string[] });
+          });
+          
+          const detailResults = await Promise.allSettled(detailPromises);
+          const newlyFetched = detailResults
+            .filter((res): res is PromiseFulfilledResult<{ place: google.maps.places.Place }> =>
+              res.status === 'fulfilled' && !!res.value?.place
+            )
+            .map(res => mapPlace(res.value.place));
+          
+          apiPlaces.push(...newlyFetched);
+          placeDetailApiCalls = newlyFetched.length; // Only count actual API calls
+          
+          // Cache newly fetched places to BOTH L1 and L2
+          if (newlyFetched.length > 0) {
+            await PlacesCache.savePlacesToBothLayers(newlyFetched);
+          }
+        }
       }
+    } else {
+      Logger.info('SYSTEM', 'Sufficient cache matches - SKIPPING Text Search API', {
+        cached: filteredCachePlaces.length,
+        threshold: MIN_CACHE_MATCHES,
+        estimatedSavings: `€${(uniqueQueries.slice(0, 2).length * 0.032).toFixed(3)}`
+      });
     }
-
-    // Combine cached and fetched place IDs
-    const allPlaceIds = [...cachedPlaceIds, ...fetchedPlaceIds];
-    const uniquePlaceIds = [...new Set(allPlaceIds)].filter((id): id is string => !!id);
-
-    Logger.info('SYSTEM', '=== TEXT SEARCH SUMMARY ===', {
-      totalQueries: uniqueQueries.length,
-      cachedQueries: cachedSearches.size,
-      apiCalls: uncachedQueries.length,
-      cachedPlaceIds: cachedPlaceIds.length,
-      fetchedPlaceIds: fetchedPlaceIds.length,
-      uniquePlaceIds: uniquePlaceIds.length,
-      estimatedSavings: `€${(cachedSearches.size * 0.032).toFixed(3)}`
-    });
-
-    if (uniquePlaceIds.length === 0) {
+    
+    // Combine cached and API places
+    const allPlaces = [...filteredCachePlaces, ...apiPlaces];
+    const uniquePlaceIds = [...new Set(allPlaces.map(p => p.place_id))];
+    
+    if (allPlaces.length === 0) {
       return { places: [], uniqueCount: 0, cuisineIntent };
     }
-
-    // Check L1 (memory) + L2 (Supabase) cache to reduce API calls
-    const { found: cachedPlaces, missing: uncachedIds } = await PlacesCache.getPlacesWithL2(uniquePlaceIds);
     
-    Logger.info('SYSTEM', 'Place cache check (L1+L2)', {
-      total: uniquePlaceIds.length,
-      cached: cachedPlaces.size,
-      toFetch: uncachedIds.length
-    });
-
-    // Fetch only uncached place details from Google API
-    let fetchedPlaces: GooglePlace[] = [];
-    if (uncachedIds.length > 0) {
-      const detailPromises = uncachedIds.map(id => {
-        const place = new Place({ id });
-        return place.fetchFields({ fields: PLACE_FIELDS as unknown as string[] });
-      });
-
-      const detailResults = await Promise.allSettled(detailPromises);
-      fetchedPlaces = detailResults
-        .filter((res): res is PromiseFulfilledResult<{ place: google.maps.places.Place }> =>
-          res.status === 'fulfilled' && !!res.value?.place
-        )
-        .map(res => mapPlace(res.value.place));
-      
-      // Cache newly fetched places to BOTH L1 and L2
-      await PlacesCache.savePlacesToBothLayers(fetchedPlaces);
-    }
-
-    // Combine cached and fetched places
-    const allPlaces = [...cachedPlaces.values(), ...fetchedPlaces];
-
     // CRITICAL: Filter out non-food establishments (e.g., cap stores, clothing shops)
-    // Only keep places that have at least one food-related type
     const foodPlaces = allPlaces.filter(place => isFoodEstablishment(place.types));
+    
+    // Deduplicate by place_id
+    const seenIds = new Set<string>();
+    const deduplicatedPlaces = foodPlaces.filter(place => {
+      if (seenIds.has(place.place_id)) return false;
+      seenIds.add(place.place_id);
+      return true;
+    });
     
     Logger.info('SYSTEM', 'Food establishment filter applied', {
       total: allPlaces.length,
-      passed: foodPlaces.length,
-      filtered: allPlaces.length - foodPlaces.length
+      passed: deduplicatedPlaces.length,
+      filtered: allPlaces.length - deduplicatedPlaces.length
     });
 
     // Log API call summary for this search
     Logger.info('SYSTEM', '=== PLACES API SUMMARY ===', {
-      textSearchCalls: uniqueQueries.length,
-      placeDetailCalls: uncachedIds.length,
-      cacheHits: cachedPlaces.size,
-      newlyCached: fetchedPlaces.length,
-      totalApiCalls: uniqueQueries.length + uncachedIds.length,
-      estimatedCost: `€${((uniqueQueries.length * 0.01) + (uncachedIds.length * 0.017)).toFixed(3)}`
+      cacheFirstMatches: filteredCachePlaces.length,
+      textSearchCalls: textSearchApiCalls,
+      placeDetailCalls: placeDetailApiCalls,
+      totalPlaces: deduplicatedPlaces.length,
+      estimatedCost: textSearchApiCalls > 0 
+        ? `€${((textSearchApiCalls * 0.032) + (placeDetailApiCalls * 0.017)).toFixed(3)}`
+        : '€0.000 (cache hit)'
     });
 
-    return { places: foodPlaces, uniqueCount: uniquePlaceIds.length, cuisineIntent, translatedIntent };
+    return { places: deduplicatedPlaces, uniqueCount: uniquePlaceIds.length, cuisineIntent, translatedIntent };
   }, []);
 
   /**

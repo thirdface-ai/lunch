@@ -130,96 +130,6 @@ export const SupabaseService = {
   // ============================================
 
   /**
-   * Get cached text search results from Supabase (shared across all users)
-   * Returns place IDs for a given search query if still valid
-   */
-  async getCachedTextSearch(
-    lat: number,
-    lng: number,
-    query: string,
-    radius: number
-  ): Promise<string[] | null> {
-    try {
-      // Round to 3 decimal places (~111m precision)
-      const roundedLat = Math.round(lat * 1000) / 1000;
-      const roundedLng = Math.round(lng * 1000) / 1000;
-      const normalizedQuery = query.toLowerCase().trim();
-
-      const { data, error } = await supabase
-        .from('text_search_cache')
-        .select('place_ids')
-        .eq('origin_lat', roundedLat)
-        .eq('origin_lng', roundedLng)
-        .eq('query', normalizedQuery)
-        .eq('radius', radius)
-        .gt('expires_at', new Date().toISOString())
-        .maybeSingle();
-
-      if (error) {
-        Logger.warn('CACHE', 'Supabase text search cache query error', { error: error.message });
-        return null;
-      }
-
-      if (!data) {
-        return null;
-      }
-
-      Logger.info('CACHE', `Supabase L2 text search hit: "${query}"`, {
-        placeCount: data.place_ids.length,
-        origin: `${roundedLat},${roundedLng}`
-      });
-
-      return data.place_ids;
-    } catch (e) {
-      Logger.warn('CACHE', 'Supabase text search cache exception', { error: e });
-      return null;
-    }
-  },
-
-  /**
-   * Save text search results to Supabase cache (shared across all users)
-   */
-  async cacheTextSearch(
-    lat: number,
-    lng: number,
-    query: string,
-    radius: number,
-    placeIds: string[]
-  ): Promise<void> {
-    if (placeIds.length === 0) return;
-
-    try {
-      const roundedLat = Math.round(lat * 1000) / 1000;
-      const roundedLng = Math.round(lng * 1000) / 1000;
-      const normalizedQuery = query.toLowerCase().trim();
-
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24); // 24-hour TTL
-
-      const { error } = await supabase
-        .from('text_search_cache')
-        .upsert({
-          origin_lat: roundedLat,
-          origin_lng: roundedLng,
-          query: normalizedQuery,
-          radius,
-          place_ids: placeIds,
-          expires_at: expiresAt.toISOString(),
-        }, { onConflict: 'origin_lat,origin_lng,query,radius' });
-
-      if (error) {
-        Logger.warn('CACHE', 'Supabase text search cache save failed', { error: error.message });
-      } else {
-        Logger.info('CACHE', `Saved text search to Supabase L2: "${query}"`, {
-          placeCount: placeIds.length
-        });
-      }
-    } catch (e) {
-      Logger.warn('CACHE', 'Supabase text search cache save exception', { error: e });
-    }
-  },
-
-  /**
    * Get cached places from Supabase (shared across all users)
    * Only returns non-expired entries
    */
@@ -254,6 +164,55 @@ export const SupabaseService = {
     } catch (e) {
       Logger.warn('CACHE', 'Supabase places cache exception', { error: e });
       return new Map();
+    }
+  },
+
+  /**
+   * Get all cached places within a geographic area (shared across all users)
+   * Uses lat/lng columns for spatial queries - much more efficient than query-based caching
+   * 
+   * @param lat Center latitude
+   * @param lng Center longitude  
+   * @param radiusKm Search radius in kilometers (default 1km)
+   * @returns Array of GooglePlace objects from cache
+   */
+  async getPlacesByLocation(
+    lat: number, 
+    lng: number, 
+    radiusKm: number = 1
+  ): Promise<GooglePlace[]> {
+    try {
+      // ~0.009 degrees ≈ 1km at the equator
+      // This is approximate but sufficient for restaurant searches
+      const delta = radiusKm * 0.009;
+      
+      const { data, error } = await supabase
+        .from('places_cache')
+        .select('data')
+        .gte('lat', lat - delta)
+        .lte('lat', lat + delta)
+        .gte('lng', lng - delta)
+        .lte('lng', lng + delta)
+        .gt('expires_at', new Date().toISOString());
+
+      if (error) {
+        Logger.warn('CACHE', 'Supabase location query failed', { error: error.message });
+        return [];
+      }
+
+      const places = (data || []).map(row => row.data as unknown as GooglePlace);
+      
+      if (places.length > 0) {
+        Logger.info('CACHE', `Found ${places.length} cached places in area`, {
+          center: `${lat.toFixed(4)},${lng.toFixed(4)}`,
+          radiusKm
+        });
+      }
+
+      return places;
+    } catch (e) {
+      Logger.warn('CACHE', 'Supabase location query exception', { error: e });
+      return [];
     }
   },
 

@@ -1,65 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import SupabaseService from './supabaseService';
 import { GooglePlace } from '../types';
 
-// Mock supabase client
-const mockSelect = vi.fn();
-const mockInsert = vi.fn();
-const mockUpsert = vi.fn();
-const mockEq = vi.fn();
-const mockIn = vi.fn();
-const mockGt = vi.fn();
-const mockOrder = vi.fn();
-const mockLimit = vi.fn();
+// Use vi.hoisted to properly hoist mock variables before vi.mock is executed
+const { mockFrom, mockSelect, mockInsert, mockUpsert, mockEq, mockIn, mockGt, mockGte, mockLte, mockOrder, mockLimit } = vi.hoisted(() => {
+  const mockSelect = vi.fn();
+  const mockInsert = vi.fn();
+  const mockUpsert = vi.fn();
+  const mockEq = vi.fn();
+  const mockIn = vi.fn();
+  const mockGt = vi.fn();
+  const mockGte = vi.fn();
+  const mockLte = vi.fn();
+  const mockOrder = vi.fn();
+  const mockLimit = vi.fn();
 
-const mockFrom = vi.fn(() => ({
-  select: mockSelect,
-  insert: mockInsert,
-  upsert: mockUpsert,
-}));
+  const mockFrom = vi.fn(() => ({
+    select: mockSelect,
+    insert: mockInsert,
+    upsert: mockUpsert,
+  }));
 
-mockSelect.mockReturnValue({
-  eq: mockEq,
-  in: mockIn,
-  gt: mockGt,
-  order: mockOrder,
-  limit: mockLimit,
+  return { mockFrom, mockSelect, mockInsert, mockUpsert, mockEq, mockIn, mockGt, mockGte, mockLte, mockOrder, mockLimit };
 });
-
-mockEq.mockReturnValue({
-  eq: mockEq,
-  in: mockIn,
-  gt: mockGt,
-  order: mockOrder,
-  limit: mockLimit,
-});
-
-mockIn.mockReturnValue({
-  gt: mockGt,
-  eq: mockEq,
-});
-
-mockGt.mockReturnValue({
-  then: vi.fn((resolve) => resolve({ data: [], error: null })),
-});
-
-mockOrder.mockReturnValue({
-  limit: mockLimit,
-});
-
-mockLimit.mockReturnValue({
-  then: vi.fn((resolve) => resolve({ data: [], error: null })),
-});
-
-mockInsert.mockResolvedValue({ error: null });
-mockUpsert.mockResolvedValue({ error: null });
-
-vi.mock('../lib/supabase', () => ({
-  supabase: {
-    from: mockFrom,
-  },
-  getSessionId: () => 'test-session-id',
-}));
 
 // Mock Logger
 vi.mock('../utils/logger', () => ({
@@ -69,6 +31,16 @@ vi.mock('../utils/logger', () => ({
     error: vi.fn(),
   },
 }));
+
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    from: mockFrom,
+  },
+  getSessionId: () => 'test-session-id',
+}));
+
+// Import after mocks are set up
+import SupabaseService from './supabaseService';
 
 // Helper to create mock place
 const createMockPlace = (id: string): GooglePlace => ({
@@ -84,6 +56,57 @@ const createMockPlace = (id: string): GooglePlace => ({
 describe('SupabaseService - Cache Methods', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Setup mock chain returns
+    mockSelect.mockReturnValue({
+      eq: mockEq,
+      in: mockIn,
+      gt: mockGt,
+      gte: mockGte,
+      order: mockOrder,
+      limit: mockLimit,
+    });
+
+    mockEq.mockReturnValue({
+      eq: mockEq,
+      in: mockIn,
+      gt: mockGt,
+      gte: mockGte,
+      order: mockOrder,
+      limit: mockLimit,
+    });
+
+    mockIn.mockReturnValue({
+      gt: mockGt,
+      eq: mockEq,
+    });
+
+    mockGt.mockReturnValue({
+      then: vi.fn((resolve) => resolve({ data: [], error: null })),
+    });
+    
+    mockGte.mockReturnValue({
+      lte: mockLte,
+      gte: mockGte,
+      gt: mockGt,
+    });
+    
+    mockLte.mockReturnValue({
+      gte: mockGte,
+      lte: mockLte,
+      gt: mockGt,
+    });
+
+    mockOrder.mockReturnValue({
+      limit: mockLimit,
+    });
+
+    mockLimit.mockReturnValue({
+      then: vi.fn((resolve) => resolve({ data: [], error: null })),
+    });
+
+    mockInsert.mockResolvedValue({ error: null });
+    mockUpsert.mockResolvedValue({ error: null });
   });
 
   describe('getCachedPlaces', () => {

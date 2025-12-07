@@ -152,6 +152,144 @@ Generate 3-5 CONCRETE search terms Google Places understands. Never use user's v
   }
 };
 
+/**
+ * Filter cached places by user query using AI
+ * 
+ * This function analyzes cached restaurant data and filters places that match
+ * the user's search intent. It uses the place's name, types, and editorial summary
+ * to determine relevance.
+ * 
+ * @param places Array of cached GooglePlace objects
+ * @param query User's search query (freestyle prompt or vibe)
+ * @param vibe Optional HungerVibe for additional context
+ * @returns Filtered array of places that match the query
+ */
+export const filterPlacesByQuery = async (
+  places: GooglePlace[],
+  query: string,
+  vibe?: HungerVibe | null
+): Promise<GooglePlace[]> => {
+  if (!query || query.trim().length === 0 || places.length === 0) {
+    return places;
+  }
+
+  const trimmedQuery = query.trim().toLowerCase();
+  
+  // First pass: fast local filtering for obvious matches
+  // This catches specific cuisine searches like "ramen", "sushi", "pizza"
+  const quickMatches: GooglePlace[] = [];
+  const maybeMatches: GooglePlace[] = [];
+  
+  for (const place of places) {
+    const nameLower = place.name.toLowerCase();
+    const typesStr = (place.types || []).join(' ').toLowerCase();
+    const summary = (place.editorial_summary?.overview || '').toLowerCase();
+    
+    // Direct match in name or types
+    if (nameLower.includes(trimmedQuery) || typesStr.includes(trimmedQuery)) {
+      quickMatches.push(place);
+    } 
+    // Partial match or related terms in summary
+    else if (summary.includes(trimmedQuery)) {
+      quickMatches.push(place);
+    }
+    // For generic/vibe queries, include all for AI analysis
+    else {
+      maybeMatches.push(place);
+    }
+  }
+  
+  // If we found enough quick matches for specific cuisines, return them
+  // (e.g., user searched "ramen" and we found 15 places with "ramen" in name/types)
+  if (quickMatches.length >= 10) {
+    Logger.info('AI', `Quick filter found ${quickMatches.length} matches for "${trimmedQuery}"`, {
+      total: places.length,
+      quickMatches: quickMatches.length
+    });
+    return quickMatches;
+  }
+  
+  // For vague queries or not enough quick matches, use AI to analyze
+  // Combine quick matches with maybes for AI to rank
+  const candidatesForAI = [...quickMatches, ...maybeMatches].slice(0, 50);
+  
+  if (candidatesForAI.length === 0) {
+    return [];
+  }
+  
+  // Build compact place summaries for AI analysis
+  const placeSummaries = candidatesForAI.map((p, i) => ({
+    idx: i,
+    name: p.name,
+    types: (p.types || []).slice(0, 5).join(', '),
+    summary: p.editorial_summary?.overview?.slice(0, 100) || '',
+  }));
+
+  const prompt = `Filter restaurants that match user's search.
+
+USER QUERY: "${trimmedQuery}"${vibe ? ` (vibe: ${vibe})` : ''}
+
+RESTAURANTS:
+${placeSummaries.map(p => `[${p.idx}] ${p.name} | ${p.types} | ${p.summary}`).join('\n')}
+
+Return JSON array of matching restaurant indices. Include places that:
+- Match the cuisine/food type
+- Fit the vibe/mood if specified
+- Are relevant to the query intent
+
+OUTPUT: {"matches":[0,1,5,12,...]} (indices of matching restaurants)
+Return empty array if none match.`;
+
+  try {
+    const text = await callOpenRouterProxy(
+      AI_MODEL_LIGHT, // Simple filtering task
+      prompt,
+      {
+        temperature: 0.2, // Low temp for consistent filtering
+        responseMimeType: 'application/json',
+      }
+    );
+
+    if (!text || text.trim() === '') {
+      Logger.warn('AI', 'Empty response from place filter');
+      return quickMatches.length > 0 ? quickMatches : candidatesForAI.slice(0, 10);
+    }
+
+    // Parse JSON response
+    let jsonText = text.trim();
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.slice(7);
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.slice(3);
+    }
+    if (jsonText.endsWith('```')) {
+      jsonText = jsonText.slice(0, -3);
+    }
+    jsonText = cleanJsonResponse(jsonText.trim());
+
+    const result = JSON.parse(jsonText);
+    const matchingIndices: number[] = result.matches || [];
+    
+    // Map indices back to places
+    const filteredPlaces = matchingIndices
+      .filter(idx => idx >= 0 && idx < candidatesForAI.length)
+      .map(idx => candidatesForAI[idx]);
+
+    Logger.info('AI', `Filtered ${filteredPlaces.length} places for "${trimmedQuery}"`, {
+      total: places.length,
+      analyzed: candidatesForAI.length,
+      matched: filteredPlaces.length
+    });
+
+    return filteredPlaces;
+
+  } catch (error) {
+    Logger.error('AI', 'Place filtering failed', error);
+    // Fallback: return quick matches or first 10 candidates
+    return quickMatches.length > 0 ? quickMatches : candidatesForAI.slice(0, 10);
+  }
+};
+
 // Internal helper to call the Supabase Edge Function
 const callOpenRouterProxy = async (model: string, contents: string, config: Record<string, unknown>): Promise<string> => {
   const startTime = performance.now();

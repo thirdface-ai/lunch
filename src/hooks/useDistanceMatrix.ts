@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { GooglePlace } from '../types';
 import { DistanceCache } from '../lib/placesCache';
 import Logger from '../utils/logger';
@@ -23,27 +23,30 @@ interface CalculateDistancesResult {
 }
 
 /**
- * Custom hook for Google Distance Matrix API interactions
+ * Format seconds into a human-readable duration string
+ * e.g., 720 -> "12 mins", 3600 -> "1 hour", 5400 -> "1 hour 30 mins"
+ */
+const formatDuration = (seconds: number): string => {
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.round((seconds % 3600) / 60);
+  
+  if (hours === 0) {
+    return `${mins} min${mins !== 1 ? 's' : ''}`;
+  } else if (mins === 0) {
+    return `${hours} hour${hours !== 1 ? 's' : ''}`;
+  } else {
+    return `${hours} hour${hours !== 1 ? 's' : ''} ${mins} min${mins !== 1 ? 's' : ''}`;
+  }
+};
+
+/**
+ * Custom hook for Google Routes API interactions (Route Matrix)
+ * Migrated from legacy Distance Matrix API to the modern Routes API
+ * for better performance and future-proofing (legacy API deprecated March 2025)
  */
 export const useDistanceMatrix = () => {
-  const serviceRef = useRef<google.maps.DistanceMatrixService | null>(null);
-
   /**
-   * Get or create the DistanceMatrixService instance
-   */
-  const getService = useCallback((): google.maps.DistanceMatrixService => {
-    if (!window.google) {
-      throw new Error('Google Maps API not loaded');
-    }
-    
-    if (!serviceRef.current) {
-      serviceRef.current = new google.maps.DistanceMatrixService();
-    }
-    return serviceRef.current;
-  }, []);
-
-  /**
-   * Calculate distances from origin to multiple places
+   * Calculate distances from origin to multiple places using Routes API
    * Handles batching and timeouts automatically
    */
   const calculateDistances = useCallback(async ({
@@ -51,7 +54,10 @@ export const useDistanceMatrix = () => {
     places,
     travelMode = google.maps.TravelMode.WALKING,
   }: CalculateDistancesParams): Promise<CalculateDistancesResult> => {
-    const service = getService();
+    if (!window.google) {
+      throw new Error('Google Maps API not loaded');
+    }
+
     const durations = new Map<string, PlaceDuration>();
     let failedCount = 0;
 
@@ -84,66 +90,159 @@ export const useDistanceMatrix = () => {
     const newlyFetchedDistances = new Map<string, PlaceDuration>();
     
     if (uncachedPlaces.length > 0) {
+      // Try to use the new Routes API, fall back to legacy Distance Matrix if unavailable
+      let useRoutesApi = false;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let RouteMatrix: any = null;
+      
+      try {
+        // Import the routes library (new Routes API)
+        // Note: TypeScript types for RouteMatrix may not be available yet
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const routesLib = await google.maps.importLibrary('routes') as any;
+        if (routesLib && routesLib.RouteMatrix && typeof routesLib.RouteMatrix.computeRouteMatrix === 'function') {
+          RouteMatrix = routesLib.RouteMatrix;
+          useRoutesApi = true;
+        }
+      } catch {
+        // Routes library not available, will fall back to legacy API
+        Logger.info('SYSTEM', 'Routes API not available, using legacy Distance Matrix API');
+      }
+
       // Batch places to stay within API limits
       const batches: GooglePlace[][] = [];
       for (let i = 0; i < uncachedPlaces.length; i += BATCH_SIZE) {
         batches.push(uncachedPlaces.slice(i, i + BATCH_SIZE));
       }
 
-      // Process batches with timeout handling
-      const batchPromises = batches.map(batch =>
-        new Promise<void>((resolve) => {
-          // Set timeout to prevent hanging if callback never fires
-          const timeoutId = setTimeout(() => {
-            console.warn('Distance matrix request timed out for batch');
-            failedCount += batch.length;
-            resolve();
-          }, MATRIX_TIMEOUT_MS);
-
-          // Extract destinations - batch already comes from validPlaces so all have geometry.location
-          const destinations = batch.map(p => p.geometry!.location!);
-
+      if (useRoutesApi && RouteMatrix) {
+        // Use new Routes API (RouteMatrix.computeRouteMatrix)
+        const batchPromises = batches.map(async (batch) => {
           try {
-            service.getDistanceMatrix(
-              {
-                origins: [{ lat: origin.lat, lng: origin.lng }],
-                destinations,
-                travelMode,
-              },
-              (response, status) => {
-                clearTimeout(timeoutId);
+            // Build destinations array with location coordinates
+            const destinations = batch.map(p => {
+              const loc = p.geometry!.location!;
+              const lat = typeof loc.lat === 'function' ? loc.lat() : loc.lat;
+              const lng = typeof loc.lng === 'function' ? loc.lng() : loc.lng;
+              return {
+                location: { lat, lng }
+              };
+            });
 
-                if (status === 'OK' && response?.rows[0]) {
-                  // Iterate using same index as destinations array
-                  batch.forEach((place, idx) => {
-                    const element = response.rows[0].elements[idx];
-                    if (element?.status === 'OK' && element.duration) {
-                      const distance = {
-                        text: element.duration.text,
-                        value: element.duration.value,
-                      };
-                      durations.set(place.place_id, distance);
-                      newlyFetchedDistances.set(place.place_id, distance);
-                    } else {
-                      failedCount++;
-                    }
-                  });
-                } else {
-                  failedCount += batch.length;
-                }
-                resolve();
+            // Create the RouteMatrix request
+            // fields array is required - specifies which fields to return in the response
+            const request = {
+              origins: [{ location: { lat: origin.lat, lng: origin.lng } }],
+              destinations,
+              travelMode: travelMode === google.maps.TravelMode.WALKING ? 'WALK' : 'DRIVE',
+              fields: ['durationMillis', 'distanceMeters', 'condition'],
+            };
+
+            // Set up timeout
+            const timeoutPromise = new Promise<null>((resolve) => {
+              setTimeout(() => {
+                console.warn('Route matrix request timed out for batch');
+                resolve(null);
+              }, MATRIX_TIMEOUT_MS);
+            });
+
+            // Make the API call with timeout
+            const response = await Promise.race([
+              RouteMatrix!.computeRouteMatrix(request),
+              timeoutPromise
+            ]);
+
+            if (!response || !response.matrix) {
+              failedCount += batch.length;
+              return;
+            }
+
+            // Process response - Routes API returns matrix.rows[originIndex].items[destIndex]
+            // For 1 origin x N destinations, we access matrix.rows[0].items
+            const items = response.matrix.rows?.[0]?.items;
+            if (!items) {
+              failedCount += batch.length;
+              return;
+            }
+
+            batch.forEach((place, idx) => {
+              const element = items[idx];
+              if (element && element.condition === 'ROUTE_EXISTS' && element.durationMillis != null) {
+                // Routes API returns durationMillis in milliseconds, convert to seconds
+                const durationSeconds = Math.round(element.durationMillis / 1000);
+                
+                const distance = {
+                  text: formatDuration(durationSeconds),
+                  value: durationSeconds,
+                };
+                durations.set(place.place_id, distance);
+                newlyFetchedDistances.set(place.place_id, distance);
+              } else {
+                failedCount++;
               }
-            );
+            });
           } catch (err) {
-            clearTimeout(timeoutId);
-            console.error('Distance matrix request failed:', err);
+            console.error('Route matrix request failed:', err);
             failedCount += batch.length;
-            resolve();
           }
-        })
-      );
+        });
 
-      await Promise.all(batchPromises);
+        await Promise.all(batchPromises);
+      } else {
+        // Fall back to legacy Distance Matrix API
+        const service = new google.maps.DistanceMatrixService();
+        
+        const batchPromises = batches.map(batch =>
+          new Promise<void>((resolve) => {
+            const timeoutId = setTimeout(() => {
+              console.warn('Distance matrix request timed out for batch');
+              failedCount += batch.length;
+              resolve();
+            }, MATRIX_TIMEOUT_MS);
+
+            const destinations = batch.map(p => p.geometry!.location!);
+
+            try {
+              service.getDistanceMatrix(
+                {
+                  origins: [{ lat: origin.lat, lng: origin.lng }],
+                  destinations,
+                  travelMode,
+                },
+                (response, status) => {
+                  clearTimeout(timeoutId);
+
+                  if (status === 'OK' && response?.rows[0]) {
+                    batch.forEach((place, idx) => {
+                      const element = response.rows[0].elements[idx];
+                      if (element?.status === 'OK' && element.duration) {
+                        const distance = {
+                          text: element.duration.text,
+                          value: element.duration.value,
+                        };
+                        durations.set(place.place_id, distance);
+                        newlyFetchedDistances.set(place.place_id, distance);
+                      } else {
+                        failedCount++;
+                      }
+                    });
+                  } else {
+                    failedCount += batch.length;
+                  }
+                  resolve();
+                }
+              );
+            } catch (err) {
+              clearTimeout(timeoutId);
+              console.error('Distance matrix request failed:', err);
+              failedCount += batch.length;
+              resolve();
+            }
+          })
+        );
+
+        await Promise.all(batchPromises);
+      }
       
       // Save newly fetched distances to BOTH L1 and L2 cache
       if (newlyFetchedDistances.size > 0) {
@@ -153,7 +252,7 @@ export const useDistanceMatrix = () => {
 
     // Log API call summary for this distance calculation
     const batchCount = Math.ceil(uncachedPlaces.length / BATCH_SIZE);
-    Logger.info('SYSTEM', '=== DISTANCE MATRIX API SUMMARY ===', {
+    Logger.info('SYSTEM', '=== ROUTES API SUMMARY ===', {
       totalPlaces: validPlaces.length,
       cacheHits: cachedDistances.size,
       apiCalls: batchCount,
@@ -163,7 +262,7 @@ export const useDistanceMatrix = () => {
     });
 
     return { durations, failedCount };
-  }, [getService]);
+  }, []);
 
   /**
    * Filter places by maximum walking duration
@@ -193,70 +292,10 @@ export const useDistanceMatrix = () => {
     });
   }, []);
 
-  /**
-   * Verify walking times using Directions API (more accurate than Distance Matrix)
-   * Use this for final results to get precise route-based walking times
-   */
-  const verifyWalkingTimes = useCallback(async (
-    origin: { lat: number; lng: number },
-    places: Array<{ place_id: string; geometry?: { location?: google.maps.LatLng | google.maps.LatLngLiteral } }>
-  ): Promise<Map<string, PlaceDuration>> => {
-    if (!window.google) {
-      throw new Error('Google Maps API not loaded');
-    }
-
-    const directionsService = new google.maps.DirectionsService();
-    const verifiedDurations = new Map<string, PlaceDuration>();
-
-    // Process each place in parallel
-    const promises = places.map(async (place) => {
-      if (!place.geometry?.location) return;
-
-      try {
-        const result = await new Promise<google.maps.DirectionsResult | null>((resolve) => {
-          const timeoutId = setTimeout(() => {
-            console.warn(`Directions API timeout for ${place.place_id}`);
-            resolve(null);
-          }, 5000);
-
-          directionsService.route(
-            {
-              origin: { lat: origin.lat, lng: origin.lng },
-              destination: place.geometry!.location!,
-              travelMode: google.maps.TravelMode.WALKING,
-            },
-            (response, status) => {
-              clearTimeout(timeoutId);
-              if (status === 'OK' && response) {
-                resolve(response);
-              } else {
-                resolve(null);
-              }
-            }
-          );
-        });
-
-        if (result?.routes[0]?.legs[0]?.duration) {
-          const duration = result.routes[0].legs[0].duration;
-          verifiedDurations.set(place.place_id, {
-            text: duration.text,
-            value: duration.value,
-          });
-        }
-      } catch (err) {
-        console.error(`Failed to verify walking time for ${place.place_id}:`, err);
-      }
-    });
-
-    await Promise.all(promises);
-    return verifiedDurations;
-  }, []);
-
   return {
     calculateDistances,
     filterByDuration,
     sortByDuration,
-    verifyWalkingTimes,
   };
 };
 

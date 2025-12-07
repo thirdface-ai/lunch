@@ -460,8 +460,8 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         throw new Error('DEEP ANALYSIS PIPELINE YIELDED NO VIABLE RECOMMENDATIONS.');
       }
 
-      // Take up to 5 results (quality over quantity - no padding with generic fallbacks)
-      const finalSelection = recommendations.slice(0, 5);
+      // Take up to 3 results (quality over quantity - no padding with generic fallbacks)
+      const finalSelection = recommendations.slice(0, 3);
 
       setProgress(95);
       Logger.info('SYSTEM', 'Analysis Complete', {
