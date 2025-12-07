@@ -55,11 +55,12 @@ const distanceCache = new Map<string, CachedDistance>();
 /**
  * Generate cache key for distance lookups
  * Rounds lat/lng to 4 decimal places (~11m precision) for cache hits on nearby origins
+ * Includes travel mode since walking/driving/transit times differ significantly
  */
-const getDistanceKey = (originLat: number, originLng: number, placeId: string): string => {
+const getDistanceKey = (originLat: number, originLng: number, placeId: string, travelMode: string = 'WALKING'): string => {
   const lat = originLat.toFixed(4);
   const lng = originLng.toFixed(4);
-  return `${lat},${lng}:${placeId}`;
+  return `${lat},${lng}:${placeId}:${travelMode}`;
 };
 
 /**
@@ -237,35 +238,36 @@ export const PlacesCache = {
 
 /**
  * Distance Cache
+ * Now includes travel mode (WALKING, DRIVING, TRANSIT) in cache key
  */
 export const DistanceCache = {
   /**
-   * Get cached distance
+   * Get cached distance for a specific travel mode
    */
-  get(originLat: number, originLng: number, placeId: string): CachedDistance | null {
-    const key = getDistanceKey(originLat, originLng, placeId);
+  get(originLat: number, originLng: number, placeId: string, travelMode: string = 'WALKING'): CachedDistance | null {
+    const key = getDistanceKey(originLat, originLng, placeId, travelMode);
     return distanceCache.get(key) || null;
   },
 
   /**
-   * Cache distance
+   * Cache distance for a specific travel mode
    */
-  set(originLat: number, originLng: number, placeId: string, distance: CachedDistance): void {
-    const key = getDistanceKey(originLat, originLng, placeId);
+  set(originLat: number, originLng: number, placeId: string, distance: CachedDistance, travelMode: string = 'WALKING'): void {
+    const key = getDistanceKey(originLat, originLng, placeId, travelMode);
     distanceCache.set(key, distance);
   },
 
   /**
-   * Get multiple cached distances
+   * Get multiple cached distances for a specific travel mode
    * Tracks cache hits/misses and cost savings
    */
-  getMany(originLat: number, originLng: number, placeIds: string[]): Map<string, CachedDistance> {
+  getMany(originLat: number, originLng: number, placeIds: string[], travelMode: string = 'WALKING'): Map<string, CachedDistance> {
     const found = new Map<string, CachedDistance>();
     let hits = 0;
     let misses = 0;
     
     for (const id of placeIds) {
-      const cached = this.get(originLat, originLng, id);
+      const cached = this.get(originLat, originLng, id, travelMode);
       if (cached) {
         found.set(id, cached);
         hits++;
@@ -280,7 +282,8 @@ export const DistanceCache = {
     stats.estimatedSavingsEur += hits * COST_PER_DISTANCE_ELEMENT;
     
     if (hits > 0) {
-      Logger.info('CACHE', `Distance cache: ${hits} hits, ${misses} misses`, {
+      Logger.info('CACHE', `Distance cache (${travelMode}): ${hits} hits, ${misses} misses`, {
+        travelMode,
         hitRate: `${((hits / placeIds.length) * 100).toFixed(1)}%`,
         savedCalls: hits,
         estimatedSavings: `€${(hits * COST_PER_DISTANCE_ELEMENT).toFixed(3)}`
@@ -291,24 +294,26 @@ export const DistanceCache = {
   },
 
   /**
-   * Cache multiple distances (L1 only - synchronous)
+   * Cache multiple distances for a specific travel mode (L1 only - synchronous)
    */
-  setMany(originLat: number, originLng: number, distances: Map<string, CachedDistance>): void {
+  setMany(originLat: number, originLng: number, distances: Map<string, CachedDistance>, travelMode: string = 'WALKING'): void {
     distances.forEach((distance, placeId) => {
-      this.set(originLat, originLng, placeId, distance);
+      this.set(originLat, originLng, placeId, distance, travelMode);
     });
-    Logger.info('CACHE', `Cached ${distances.size} distances to L1`, {
+    Logger.info('CACHE', `Cached ${distances.size} distances to L1 (${travelMode})`, {
+      travelMode,
       totalCached: distanceCache.size
     });
   },
 
   /**
-   * Get distances with L2 (Supabase) fallback
+   * Get distances with L2 (Supabase) fallback for a specific travel mode
    */
   async getManyWithL2(
     originLat: number, 
     originLng: number, 
-    placeIds: string[]
+    placeIds: string[],
+    travelMode: string = 'WALKING'
   ): Promise<{ found: Map<string, CachedDistance>; missing: string[] }> {
     const found = new Map<string, CachedDistance>();
     let l1Hits = 0;
@@ -317,7 +322,7 @@ export const DistanceCache = {
     // Check L1 first
     const l1Missing: string[] = [];
     for (const id of placeIds) {
-      const cached = this.get(originLat, originLng, id);
+      const cached = this.get(originLat, originLng, id, travelMode);
       if (cached) {
         found.set(id, cached);
         l1Hits++;
@@ -328,11 +333,11 @@ export const DistanceCache = {
     
     // Check L2 for remaining
     if (l1Missing.length > 0) {
-      const l2Results = await SupabaseService.getCachedDistances(originLat, originLng, l1Missing);
+      const l2Results = await SupabaseService.getCachedDistances(originLat, originLng, l1Missing, travelMode);
       l2Results.forEach((distance, id) => {
         found.set(id, distance);
         // Save to L1 for faster subsequent access
-        this.set(originLat, originLng, id, distance);
+        this.set(originLat, originLng, id, distance, travelMode);
         l2Hits++;
       });
     }
@@ -346,7 +351,8 @@ export const DistanceCache = {
     stats.estimatedSavingsEur += totalHits * COST_PER_DISTANCE_ELEMENT;
     
     if (totalHits > 0 || missing.length > 0) {
-      Logger.info('CACHE', `Distance cache lookup: L1=${l1Hits}, L2=${l2Hits}, miss=${missing.length}`, {
+      Logger.info('CACHE', `Distance cache lookup (${travelMode}): L1=${l1Hits}, L2=${l2Hits}, miss=${missing.length}`, {
+        travelMode,
         total: placeIds.length,
         l1Hits,
         l2Hits,
@@ -360,21 +366,22 @@ export const DistanceCache = {
   },
 
   /**
-   * Save distances to both L1 and L2 cache
+   * Save distances to both L1 and L2 cache for a specific travel mode
    */
   async saveToBothLayers(
     originLat: number,
     originLng: number,
-    distances: Map<string, CachedDistance>
+    distances: Map<string, CachedDistance>,
+    travelMode: string = 'WALKING'
   ): Promise<void> {
     if (distances.size === 0) return;
     
     // Save to L1 (synchronous)
-    this.setMany(originLat, originLng, distances);
+    this.setMany(originLat, originLng, distances, travelMode);
     
     // Save to L2 (async, non-blocking)
-    SupabaseService.cacheDistances(originLat, originLng, distances).catch(err => {
-      Logger.warn('CACHE', 'Failed to save distances to L2 cache', { error: err });
+    SupabaseService.cacheDistances(originLat, originLng, distances, travelMode).catch(err => {
+      Logger.warn('CACHE', 'Failed to save distances to L2 cache', { error: err, travelMode });
     });
   }
 };

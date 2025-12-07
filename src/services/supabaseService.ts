@@ -255,11 +255,13 @@ export const SupabaseService = {
   /**
    * Get cached distances from Supabase (shared across all users)
    * Origin coordinates are rounded to 4 decimal places (~11m precision)
+   * Now includes travel mode filtering (WALKING, DRIVING, TRANSIT)
    */
   async getCachedDistances(
     originLat: number, 
     originLng: number, 
-    placeIds: string[]
+    placeIds: string[],
+    travelMode: string = 'WALKING'
   ): Promise<Map<string, CachedDuration>> {
     if (placeIds.length === 0) return new Map();
 
@@ -273,11 +275,12 @@ export const SupabaseService = {
         .select('place_id, duration_text, duration_value')
         .eq('origin_lat', roundedLat)
         .eq('origin_lng', roundedLng)
+        .eq('travel_mode', travelMode)
         .in('place_id', placeIds)
         .gt('expires_at', new Date().toISOString());
 
       if (error) {
-        Logger.warn('CACHE', 'Supabase distances cache fetch failed', { error: error.message });
+        Logger.warn('CACHE', 'Supabase distances cache fetch failed', { error: error.message, travelMode });
         return new Map();
       }
 
@@ -290,8 +293,9 @@ export const SupabaseService = {
       });
 
       if (result.size > 0) {
-        Logger.info('CACHE', `Supabase L2 distance cache: ${result.size} hits`, {
+        Logger.info('CACHE', `Supabase L2 distance cache (${travelMode}): ${result.size} hits`, {
           origin: `${roundedLat},${roundedLng}`,
+          travelMode,
           requested: placeIds.length,
           found: result.size
         });
@@ -299,18 +303,20 @@ export const SupabaseService = {
 
       return result;
     } catch (e) {
-      Logger.warn('CACHE', 'Supabase distances cache exception', { error: e });
+      Logger.warn('CACHE', 'Supabase distances cache exception', { error: e, travelMode });
       return new Map();
     }
   },
 
   /**
    * Save distances to Supabase cache (shared across all users)
+   * Includes travel mode for proper cache isolation between walking/driving/transit
    */
   async cacheDistances(
     originLat: number,
     originLng: number,
-    distances: Map<string, CachedDuration>
+    distances: Map<string, CachedDuration>,
+    travelMode: string = 'WALKING'
   ): Promise<void> {
     if (distances.size === 0) return;
 
@@ -327,6 +333,7 @@ export const SupabaseService = {
         place_id: string;
         duration_text: string;
         duration_value: number;
+        travel_mode: string;
         expires_at: string;
       }> = [];
 
@@ -337,21 +344,22 @@ export const SupabaseService = {
           place_id: placeId,
           duration_text: duration.text,
           duration_value: duration.value,
+          travel_mode: travelMode,
           expires_at: expiresAt.toISOString(),
         });
       });
 
       const { error } = await supabase
         .from('distances_cache')
-        .upsert(records, { onConflict: 'origin_lat,origin_lng,place_id' });
+        .upsert(records, { onConflict: 'origin_lat,origin_lng,place_id,travel_mode' });
 
       if (error) {
-        Logger.warn('CACHE', 'Supabase distances cache save failed', { error: error.message });
+        Logger.warn('CACHE', 'Supabase distances cache save failed', { error: error.message, travelMode });
       } else {
-        Logger.info('CACHE', `Saved ${distances.size} distances to Supabase L2 cache`);
+        Logger.info('CACHE', `Saved ${distances.size} distances to Supabase L2 cache (${travelMode})`);
       }
     } catch (e) {
-      Logger.warn('CACHE', 'Supabase distances cache save exception', { error: e });
+      Logger.warn('CACHE', 'Supabase distances cache save exception', { error: e, travelMode });
     }
   },
 };

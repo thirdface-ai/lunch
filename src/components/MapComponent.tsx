@@ -54,9 +54,14 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
 
   const isDark = theme === ThemeMode.DARK;
 
-  // Initialize the map instance once the component is mounted
+  // Initialize the map instance - recreate when theme changes for proper dark mode
   useEffect(() => {
-    if (!mapRef.current || map) return;
+    if (!mapRef.current) return;
+
+    // Clear existing map when theme changes
+    if (map) {
+      setMap(null);
+    }
 
     let isMounted = true;
     const initMap = async () => {
@@ -66,12 +71,14 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
         await google.maps.importLibrary('marker');
         
         if (isMounted && mapRef.current) {
+          // Use colorScheme for dark mode with cloud-based maps
+          // This requires the map to be recreated when theme changes
           const mapInstance = new Map(mapRef.current, {
             center: { lat: userLat || 0, lng: userLng || 0 },
             zoom: 14,
             disableDefaultUI: true,
-            styles: isDark ? DARK_MAP_STYLES : undefined,
             mapId: 'lunch-map', // Required for AdvancedMarkerElement
+            colorScheme: isDark ? 'DARK' : 'LIGHT',
           });
           setMap(mapInstance);
           setApiStatus('loaded');
@@ -86,13 +93,8 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
     initMap();
 
     return () => { isMounted = false; };
-  }, [map, userLat, userLng, isDark]);
-
-  // Update map styles when theme changes
-  useEffect(() => {
-    if (!map) return;
-    map.setOptions({ styles: isDark ? DARK_MAP_STYLES : [] });
-  }, [map, isDark]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDark]); // Recreate map when theme changes
 
   // Update markers and viewport when map is ready or data changes
   useEffect(() => {

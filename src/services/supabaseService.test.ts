@@ -295,7 +295,7 @@ describe('SupabaseService - Cache Methods', () => {
       await SupabaseService.cacheDistances(52.52, 13.405, distances);
 
       const upsertCall = mockUpsert.mock.calls[0];
-      expect(upsertCall[1]).toEqual({ onConflict: 'origin_lat,origin_lng,place_id' });
+      expect(upsertCall[1]).toEqual({ onConflict: 'origin_lat,origin_lng,place_id,travel_mode' });
     });
   });
 });

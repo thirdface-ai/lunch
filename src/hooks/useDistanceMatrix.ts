@@ -4,7 +4,7 @@ import { DistanceCache } from '../lib/placesCache';
 import Logger from '../utils/logger';
 
 const BATCH_SIZE = 25;
-const MATRIX_TIMEOUT_MS = 15000; // 15 second timeout per batch (increased from 10s)
+const MATRIX_TIMEOUT_MS = 30000; // 30 second timeout per batch
 
 export interface PlaceDuration {
   text: string;
@@ -64,12 +64,22 @@ export const useDistanceMatrix = () => {
     // Filter places with valid geometry
     const validPlaces = places.filter(p => p.geometry?.location);
 
+    // Convert travel mode enum to string for cache key
+    // Routes API uses: WALKING, DRIVING, BICYCLING, TRANSIT
+    const travelModeString = travelMode === google.maps.TravelMode.WALKING ? 'WALKING' 
+      : travelMode === google.maps.TravelMode.DRIVING ? 'DRIVING'
+      : travelMode === google.maps.TravelMode.BICYCLING ? 'BICYCLING'
+      : travelMode === google.maps.TravelMode.TRANSIT ? 'TRANSIT'
+      : 'WALKING';
+
     // Check L1 (memory) + L2 (Supabase) cache to reduce API calls
+    // Now includes travel mode for proper cache isolation
     const placeIds = validPlaces.map(p => p.place_id);
     const { found: cachedDistances, missing: uncachedIds } = await DistanceCache.getManyWithL2(
       origin.lat, 
       origin.lng, 
-      placeIds
+      placeIds,
+      travelModeString
     );
     
     // Add cached distances to results
@@ -80,7 +90,8 @@ export const useDistanceMatrix = () => {
     // Filter to only uncached places
     const uncachedPlaces = validPlaces.filter(p => uncachedIds.includes(p.place_id));
     
-    Logger.info('SYSTEM', 'Distance cache check (L1+L2)', {
+    Logger.info('SYSTEM', `Distance cache check (L1+L2) [${travelModeString}]`, {
+      travelMode: travelModeString,
       total: validPlaces.length,
       cached: cachedDistances.size,
       toFetch: uncachedPlaces.length
@@ -117,14 +128,7 @@ export const useDistanceMatrix = () => {
 
       if (useRoutesApi && RouteMatrix) {
         // Use new Routes API (RouteMatrix.computeRouteMatrix)
-        // Convert google.maps.TravelMode enum to string for Routes API
-        // Valid values: DRIVING, WALKING, BICYCLING, TRANSIT
-        const travelModeString = travelMode === google.maps.TravelMode.WALKING ? 'WALKING' 
-          : travelMode === google.maps.TravelMode.DRIVING ? 'DRIVING'
-          : travelMode === google.maps.TravelMode.BICYCLING ? 'BICYCLING'
-          : travelMode === google.maps.TravelMode.TRANSIT ? 'TRANSIT'
-          : 'WALKING'; // Default to WALKING
-        
+        // travelModeString already defined above for cache key
         const batchPromises = batches.map(async (batch) => {
           try {
             // Build destinations array with location coordinates
@@ -296,15 +300,16 @@ export const useDistanceMatrix = () => {
         await Promise.all(batchPromises);
       }
       
-      // Save newly fetched distances to BOTH L1 and L2 cache
+      // Save newly fetched distances to BOTH L1 and L2 cache (with travel mode)
       if (newlyFetchedDistances.size > 0) {
-        await DistanceCache.saveToBothLayers(origin.lat, origin.lng, newlyFetchedDistances);
+        await DistanceCache.saveToBothLayers(origin.lat, origin.lng, newlyFetchedDistances, travelModeString);
       }
     }
 
     // Log API call summary for this distance calculation
     const batchCount = Math.ceil(uncachedPlaces.length / BATCH_SIZE);
-    Logger.info('SYSTEM', '=== ROUTES API SUMMARY ===', {
+    Logger.info('SYSTEM', `=== ROUTES API SUMMARY [${travelModeString}] ===`, {
+      travelMode: travelModeString,
       totalPlaces: validPlaces.length,
       cacheHits: cachedDistances.size,
       apiCalls: batchCount,

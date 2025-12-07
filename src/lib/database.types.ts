@@ -51,6 +51,7 @@ export type Database = {
           origin_lat: number
           origin_lng: number
           place_id: string
+          travel_mode: string
         }
         Insert: {
           created_at?: string | null
@@ -61,6 +62,7 @@ export type Database = {
           origin_lat: number
           origin_lng: number
           place_id: string
+          travel_mode?: string
         }
         Update: {
           created_at?: string | null
@@ -71,6 +73,7 @@ export type Database = {
           origin_lat?: number
           origin_lng?: number
           place_id?: string
+          travel_mode?: string
         }
         Relationships: []
       }
