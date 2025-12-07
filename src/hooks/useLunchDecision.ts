@@ -369,12 +369,10 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
 
       // When special filters are selected, we need MORE candidates to filter from
       // because these filters reduce the pool - expand the distance threshold
-      const effectiveNewlyOpenedOnly = preferences.newlyOpenedOnly || aiDetectedNewlyOpened;
-      const effectivePopularOnly = preferences.popularOnly || aiDetectedPopular;
-      const needsCardOnly = preferences.noCash;
+      // (reusing effectiveNewlyOpened, effectivePopular, needsCardOnly from above)
       
       // Calculate how much to expand based on number of filters
-      const filterCount = [effectiveNewlyOpenedOnly, effectivePopularOnly, needsCardOnly].filter(Boolean).length;
+      const filterCount = [effectiveNewlyOpened, effectivePopular, needsCardOnly].filter(Boolean).length;
       const distanceMultiplier = filterCount > 0 ? Math.min(2 + filterCount, 4) : 1; // 3x for 1 filter, 4x for 2+
       const effectiveMaxDuration = maxDurationSeconds * distanceMultiplier;
 
@@ -391,8 +389,8 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
       
       // Log appropriate message based on active filters
       const activeFilters: string[] = [];
-      if (effectiveNewlyOpenedOnly) activeFilters.push('FRESH DROPS');
-      if (effectivePopularOnly) activeFilters.push('TRENDING');
+      if (effectiveNewlyOpened) activeFilters.push('FRESH DROPS');
+      if (effectivePopular) activeFilters.push('TRENDING');
       if (needsCardOnly) activeFilters.push('CARD-ONLY');
       
       if (activeFilters.length > 0) {
@@ -491,8 +489,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
       addLog('ANALYZING REVIEWS AND RATINGS...');
 
       // Combine user preferences with AI-detected intent from freestyle prompt
-      const effectiveNewlyOpenedOnly = preferences.newlyOpenedOnly || aiDetectedNewlyOpened;
-      const effectivePopularOnly = preferences.popularOnly || aiDetectedPopular;
+      // (reusing effectiveNewlyOpened, effectivePopular from earlier in the function)
       
       if (aiDetectedNewlyOpened || aiDetectedPopular) {
         Logger.info('SYSTEM', 'AI detected search intent from freestyle prompt', {
@@ -510,8 +507,8 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         preferences.address,
         preferences.dietaryRestrictions,
         preferences.freestylePrompt,
-        effectiveNewlyOpenedOnly,
-        effectivePopularOnly,
+        effectiveNewlyOpened,
+        effectivePopular,
         addLog // Pass the log callback for real-time personalized updates
       );
 
