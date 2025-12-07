@@ -260,9 +260,10 @@ const ResultsView: React.FC<ResultsViewProps> = ({
           <div className="flex-1 sm:overflow-y-auto sm:min-h-0">
             {results.map((place, idx) => {
               // Find today's hours by matching the day name in the weekday_text strings
-              // Use the browser's locale to match Google Places API's weekdayDescriptions language
-              const browserLocale = typeof navigator !== 'undefined' ? navigator.language : 'en-US';
-              const todayName = new Date().toLocaleDateString(browserLocale, { weekday: 'long' });
+              // IMPORTANT: Google Places API ALWAYS returns English day names, regardless of locale
+              // So we must use English day names for the lookup, not the browser's locale
+              const englishDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+              const todayName = englishDays[new Date().getDay()];
               const todaysHoursRaw = place.opening_hours?.weekday_text?.find(
                 text => text.toLowerCase().startsWith(todayName.toLowerCase())
               );

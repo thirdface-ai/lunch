@@ -7,6 +7,8 @@ import {
   detectCuisineIntent,
   getOpenStatusScore,
   willBeOpenOnArrival,
+  isClosedToday,
+  filterOutClosedToday,
 } from './lunchAlgorithm';
 import { HungerVibe, PricePoint, GooglePlace } from '../types';
 
@@ -423,6 +425,203 @@ describe('willBeOpenOnArrival', () => {
     };
     
     expect(willBeOpenOnArrival(place, undefined)).toBe(true);
+  });
+});
+
+describe('isClosedToday', () => {
+  // Helper to get today's day name in English (matches Google Places API format)
+  const getTodayName = (): string => {
+    const englishDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return englishDays[new Date().getDay()];
+  };
+
+  it('returns false for place without opening_hours', () => {
+    const place: GooglePlace = {
+      place_id: 'test',
+      name: 'Test',
+    };
+    
+    expect(isClosedToday(place)).toBe(false);
+  });
+
+  it('returns false for place without weekday_text', () => {
+    const place: GooglePlace = {
+      place_id: 'test',
+      name: 'Test',
+      opening_hours: { open_now: false },
+    };
+    
+    expect(isClosedToday(place)).toBe(false);
+  });
+
+  it('returns false for place with empty weekday_text', () => {
+    const place: GooglePlace = {
+      place_id: 'test',
+      name: 'Test',
+      opening_hours: { open_now: false, weekday_text: [] },
+    };
+    
+    expect(isClosedToday(place)).toBe(false);
+  });
+
+  it('returns true when today is explicitly "Closed"', () => {
+    const todayName = getTodayName();
+    const place: GooglePlace = {
+      place_id: 'test',
+      name: 'Test',
+      opening_hours: {
+        open_now: false,
+        weekday_text: [
+          `${todayName}: Closed`,
+        ],
+      },
+    };
+    
+    expect(isClosedToday(place)).toBe(true);
+  });
+
+  it('returns false when today has operating hours', () => {
+    const todayName = getTodayName();
+    const place: GooglePlace = {
+      place_id: 'test',
+      name: 'Test',
+      opening_hours: {
+        open_now: false,
+        weekday_text: [
+          `${todayName}: 11:00 AM – 10:00 PM`,
+        ],
+      },
+    };
+    
+    expect(isClosedToday(place)).toBe(false);
+  });
+
+  it('returns false when today has "Open 24 hours"', () => {
+    const todayName = getTodayName();
+    const place: GooglePlace = {
+      place_id: 'test',
+      name: 'Test',
+      opening_hours: {
+        open_now: true,
+        weekday_text: [
+          `${todayName}: Open 24 hours`,
+        ],
+      },
+    };
+    
+    expect(isClosedToday(place)).toBe(false);
+  });
+
+  it('is case insensitive for "Closed"', () => {
+    const todayName = getTodayName();
+    const place: GooglePlace = {
+      place_id: 'test',
+      name: 'Test',
+      opening_hours: {
+        open_now: false,
+        weekday_text: [
+          `${todayName}: CLOSED`,
+        ],
+      },
+    };
+    
+    expect(isClosedToday(place)).toBe(true);
+  });
+});
+
+describe('filterOutClosedToday', () => {
+  // Helper to get today's day name in English (matches Google Places API format)
+  const getTodayName = (): string => {
+    const englishDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return englishDays[new Date().getDay()];
+  };
+
+  it('filters out places closed today', () => {
+    const todayName = getTodayName();
+    const places: GooglePlace[] = [
+      {
+        place_id: 'open-1',
+        name: 'Open Place',
+        opening_hours: {
+          open_now: true,
+          weekday_text: [`${todayName}: 11:00 AM – 10:00 PM`],
+        },
+      },
+      {
+        place_id: 'closed-1',
+        name: 'Closed Place',
+        opening_hours: {
+          open_now: false,
+          weekday_text: [`${todayName}: Closed`],
+        },
+      },
+      {
+        place_id: 'no-hours',
+        name: 'No Hours Place',
+      },
+    ];
+
+    const result = filterOutClosedToday(places);
+    
+    expect(result).toHaveLength(2);
+    expect(result.map(p => p.place_id)).toContain('open-1');
+    expect(result.map(p => p.place_id)).toContain('no-hours');
+    expect(result.map(p => p.place_id)).not.toContain('closed-1');
+  });
+
+  it('returns all places when none are closed today', () => {
+    const todayName = getTodayName();
+    const places: GooglePlace[] = [
+      {
+        place_id: 'open-1',
+        name: 'Open Place 1',
+        opening_hours: {
+          open_now: true,
+          weekday_text: [`${todayName}: 11:00 AM – 10:00 PM`],
+        },
+      },
+      {
+        place_id: 'open-2',
+        name: 'Open Place 2',
+        opening_hours: {
+          open_now: false,
+          weekday_text: [`${todayName}: 6:00 PM – 11:00 PM`],
+        },
+      },
+    ];
+
+    const result = filterOutClosedToday(places);
+    expect(result).toHaveLength(2);
+  });
+
+  it('returns empty array when all places are closed today', () => {
+    const todayName = getTodayName();
+    const places: GooglePlace[] = [
+      {
+        place_id: 'closed-1',
+        name: 'Closed Place 1',
+        opening_hours: {
+          open_now: false,
+          weekday_text: [`${todayName}: Closed`],
+        },
+      },
+      {
+        place_id: 'closed-2',
+        name: 'Closed Place 2',
+        opening_hours: {
+          open_now: false,
+          weekday_text: [`${todayName}: Closed`],
+        },
+      },
+    ];
+
+    const result = filterOutClosedToday(places);
+    expect(result).toHaveLength(0);
+  });
+
+  it('handles empty array', () => {
+    const result = filterOutClosedToday([]);
+    expect(result).toEqual([]);
   });
 });
 

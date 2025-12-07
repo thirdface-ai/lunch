@@ -284,6 +284,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         radius,
         vibe: preferences.vibe,
         freestylePrompt: preferences.freestylePrompt,
+        address: preferences.address, // For city-aware search queries
       });
 
       // If freestyle prompt returns no results, retry with vibe-only or generic search
@@ -300,6 +301,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
           radius,
           vibe: preferences.vibe,
           freestylePrompt: undefined, // Remove the freestyle prompt
+          address: preferences.address, // Keep address for city-aware queries
         });
       }
 

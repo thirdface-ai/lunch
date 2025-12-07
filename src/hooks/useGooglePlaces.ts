@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { GooglePlace, HungerVibe, PlaceReview } from '../types';
-import { getSearchQueriesForVibe, detectCuisineIntent, CuisineIntent } from '../utils/lunchAlgorithm';
+import { getSearchQueriesForVibe, detectCuisineIntent, CuisineIntent, filterOutClosedToday } from '../utils/lunchAlgorithm';
 import { translateSearchIntent, TranslatedSearchIntent, filterPlacesByQuery } from '../services/aiService';
 import { PlacesCache } from '../lib/placesCache';
 import { SupabaseService } from '../services/supabaseService';
@@ -90,6 +90,7 @@ interface SearchPlacesParams {
   radius: number;
   vibe: HungerVibe | null;
   freestylePrompt?: string;
+  address?: string; // For city-aware search queries
 }
 
 interface SearchPlacesResult {
@@ -163,6 +164,7 @@ export const useGooglePlaces = () => {
     radius,
     vibe,
     freestylePrompt,
+    address,
   }: SearchPlacesParams): Promise<SearchPlacesResult> => {
     if (!window.google) {
       throw new Error('Google Maps API not loaded');
@@ -195,7 +197,7 @@ export const useGooglePlaces = () => {
         // Not a specific cuisine - use AI to translate vague prompts into smart search queries
         // This handles requests like "newest hottest places", "hidden gems", "something fancy"
         try {
-          translatedIntent = await translateSearchIntent(trimmedPrompt, vibe);
+          translatedIntent = await translateSearchIntent(trimmedPrompt, vibe, address);
           
           if (translatedIntent.searchQueries.length > 0) {
             searchQueries = translatedIntent.searchQueries;
@@ -222,16 +224,29 @@ export const useGooglePlaces = () => {
             `best ${trimmedPrompt}`,
           ];
         }
-        
-        // Add vibe query as supplement if no AI translation available
-        if (!translatedIntent && vibe) {
-          const vibeQueries = getSearchQueriesForVibe(vibe);
-          searchQueries.push(vibeQueries[0]);
-        }
       }
     } else {
-      // No freestyle prompt: use vibe-based queries
-      searchQueries = getSearchQueriesForVibe(vibe);
+      // No freestyle prompt: use AI to generate city-aware vibe queries
+      // This makes "Grab & Go" in Berlin different from "Grab & Go" in NYC
+      try {
+        const vibeQuery = vibe || 'good local food';
+        translatedIntent = await translateSearchIntent(vibeQuery, vibe, address);
+        
+        if (translatedIntent.searchQueries.length > 0) {
+          searchQueries = translatedIntent.searchQueries;
+          Logger.info('SYSTEM', 'City-aware vibe queries generated', { 
+            vibe,
+            address,
+            queries: searchQueries
+          });
+        } else {
+          // Fallback to static queries if AI fails
+          searchQueries = getSearchQueriesForVibe(vibe);
+        }
+      } catch (e) {
+        Logger.warn('SYSTEM', 'City-aware vibe query failed, using fallback', { error: e });
+        searchQueries = getSearchQueriesForVibe(vibe);
+      }
     }
 
     // Deduplicate and limit queries
@@ -361,18 +376,23 @@ export const useGooglePlaces = () => {
     // CRITICAL: Filter out non-food establishments (e.g., cap stores, clothing shops)
     const foodPlaces = allPlaces.filter(place => isFoodEstablishment(place.types));
     
+    // Filter out places that are closed for the entire day today
+    const openTodayPlaces = filterOutClosedToday(foodPlaces);
+    const closedTodayCount = foodPlaces.length - openTodayPlaces.length;
+    
     // Deduplicate by place_id
     const seenIds = new Set<string>();
-    const deduplicatedPlaces = foodPlaces.filter(place => {
+    const deduplicatedPlaces = openTodayPlaces.filter(place => {
       if (seenIds.has(place.place_id)) return false;
       seenIds.add(place.place_id);
       return true;
     });
     
-    Logger.info('SYSTEM', 'Food establishment filter applied', {
+    Logger.info('SYSTEM', 'Place filters applied', {
       total: allPlaces.length,
-      passed: deduplicatedPlaces.length,
-      filtered: allPlaces.length - deduplicatedPlaces.length
+      afterFoodFilter: foodPlaces.length,
+      closedToday: closedTodayCount,
+      final: deduplicatedPlaces.length
     });
 
     // Log API call summary for this search

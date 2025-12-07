@@ -87,53 +87,48 @@ const extractJsonFromResponse = (text: string): string => {
  * AI-powered translation of freestyle prompts into Google Places search queries
  * 
  * Handles vague requests like "newest hottest places" by understanding intent
- * and generating appropriate search queries that Google Places can understand.
+ * and generates city-appropriate search queries based on local food culture.
  */
 export const translateSearchIntent = async (
   freestylePrompt: string,
-  vibe: HungerVibe | null
+  vibe: HungerVibe | null,
+  address?: string
 ): Promise<TranslatedSearchIntent> => {
-  const trimmedPrompt = freestylePrompt.trim();
+  const query = freestylePrompt.trim();
   
-  // Skip AI for empty prompts
-  if (!trimmedPrompt) {
-    return {
-      searchQueries: [],
-      originalPrompt: trimmedPrompt,
-    };
+  if (!query) {
+    return { searchQueries: [], originalPrompt: query };
   }
 
-  Logger.info('AI', 'Translating search intent', { prompt: trimmedPrompt, vibe });
+  // Extract location context
+  const location = address || 'Unknown location';
+  const vibeText = vibe || 'none';
 
-  const prompt = `Translate user food request into Google Places search queries.
+  Logger.info('AI', 'Translating search intent', { query, vibe: vibeText, location });
 
-INPUT: "${trimmedPrompt}"${vibe ? ` | VIBE: ${vibe}` : ''}
+  const prompt = `You are a local food expert. Generate Google Places search queries for: "${query}"
 
-CRITICAL RULES:
-1. Generate exactly 3 DIVERSE search queries
-2. NEVER include generic words: "restaurant", "food", "near", "nearby", "me", "delivery", "takeout"
-3. Focus on CUISINE TYPE and DISH NAMES that distinguish places
+ADDRESS: ${location}
+VIBE: ${vibeText}
 
-STRATEGY - Create 3 distinct angles:
-1. SPECIFIC DISH: The exact food item (e.g., "schnitzel", "ramen", "kebab")
-2. CUISINE TYPE: The cuisine category (e.g., "german", "japanese", "turkish") 
-3. RELATED STYLE: Related cuisine or cooking style (e.g., "austrian", "noodle bar", "mediterranean grill")
+YOUR TASK:
+1. Think about the SPECIFIC NEIGHBORHOOD in "${location}" - what's the vibe there? What do locals eat?
+2. Consider: Is this a business district? Residential? Trendy? Tourist area? Multicultural?
+3. What cuisines and food styles are popular in THIS specific area (not just the city)?
+4. If a vibe is set, interpret it for THIS neighborhood (e.g., "Grab & Go" near an office = different than "Grab & Go" in a hip neighborhood)
 
-EXAMPLES:
-- "turkish food" → ["turkish", "kebab", "mediterranean grill"]
-- "steak" → ["steak", "steakhouse", "american grill"]
-- "pizza" → ["pizza", "pizzeria", "italian"]
-- "sushi" → ["sushi", "sushi bar", "japanese"]
-- "healthy food" → ["salad bar", "poke bowl", "mediterranean"]
-- "schnitzel" → ["schnitzel", "german", "austrian"]
+GENERATE 3 search queries using:
+- Local dish names popular in this neighborhood
+- Cuisine types common in this area
+- Food styles that fit the neighborhood character
 
-BAD: ["turkish restaurant near me", "turkish food delivery"] ❌ (generic words)
-GOOD: ["turkish", "kebab", "mediterranean grill"] ✅ (specific & diverse)
+RULES:
+- Use specific terms, not generic words like "restaurant", "food", "near me"
+- Each query = different angle: specific dish, cuisine type, local food style
+- Think like someone who lives/works at "${location}"
 
-OUTPUT JSON:
-{"searchQueries":["dish","cuisine","style"],"newlyOpenedOnly":bool|null,"popularOnly":bool|null,"cuisineType":"cuisine|null"}
-
-Generate exactly 3 SPECIFIC queries. No generic words.`;
+OUTPUT (JSON only):
+{"searchQueries":["query1","query2","query3"],"newlyOpenedOnly":boolean|null,"popularOnly":boolean|null,"cuisineType":"detected_cuisine|null"}`;
 
   try {
     const text = await callOpenRouterProxy(
@@ -148,8 +143,8 @@ Generate exactly 3 SPECIFIC queries. No generic words.`;
     if (!text || text.trim() === '') {
       Logger.warn('AI', 'Empty response from intent translation');
       return {
-        searchQueries: [trimmedPrompt, 'restaurant'],
-        originalPrompt: trimmedPrompt,
+        searchQueries: [query, 'restaurant'],
+        originalPrompt: query,
       };
     }
 
@@ -172,7 +167,7 @@ Generate exactly 3 SPECIFIC queries. No generic words.`;
     const result = JSON.parse(jsonText);
     
     Logger.info('AI', 'Search intent translated', { 
-      original: trimmedPrompt,
+      original: query,
       queries: result.searchQueries,
       newlyOpenedOnly: result.newlyOpenedOnly,
       popularOnly: result.popularOnly,
@@ -180,19 +175,19 @@ Generate exactly 3 SPECIFIC queries. No generic words.`;
     });
 
     return {
-      searchQueries: result.searchQueries || [trimmedPrompt, 'restaurant'],
+      searchQueries: result.searchQueries || [query, 'restaurant'],
       newlyOpenedOnly: result.newlyOpenedOnly || undefined,
       popularOnly: result.popularOnly || undefined,
       cuisineType: result.cuisineType || undefined,
-      originalPrompt: trimmedPrompt,
+      originalPrompt: query,
     };
 
   } catch (error) {
     Logger.error('AI', 'Intent translation failed', error);
     // Fallback: use original prompt with restaurant suffix
     return {
-      searchQueries: [trimmedPrompt, `${trimmedPrompt} restaurant`, 'restaurant'],
-      originalPrompt: trimmedPrompt,
+      searchQueries: [query, `${query} restaurant`, 'restaurant'],
+      originalPrompt: query,
     };
   }
 };
@@ -659,80 +654,91 @@ export const decideLunch = async (
     };
   });
   
-  // Time context for the AI
-  const currentHour = new Date().getHours();
-  const dayOfWeek = new Date().toLocaleDateString('en', { weekday: 'long' });
+  // === BUILD CONTEXT VARIABLES ===
+  const now = new Date();
+  const hour = now.getHours();
+  const day = now.toLocaleDateString('en', { weekday: 'long' });
+  const meal = hour >= 6 && hour < 11 ? 'breakfast' : 
+               hour >= 11 && hour < 15 ? 'lunch' : 
+               hour >= 15 && hour < 17 ? 'snack' : 
+               hour >= 17 && hour < 22 ? 'dinner' : 'late night';
+  
+  const location = address;
+  const mood = vibe || 'good food';
+  const request = freestylePrompt || 'none';
+  const budget = price === 'Paying Myself' ? 'budget-friendly ($ to $$)' : 
+                 price === 'Company Card' ? 'quality over cost ($$$ to $$$$)' : 'any';
+  const dietary = dietaryRestrictions.length > 0 ? dietaryRestrictions.join(', ') : 'none';
+  const cardOnly = noCash;
+  const wantNew = newlyOpenedOnly;
+  const wantPopular = popularOnly;
+  const candidateCount = payload.length;
 
-  const totalReviews = payload.reduce((sum, p) => sum + p.reviews.length, 0);
-  const recentReviews = payload.reduce((sum, p) => sum + p.reviews.filter(r => r.recent).length, 0);
-  onLog?.(`MINING ${totalReviews} REVIEWS (${recentReviews} RECENT) FOR DISH MENTIONS...`);
+  const reviewStats = {
+    total: payload.reduce((sum, p) => sum + p.reviews.length, 0),
+    recent: payload.reduce((sum, p) => sum + p.reviews.filter(r => r.recent).length, 0)
+  };
+  
+  onLog?.(`MINING ${reviewStats.total} REVIEWS (${reviewStats.recent} RECENT) FOR DISH MENTIONS...`);
 
-  // Budget context
-  const budgetText = price ? {
-    'Paying Myself': 'Budget-conscious, prefer price_level 1-2 ($ to $$)',
-    'Company Card': 'Quality over cost, prefer price_level 3-4 ($$$ to $$$$)'
-  }[price] || '' : '';
-
-  // Dietary context
-  const dietaryText = dietaryRestrictions.length > 0 
-    ? `DIETARY REQUIREMENTS: ${dietaryRestrictions.join(', ')}. Prioritize restaurants that accommodate these.`
-    : '';
-
-  // Compute meal type once
-  const mealType = currentHour >= 6 && currentHour < 11 ? 'BREAKFAST' : 
-                   currentHour >= 11 && currentHour < 15 ? 'LUNCH' : 
-                   currentHour >= 15 && currentHour < 17 ? 'SNACK' : 
-                   currentHour >= 17 && currentHour < 22 ? 'DINNER' : 'LATE_NIGHT';
-
-  // Optimized system instruction - structured format for token efficiency
-  const systemInstruction = `Select EXACTLY 3 best restaurant matches. Return JSON array.
+  // === SYSTEM INSTRUCTION WITH VARIABLES ===
+  const systemInstruction = `You are a local food expert who knows "${location}" intimately. Select exactly 3 restaurants.
 
 CONTEXT:
-- Location: ${address}
-- Vibe: ${vibe || 'Good food'}
-- Request: ${freestylePrompt || 'None'}
-- Time: ${currentHour}:00 ${dayOfWeek} (${mealType})
-${budgetText ? `- Budget: ${budgetText}` : ''}
-${dietaryRestrictions.length > 0 ? `- Dietary: ${dietaryRestrictions.join(', ')}` : ''}
-${newlyOpenedOnly ? '- MODE: FRESH DROPS - prioritize is_fresh_drop=true places' : ''}
-${popularOnly ? '- MODE: TRENDING - prioritize is_trending=true, high recent_review_percent' : ''}
-${noCash ? '- REQUIRE: Card payment (exclude cash_only=true)' : ''}
+- Address: ${location}
+- Vibe: ${mood}
+- Request: ${request}
+- Time: ${hour}:00 ${day} (${meal})
+- Budget: ${budget}
+- Dietary: ${dietary}
+${wantNew ? '- MODE: Fresh drops only - prioritize is_fresh_drop=true' : ''}
+${wantPopular ? '- MODE: Trending spots - prioritize is_trending=true' : ''}
+${cardOnly ? '- REQUIRE: Card payment (exclude cash_only=true)' : ''}
 
-VIBE PRIORITIES:
-- GRAB_AND_GO: walking_minutes<5, takeout=true, "quick/fast" reviews
-- LIGHT_AND_CLEAN: "fresh/healthy" reviews, vegetarian=true
-- VIEW_AND_VIBE: ambiance>distance, has_wine/beer, "atmosphere/view" reviews
-- HEARTY_AND_RICH: "filling/generous portions", dine_in=true
-- SPICY_AND_BOLD: "spicy/authentic heat" reviews
-- AUTHENTIC_AND_CLASSIC: "traditional/authentic" reviews
+THINK ABOUT THIS SPECIFIC NEIGHBORHOOD:
+- What kind of area is "${location}"? (Business district? Residential? Trendy? Tourist?)
+- What do people who live/work HERE actually eat for ${meal}?
+- What cuisines thrive in THIS neighborhood specifically?
+- What's the local food scene character here?
 
-REVIEW SIGNALS:
-+: 5-star + dish mention, recent=true, "hidden gem", "locals' favorite"
--: "went downhill", "overpriced", "slow service" → mention in caveat
+INTERPRET "${mood}" FOR THIS NEIGHBORHOOD:
+- Grab & Go: What's the quick food culture HERE? (Office area = different than hip neighborhood)
+- Light & Clean: What healthy options are popular in THIS area?
+- Hearty & Rich: What's the local comfort food scene?
+- Spicy & Bold: What spicy cuisines are nearby?
+- View & Vibe: What scenic/atmospheric spots exist in this neighborhood?
+- Authentic & Classic: What are the established local favorites HERE?
 
-DISH EXTRACTION (multilingual):
-Find SPECIFIC dish names in reviews (DE/EN). Pattern: "the [dish] is amazing", "best [dish]".
-Use exact name ("Wiener Schnitzel" not "schnitzel"). Never generic ("food", "meal").
+ANALYSIS RULES:
+1. Extract SPECIFIC dish names from reviews (local language OK)
+2. Pattern: "the [dish] is amazing", "best [dish]", "[dish] war super"
+3. Use exact names, never generic ("food", "meal", "dish")
+4. Look for: 5-star + dish mention, "hidden gem", "locals' favorite"
+5. Flag: "went downhill", "overpriced", "slow service" in caveat
 
-CASH DETECTION: cash_only field OR reviews: "cash only", "nur Barzahlung"
-
-OUTPUT per recommendation:
-{place_id, recommended_dish, backup_dish?, ai_reason, vibe_match_score:1-10, caveat?, is_cash_only, is_new_opening}
-
-AI_REASON RULES:
-- 2 sentences with review quotes. NEVER include ratings/review counts/walk time (shown in UI).
-- BAD: "4.6★ with 340 reviews" | GOOD: "Reviewers call it 'absolute favorite' with 'insanely delicious' dishes"
+OUTPUT FORMAT (JSON array of 3):
+[{
+  "place_id": "id",
+  "recommended_dish": "specific local dish name",
+  "backup_dish": "alternative dish (optional)",
+  "ai_reason": "2 sentences with review quotes, NO ratings/counts/walk time",
+  "vibe_match_score": 1-10,
+  "caveat": "brief warning if any (optional)",
+  "is_cash_only": boolean,
+  "is_new_opening": boolean
+}]
 
 CRITICAL:
-- Specific request (schnitzel/ramen/etc) → ALL 3 must serve that item
-- General vibe → offer variety across cuisines
-- NEVER duplicate place_id. Return 1-2 if can't find 3 quality matches.`;
+- ${request !== 'none' ? `User wants "${request}" - ALL 3 must match this` : 'Offer variety across cuisines'}
+- Recommend dishes that locals in ${location} actually order
+- Never duplicate place_id`;
 
-  const prompt = `Analyze these ${payload.length} restaurants and select exactly 3 best matches:
+  // === USER PROMPT ===
+  const prompt = `Analyze these ${candidateCount} restaurants in ${location} and select exactly 3 best matches for "${mood}":
 
 ${JSON.stringify(payload, null, 2)}
 
-Return a JSON array with exactly 3 recommendations.`;
+Return JSON array with exactly 3 recommendations.`;
 
   try {
     onLog?.(`RANKING TOP CANDIDATES...`);

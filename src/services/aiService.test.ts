@@ -558,7 +558,7 @@ describe('decideLunch', () => {
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.config.systemInstruction).toContain('FRESH DROPS');
+    expect(callBody.config.systemInstruction).toContain('Fresh drops only');
   });
 
   it('handles popularOnly filter flag', async () => {
@@ -581,7 +581,7 @@ describe('decideLunch', () => {
     );
 
     const callBody = mockInvoke.mock.calls[0][1].body;
-    expect(callBody.config.systemInstruction).toContain('TRENDING');
+    expect(callBody.config.systemInstruction).toContain('Trending spots');
   });
 
   it('returns empty array when no candidates provided', async () => {

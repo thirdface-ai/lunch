@@ -74,6 +74,52 @@ export const detectCuisineIntent = (query: string): CuisineIntent => {
 };
 
 /**
+ * Get today's day name in English
+ * IMPORTANT: Google Places API ALWAYS returns English day names in weekdayDescriptions,
+ * regardless of the user's locale. We must use English day names for matching.
+ */
+const getTodayName = (): string => {
+  const englishDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return englishDays[new Date().getDay()];
+};
+
+/**
+ * Check if a place is closed for the entire day today
+ * Returns true if the place is explicitly closed today (not just currently closed)
+ */
+export const isClosedToday = (place: GooglePlace): boolean => {
+  // If no opening hours data, assume open (benefit of the doubt)
+  if (!place.opening_hours?.weekday_text || place.opening_hours.weekday_text.length === 0) {
+    return false;
+  }
+  
+  const todayName = getTodayName();
+  
+  // Find today's entry in weekday_text
+  const todayEntry = place.opening_hours.weekday_text.find(
+    text => text.toLowerCase().startsWith(todayName.toLowerCase())
+  );
+  
+  if (!todayEntry) return false; // Can't find today, assume open
+  
+  // Extract hours part (after the colon)
+  const colonIndex = todayEntry.indexOf(':');
+  if (colonIndex === -1) return false;
+  
+  const hoursStr = todayEntry.substring(colonIndex + 1).trim().toLowerCase();
+  
+  // Check if explicitly closed
+  return hoursStr === 'closed';
+};
+
+/**
+ * Filter out places that are closed for the entire day today
+ */
+export const filterOutClosedToday = (places: GooglePlace[]): GooglePlace[] => {
+  return places.filter(place => !isClosedToday(place));
+};
+
+/**
  * Parse time string like "11:00 AM", "2:30 PM", "14:00" into minutes since midnight
  */
 const parseTimeToMinutes = (timeStr: string): number | null => {
@@ -129,9 +175,9 @@ const parseTodaysHours = (todaysHours: string): { openMinutes: number; closeMinu
 const getTodaysHoursString = (weekdayText: string[] | undefined): string | null => {
   if (!weekdayText || weekdayText.length === 0) return null;
   
-  // Get today's day name in the browser's locale (to match Google's format)
-  const browserLocale = typeof navigator !== 'undefined' ? navigator.language : 'en-US';
-  const todayName = new Date().toLocaleDateString(browserLocale, { weekday: 'long' });
+  // Get today's day name in English
+  // IMPORTANT: Google Places API ALWAYS returns English day names, regardless of locale
+  const todayName = getTodayName();
   
   // Find today's entry
   const todayEntry = weekdayText.find(
