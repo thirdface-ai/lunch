@@ -117,6 +117,14 @@ export const useDistanceMatrix = () => {
 
       if (useRoutesApi && RouteMatrix) {
         // Use new Routes API (RouteMatrix.computeRouteMatrix)
+        // Convert google.maps.TravelMode enum to string for Routes API
+        // Valid values: DRIVING, WALKING, BICYCLING, TRANSIT
+        const travelModeString = travelMode === google.maps.TravelMode.WALKING ? 'WALKING' 
+          : travelMode === google.maps.TravelMode.DRIVING ? 'DRIVING'
+          : travelMode === google.maps.TravelMode.BICYCLING ? 'BICYCLING'
+          : travelMode === google.maps.TravelMode.TRANSIT ? 'TRANSIT'
+          : 'WALKING'; // Default to WALKING
+        
         const batchPromises = batches.map(async (batch) => {
           try {
             // Build destinations array with location coordinates
@@ -130,12 +138,11 @@ export const useDistanceMatrix = () => {
             });
 
             // Create the RouteMatrix request
-            // fields array is required - specifies which fields to return in the response
-            // travelMode uses google.maps.TravelMode enum (WALKING, DRIVING, etc.)
+            // Routes API uses string travel modes: DRIVE, WALK, BICYCLE, TRANSIT, TWO_WHEELER
             const request = {
               origins: [{ location: { lat: origin.lat, lng: origin.lng } }],
               destinations,
-              travelMode: travelMode,
+              travelMode: travelModeString,
               fields: ['durationMillis', 'distanceMeters', 'condition'],
             };
 
@@ -153,24 +160,62 @@ export const useDistanceMatrix = () => {
               timeoutPromise
             ]);
 
-            if (!response || !response.matrix) {
+            if (!response) {
+              Logger.info('SYSTEM', 'Routes API returned null/undefined (likely timeout)');
               failedCount += batch.length;
               return;
             }
 
-            // Process response - Routes API returns matrix.rows[originIndex].items[destIndex]
-            // For 1 origin x N destinations, we access matrix.rows[0].items
-            const items = response.matrix.rows?.[0]?.items;
+            // Log response structure for debugging
+            Logger.info('SYSTEM', 'Routes API response received', {
+              hasMatrix: !!response.matrix,
+              responseKeys: Object.keys(response),
+            });
+
+            // The response structure may vary - handle both formats
+            // Format 1: response.matrix.rows[0].items (nested)
+            // Format 2: response directly contains the array of results
+            let items;
+            if (response.matrix?.rows?.[0]?.items) {
+              items = response.matrix.rows[0].items;
+            } else if (Array.isArray(response)) {
+              // Response might be a flat array of route elements
+              items = response;
+            } else if (response.rows?.[0]?.items) {
+              items = response.rows[0].items;
+            }
+            
             if (!items) {
+              Logger.info('SYSTEM', 'Routes API response has unexpected structure', {
+                response: JSON.stringify(response).slice(0, 500)
+              });
               failedCount += batch.length;
               return;
             }
 
             batch.forEach((place, idx) => {
               const element = items[idx];
-              if (element && element.condition === 'ROUTE_EXISTS' && element.durationMillis != null) {
+              // Check for valid route - condition may be 'ROUTE_EXISTS' or route might just have duration
+              const hasValidRoute = element && (
+                element.condition === 'ROUTE_EXISTS' || 
+                element.durationMillis != null ||
+                element.duration != null
+              );
+              
+              if (hasValidRoute) {
                 // Routes API returns durationMillis in milliseconds, convert to seconds
-                const durationSeconds = Math.round(element.durationMillis / 1000);
+                // Some responses may use 'duration' object with 'seconds' field instead
+                let durationSeconds: number;
+                if (element.durationMillis != null) {
+                  durationSeconds = Math.round(element.durationMillis / 1000);
+                } else if (element.duration?.seconds != null) {
+                  durationSeconds = element.duration.seconds;
+                } else if (typeof element.duration === 'number') {
+                  durationSeconds = element.duration;
+                } else {
+                  failedCount++;
+                  return;
+                }
                 
                 const distance = {
                   text: formatDuration(durationSeconds),
@@ -179,6 +224,12 @@ export const useDistanceMatrix = () => {
                 durations.set(place.place_id, distance);
                 newlyFetchedDistances.set(place.place_id, distance);
               } else {
+                if (element) {
+                  Logger.info('SYSTEM', 'Routes API element has no route', {
+                    condition: element.condition,
+                    elementKeys: Object.keys(element)
+                  });
+                }
                 failedCount++;
               }
             });

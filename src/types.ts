@@ -10,7 +10,8 @@ export enum AppState {
 // Transport Mode
 export enum TransportMode {
   WALK = 'WALK',
-  DELIVERY = 'DELIVERY'
+  DRIVE = 'DRIVE',
+  TRANSIT = 'TRANSIT'
 }
 
 // Theme Mode

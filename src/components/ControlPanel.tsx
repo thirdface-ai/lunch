@@ -581,26 +581,94 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     </div>
                 </div>
 
-                {/* Bottom: Proximity Range (aligns with custom input) */}
+                {/* Bottom: Travel Mode + Proximity Range (aligns with custom input) */}
                 <div className="mt-4 sm:mt-0">
-                    <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Proximity Range</label>
-                    <div className={`flex h-14 sm:h-14 rounded-sm border p-1 gap-1 ${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'}`} role="radiogroup" aria-label="Walk Limit">
-                        {Object.values(WalkLimit).map((limit) => (
+                    <label className={`block font-mono text-[10px] sm:text-[9px] font-bold uppercase tracking-widest mb-3 sm:mb-4 ${isDark ? darkMuted : lightMuted}`}>Travel Mode & Range</label>
+                    <div className={`rounded-sm border p-1 ${isDark ? 'bg-dark-surface border-dark-border' : 'bg-[#E5E5E0] border-braun-border'}`}>
+                        {/* Travel Mode Icons */}
+                        <div className="flex gap-1 mb-1" role="radiogroup" aria-label="Travel Mode">
+                            {/* Walk */}
                             <button
-                                key={limit}
                                 role="radio"
-                                aria-checked={preferences.walkLimit === limit}
-                                onClick={() => { Sounds.lightClick(); setPreferences(prev => ({ ...prev, walkLimit: limit })); }}
-                                className={`flex-1 flex flex-col items-center justify-center rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30
-                                    ${preferences.walkLimit === limit 
+                                aria-checked={preferences.mode === TransportMode.WALK}
+                                aria-label="Walk"
+                                onClick={() => { Sounds.lightClick(); setPreferences(prev => ({ ...prev, mode: TransportMode.WALK })); }}
+                                className={`flex-1 flex items-center justify-center h-10 rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30 transition-all
+                                    ${preferences.mode === TransportMode.WALK 
                                         ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md` 
                                         : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
                                     }
                                 `}
                             >
-                                <span className="font-mono text-[11px] sm:text-[10px] font-bold uppercase tracking-wide">{limit}</span>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="5" r="2"/>
+                                    <path d="M10 22l3-9-2-1v-4l-3 3"/>
+                                    <path d="M14 13l2 9"/>
+                                    <path d="M7 10l-2 8"/>
+                                </svg>
                             </button>
-                        ))}
+                            {/* Drive */}
+                            <button
+                                role="radio"
+                                aria-checked={preferences.mode === TransportMode.DRIVE}
+                                aria-label="Drive"
+                                onClick={() => { Sounds.lightClick(); setPreferences(prev => ({ ...prev, mode: TransportMode.DRIVE })); }}
+                                className={`flex-1 flex items-center justify-center h-10 rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30 transition-all
+                                    ${preferences.mode === TransportMode.DRIVE 
+                                        ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md` 
+                                        : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
+                                    }
+                                `}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M5 17h14v-5l-2-4H7l-2 4v5z"/>
+                                    <circle cx="7.5" cy="17.5" r="1.5"/>
+                                    <circle cx="16.5" cy="17.5" r="1.5"/>
+                                    <path d="M5 12h14"/>
+                                </svg>
+                            </button>
+                            {/* Transit */}
+                            <button
+                                role="radio"
+                                aria-checked={preferences.mode === TransportMode.TRANSIT}
+                                aria-label="Public Transit"
+                                onClick={() => { Sounds.lightClick(); setPreferences(prev => ({ ...prev, mode: TransportMode.TRANSIT })); }}
+                                className={`flex-1 flex items-center justify-center h-10 rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30 transition-all
+                                    ${preferences.mode === TransportMode.TRANSIT 
+                                        ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md` 
+                                        : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
+                                    }
+                                `}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="4" y="3" width="16" height="14" rx="2"/>
+                                    <path d="M4 10h16"/>
+                                    <circle cx="8" cy="20" r="1"/>
+                                    <circle cx="16" cy="20" r="1"/>
+                                    <path d="M8 17v3"/>
+                                    <path d="M16 17v3"/>
+                                </svg>
+                            </button>
+                        </div>
+                        {/* Time Range */}
+                        <div className="flex gap-1" role="radiogroup" aria-label="Time Limit">
+                            {Object.values(WalkLimit).map((limit) => (
+                                <button
+                                    key={limit}
+                                    role="radio"
+                                    aria-checked={preferences.walkLimit === limit}
+                                    onClick={() => { Sounds.lightClick(); setPreferences(prev => ({ ...prev, walkLimit: limit })); }}
+                                    className={`flex-1 flex flex-col items-center justify-center h-10 rounded-[1px] btn-toggle outline-none focus:ring-1 focus:ring-white/30 transition-all
+                                        ${preferences.walkLimit === limit 
+                                            ? `${isDark ? 'bg-dark-text text-dark-bg' : 'bg-braun-dark text-white'} shadow-md` 
+                                            : `${isDark ? 'text-dark-text-muted hover:bg-white/10 hover:text-white' : 'text-braun-text-muted hover:bg-white/50 hover:text-braun-dark'}`
+                                        }
+                                    `}
+                                >
+                                    <span className="font-mono text-[11px] sm:text-[10px] font-bold uppercase tracking-wide">{limit}</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>

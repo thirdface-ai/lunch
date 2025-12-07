@@ -1,6 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FinalResult, ThemeMode } from '../types';
 
+// Pin SVG for user location marker
+const createUserPinSvg = (isDark: boolean): string => {
+  const color = isDark ? '#FFFFFF' : '#111111';
+  return `<svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="10" cy="10" r="8" fill="${color}" stroke="${color}" stroke-width="2"/>
+  </svg>`;
+};
+
+// Pin SVG for result markers with number label
+const createResultPinSvg = (number: number): string => {
+  return `<svg width="32" height="40" viewBox="0 0 32 40" xmlns="http://www.w3.org/2000/svg">
+    <path d="M16 0C9.37 0 4 5.37 4 12c0 9 12 28 12 28s12-19 12-28c0-6.63-5.37-12-12-12z" fill="#FF4400" stroke="#CC3300" stroke-width="1"/>
+    <text x="16" y="16" text-anchor="middle" fill="white" font-size="12" font-weight="bold" font-family="Arial, sans-serif">${number}</text>
+  </svg>`;
+};
+
 // Dark mode styles for Google Maps
 const DARK_MAP_STYLES: google.maps.MapTypeStyle[] = [
   { elementType: 'geometry', stylers: [{ color: '#1a1a1a' }] },
@@ -34,7 +50,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [apiStatus, setApiStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
 
   const isDark = theme === ThemeMode.DARK;
 
@@ -46,12 +62,16 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
     const initMap = async () => {
       try {
         const { Map } = await google.maps.importLibrary('maps') as google.maps.MapsLibrary;
+        // Also import marker library for AdvancedMarkerElement
+        await google.maps.importLibrary('marker');
+        
         if (isMounted && mapRef.current) {
           const mapInstance = new Map(mapRef.current, {
             center: { lat: userLat || 0, lng: userLng || 0 },
             zoom: 14,
             disableDefaultUI: true,
             styles: isDark ? DARK_MAP_STYLES : undefined,
+            mapId: 'lunch-map', // Required for AdvancedMarkerElement
           });
           setMap(mapInstance);
           setApiStatus('loaded');
@@ -80,23 +100,22 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
 
     const updateMap = async () => {
       // Clear any existing markers
-      markersRef.current.forEach(marker => marker.setMap(null));
+      markersRef.current.forEach(marker => marker.map = null);
       markersRef.current = [];
 
+      // Get AdvancedMarkerElement class
+      const { AdvancedMarkerElement } = await google.maps.importLibrary('marker') as google.maps.MarkerLibrary;
+
       // Create user location marker (black/white dot)
-      const userMarker = new google.maps.Marker({
+      const userPinElement = document.createElement('div');
+      userPinElement.innerHTML = createUserPinSvg(isDark);
+      
+      const userMarker = new AdvancedMarkerElement({
         map,
         position: { lat: userLat, lng: userLng },
         title: 'Your Location',
         zIndex: 1,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 8,
-          fillColor: isDark ? '#FFFFFF' : '#111111',
-          fillOpacity: 1,
-          strokeColor: isDark ? '#FFFFFF' : '#111111',
-          strokeWeight: 2,
-        },
+        content: userPinElement,
       });
       markersRef.current.push(userMarker);
 
@@ -104,27 +123,16 @@ const MapComponent: React.FC<MapComponentProps> = ({ userLat, userLng, results, 
       results.forEach((res, idx) => {
         if (!res.geometry?.location) return;
 
-        const marker = new google.maps.Marker({
+        const pinElement = document.createElement('div');
+        pinElement.innerHTML = createResultPinSvg(idx + 1);
+        pinElement.style.cursor = 'pointer';
+        
+        const marker = new AdvancedMarkerElement({
           map,
           position: res.geometry.location,
           title: `${idx + 1}. ${res.name}`,
           zIndex: 10 + idx,
-          label: {
-            text: (idx + 1).toString(),
-            color: '#FFFFFF',
-            fontWeight: 'bold',
-            fontSize: '12px',
-          },
-          icon: {
-            path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-            fillColor: '#FF4400',
-            fillOpacity: 1,
-            strokeColor: '#CC3300',
-            strokeWeight: 1,
-            scale: 1.8,
-            anchor: new google.maps.Point(12, 22),
-            labelOrigin: new google.maps.Point(12, 9),
-          },
+          content: pinElement,
         });
         
         marker.addListener('click', () => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppState, FinalResult, ThemeMode } from '../types';
+import { AppState, FinalResult, ThemeMode, TransportMode } from '../types';
 import MapComponent from './MapComponent';
 import Sounds from '../utils/sounds';
 
@@ -149,6 +149,7 @@ interface ResultsViewProps {
   userLng: number | null;
   onReset: () => void;
   theme: ThemeMode;
+  transportMode: TransportMode;
 }
 
 /**
@@ -208,9 +209,14 @@ const ResultsView: React.FC<ResultsViewProps> = ({
   userLat,
   userLng,
   onReset,
-  theme
+  theme,
+  transportMode
 }) => {
   const isDark = theme === ThemeMode.DARK;
+  
+  // Get travel mode label for display
+  const travelModeLabel = transportMode === TransportMode.DRIVE ? 'DRIVE' 
+    : transportMode === TransportMode.TRANSIT ? 'TRANSIT' : 'WALK';
   
   // Generate title once per results set using useMemo
   const funnyTitle = React.useMemo(() => generateFunnyTitle(results), [results]);
@@ -311,7 +317,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({
                               : (place.price_level === 0 ? 'Free' : '$$')}</span>
                           </span>
                           <span className="inline-flex items-center gap-2">
-                            <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>WALK:</span>
+                            <span className={`${isDark ? 'text-dark-text' : 'text-braun-dark'} font-bold`}>{travelModeLabel}:</span>
                             <span>{place.walking_time_text || 'N/A'}</span>
                           </span>
                           <span className="inline-flex items-center gap-2">

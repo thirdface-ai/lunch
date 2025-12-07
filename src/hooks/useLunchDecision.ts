@@ -16,6 +16,7 @@ import {
   AppState,
   UserPreferences,
   FinalResult,
+  TransportMode,
 } from '../types';
 
 // Check if we're in mock mode (localhost without Google Maps loaded)
@@ -212,11 +213,13 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
     await delay(500);
     setProgress(45);
 
-    addLog('CALCULATING WALKING DISTANCES...');
+    const mockModeLabel = preferences.mode === TransportMode.DRIVE ? 'DRIVING' 
+      : preferences.mode === TransportMode.TRANSIT ? 'TRANSIT' : 'WALKING';
+    addLog(`CALCULATING ${mockModeLabel} DISTANCES...`);
     await delay(700);
     setProgress(55);
 
-    addLog(`23 PLACES WITHIN ${preferences.walkLimit} WALK...`);
+    addLog(`23 PLACES WITHIN ${preferences.walkLimit}...`);
     await delay(600);
     setProgress(65);
 
@@ -322,12 +325,22 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
       const candidatePool = shuffleArray([...places]).slice(0, 30);
       setProgress(35);
 
+      // Convert TransportMode to google.maps.TravelMode
+      const travelMode = preferences.mode === TransportMode.DRIVE 
+        ? google.maps.TravelMode.DRIVING
+        : preferences.mode === TransportMode.TRANSIT
+        ? google.maps.TravelMode.TRANSIT
+        : google.maps.TravelMode.WALKING;
+      
       const { durations } = await calculateDistances({
         origin: { lat: preferences.lat, lng: preferences.lng },
         places: candidatePool,
+        travelMode,
       });
 
-      addLog('CALCULATING WALKING DISTANCES...');
+      const modeLabel = preferences.mode === TransportMode.DRIVE ? 'DRIVING' 
+        : preferences.mode === TransportMode.TRANSIT ? 'TRANSIT' : 'WALKING';
+      addLog(`CALCULATING ${modeLabel} DISTANCES...`);
       setProgress(45);
 
       // Filter and score candidates
@@ -347,7 +360,7 @@ export const useLunchDecision = (): UseLunchDecisionReturn => {
         if (status === 'open' || status === 'opens_soon') openCount++;
       });
       
-      addLog(`${candidatesWithinRange.length} PLACES WITHIN ${preferences.walkLimit} WALK...`);
+      addLog(`${candidatesWithinRange.length} PLACES WITHIN ${preferences.walkLimit}...`);
       setProgress(55);
 
       if (candidatesWithinRange.length === 0) {

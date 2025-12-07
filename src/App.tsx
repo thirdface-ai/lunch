@@ -81,6 +81,7 @@ const AppContent: React.FC = () => {
           userLng={preferences.lng}
           onReset={reset}
           theme={effectiveTheme === 'dark' ? ThemeMode.DARK : ThemeMode.LIGHT}
+          transportMode={preferences.mode}
         />
       </div>
 
